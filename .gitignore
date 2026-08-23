@@ -1,0 +1,54 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# local env files
+.env
+
+# sandbox-specific tooling caches (do not commit)
+# Expo CLI home redirect (__UNSAFE_EXPO_HOME_DIRECTORY)
+.expo-home/
+# EAS CLI config redirect (XDG_CONFIG_HOME)
+.eas-config/
+# Claude Code local settings (project guidance lives in CLAUDE.md/AGENTS.md)
+.claude/
+# local eas-cli install (workaround for global npm cache EACCES)
+eas-tool/

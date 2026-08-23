@@ -1,0 +1,22 @@
+# 依赖由 EAS 云端自行安装，本地 node_modules 不上传（1.1G，上传会超时）
+node_modules/
+
+# Expo 本地缓存与构建产物
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# 本地环境变量（构建时用 EAS 环境变量或云端 env 注入）
+.env
+.env*.local
+
+# 原生生成目录
+/ios
+/android
+
+# 杂项
+*.log
+.DS_Store
+*.tsbuildinfo
+.metro-health-check*

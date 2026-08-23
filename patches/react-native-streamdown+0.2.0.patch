@@ -1,0 +1,39 @@
+diff --git a/node_modules/react-native-streamdown/lib/module/worklets/remendWorklet.js b/node_modules/react-native-streamdown/lib/module/worklets/remendWorklet.js
+index 11691d9..2117020 100644
+--- a/node_modules/react-native-streamdown/lib/module/worklets/remendWorklet.js
++++ b/node_modules/react-native-streamdown/lib/module/worklets/remendWorklet.js
+@@ -1,6 +1,5 @@
+ "use strict";
+ 
+-import { createWorkletRuntime, scheduleOnRuntime, scheduleOnRN } from 'react-native-worklets';
+ import remend from 'remend';
+ const defaultRemendConfig = {
+   bold: true,
+@@ -14,17 +13,18 @@
+   katex: false,
+   setextHeadings: true
+ };
+-const remendRuntime = createWorkletRuntime('remend-processor');
+ export function processRemendInWorklet(markdown, onComplete, config) {
+   const mergedConfig = config ? {
+     ...defaultRemendConfig,
+     ...config
+   } : defaultRemendConfig;
+-  scheduleOnRuntime(remendRuntime, () => {
+-    'worklet';
+-
+-    const result = remend(markdown, mergedConfig);
+-    scheduleOnRN(onComplete, result);
+-  });
++  // PATCHED (wikipali-mobile): react-native-streamdown@0.2.0's Bundle Mode
++  // worklet is incompatible with react-native-worklets@0.10.x (Expo SDK 57),
++  // which removed the `workletizableModules` Babel option. Without it `remend`
++  // becomes a Remote Function and calling it synchronously inside the worklet
++  // throws "[Worklets] Tried to synchronously call a Remote Function".
++  // Fix: run remend on the JS thread directly (remend is pure JS).
++  const result = remend(markdown, mergedConfig);
++  onComplete(result);
+ }
+-//# sourceMappingURL=remendWorklet.js.map
+\ No newline at end of file
++//# sourceMappingURL=remendWorklet.js.map
