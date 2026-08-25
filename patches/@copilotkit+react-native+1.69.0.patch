@@ -1,0 +1,13 @@
+diff --git a/node_modules/@copilotkit/react-native/dist/streaming-fetch-BnQh3vBz.mjs b/node_modules/@copilotkit/react-native/dist/streaming-fetch-BnQh3vBz.mjs
+index 51f19f91a590854b00b785cfbbc322ecf66cc18c..5d8e4579953471b0d891186de0753b1278b0df84 100644
+--- a/node_modules/@copilotkit/react-native/dist/streaming-fetch-BnQh3vBz.mjs
++++ b/node_modules/@copilotkit/react-native/dist/streaming-fetch-BnQh3vBz.mjs
+@@ -28,7 +28,7 @@
+ 			}
+ 			const xhr = new XMLHttpRequest();
+ 			xhr.open(method, url);
+-			xhr.timeout = 6e4;
++			xhr.timeout = 600000;
+ 			let headerEntries;
+ 			if (headers instanceof Headers) headerEntries = Array.from(headers.entries());
+ 			else if (Array.isArray(headers)) headerEntries = headers;

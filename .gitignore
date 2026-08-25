@@ -46,6 +46,8 @@ yarn-error.*
 # sandbox-specific tooling caches (do not commit)
 # Expo CLI home redirect (__UNSAFE_EXPO_HOME_DIRECTORY)
 .expo-home/
+# npm cache redirect (npm_config_cache)
+.npm-cache/
 # EAS CLI config redirect (XDG_CONFIG_HOME)
 .eas-config/
 # Claude Code local settings (project guidance lives in CLAUDE.md/AGENTS.md)

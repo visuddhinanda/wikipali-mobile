@@ -7,6 +7,12 @@ dist/
 web-build/
 expo-env.d.ts
 
+# 沙箱本地缓存 / 工具（不上传）
+.npm-cache/
+.expo-home/
+.eas-config/
+eas-tool/
+
 # 本地环境变量（构建时用 EAS 环境变量或云端 env 注入）
 .env
 .env*.local
