@@ -1,0 +1,404 @@
+import React, { useEffect, useRef } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { useHeaderHeight } from "@react-navigation/elements";
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
+import {
+  CopilotChat,
+  useCopilotChatContext,
+  useRenderTool,
+  useRenderToolCall,
+} from "@copilotkit/react-native";
+import { StreamdownText } from "react-native-streamdown";
+import { z } from "zod";
+import { colors, radius, spacing, type } from "../theme";
+import type { RootStackParamList } from "../navigation/types";
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+/**
+ * 从 wikipali 阅读器链接解析 book/paragraph/channel。
+ * 例：`…/library/tipitaka/188-459/read?channel=translation`
+ *   - `channel=translation`：特殊标记，表示「列出该章节全部版本」
+ *   - `channel=<uuid>`：具体频道 id，直接按该版本请求经文
+ */
+function parsePassage(url: string): {
+  book: number;
+  paragraph: number;
+  channel?: string;
+} | null {
+  const m = url.match(/\/library\/tipitaka\/(\d+)-(\d+)(?:\/|$)/);
+  if (!m) return null;
+
+  const raw = /[?&]channel=([^&#]+)/.exec(url)?.[1];
+  let channel: string | undefined;
+  if (raw) {
+    try {
+      channel = decodeURIComponent(raw);
+    } catch {
+      channel = raw;
+    }
+  }
+
+  return { book: Number(m[1]), paragraph: Number(m[2]), channel };
+}
+
+/** 工具名 → 中文标签。 */
+const TOOL_LABELS: Record<string, string> = {
+  wikipali_forms: "展开词形",
+  wikipali_search: "检索经文",
+  wikipali_get: "取经文原文",
+  wikipali_dist: "统计出处分布",
+  wikipali_word: "查词典",
+  wikipali_count: "词频统计",
+  wikipali_terms: "查术语",
+  wikipali_books: "分类目录",
+  wikipali_toc: "章节目录",
+  wikipali_paras: "段落清单",
+  wikipali_chapter: "章节体量",
+  wikipali_chapter_fetch: "整章取文",
+  wikipali_versions: "查译本",
+  wikipali_related: "关联段落",
+  wikipali_articles: "文章列表",
+  wikipali_article: "读文章",
+  wikipali_anthology: "文集",
+};
+
+/** 引用链接的 tag 样式（按 URL 模式匹配 wikipali 阅读器链接）。 */
+const markdownStyle = {
+  link: {
+    color: colors.vermilion,
+    underline: false as const,
+  },
+  linkVariants: {
+    "\\/library\\/tipitaka\\/": {
+      color: "#6b7280", // 灰色字
+      underline: false as const,
+      backgroundColor: "#e5e7eb", // 淡灰底色（胶囊 tag）
+    },
+  },
+};
+
+function ToolCallBubble(props: any) {
+  const { name, status } = props;
+  const running = String(status) !== "complete";
+  const label = TOOL_LABELS[name] ?? name;
+  return (
+    <View style={styles.toolBubble}>
+      {running ? (
+        <ActivityIndicator size="small" color={colors.ochre} />
+      ) : (
+        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+      )}
+      <Text style={styles.toolBubbleText}>
+        {label} {running ? "进行中…" : "完成"}
+      </Text>
+    </View>
+  );
+}
+
+function ChatUI({ seedText }: { seedText?: string }) {
+  const navigation = useNavigation<Nav>();
+  const { agent, messages, isRunning, submitMessage } = useCopilotChatContext();
+  const renderToolCall = useRenderToolCall();
+  const [input, setInput] = React.useState("");
+  const listRef = useRef<FlatList>(null);
+  const headerHeight = useHeaderHeight();
+
+  // 「就此段落提问」带来的预置追问：进入对话后自动提交一次。
+  // 用 ref 取最新 submitMessage，依赖只放 seedText，避免 submitMessage 引用
+  // 每帧变化导致 effect 反复触发（"Maximum update depth exceeded"）。
+  const submitMessageRef = useRef(submitMessage);
+  submitMessageRef.current = submitMessage;
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seedText && !seededRef.current) {
+      seededRef.current = true;
+      submitMessageRef.current(seedText);
+    }
+  }, [seedText]);
+
+  // 「思考中」指示：AI 在跑、但当前既没在流式输出正文、也没在跑工具（查资料）时显示。
+  const lastMsg: any =
+    messages && messages.length > 0 ? messages[messages.length - 1] : null;
+  const assistantStreaming = lastMsg?.role === "assistant" && !!lastMsg.content;
+  const runningTool =
+    lastMsg?.role === "assistant"
+      ? (lastMsg.toolCalls ?? []).find(
+          (tc: any) => String(tc.status) !== "complete",
+        )
+      : null;
+  const showThinking = isRunning && !assistantStreaming && !runningTool;
+
+  useRenderTool(
+    {
+      name: "*",
+      description: "显示工具调用状态",
+      parameters: z.object({}),
+      render: ToolCallBubble,
+    },
+    [],
+  );
+
+  const handleLinkPress = (event: { url: string }) => {
+    const parsed = parsePassage(event.url);
+    if (!parsed) return;
+    const title = `${parsed.book}-${parsed.paragraph}`;
+
+    // channel=translation：先查询该章节全部版本，列出让用户选择后再读经文；
+    // channel=<uuid>：直接按该版本请求经文；无 channel：走旧 chapter-content 接口。
+    if (parsed.channel === "translation") {
+      navigation.navigate("BookChannels", {
+        book: parsed.book,
+        paragraph: parsed.paragraph,
+        title,
+      });
+      return;
+    }
+
+    navigation.navigate("Reader", {
+      book: parsed.book,
+      paragraph: parsed.paragraph,
+      title,
+      channelId: parsed.channel,
+    });
+  };
+
+  const send = () => {
+    const text = input.trim();
+    if (!text || isRunning) return;
+    setInput("");
+    submitMessage(text);
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
+    if (item.role === "user") {
+      return (
+        <View style={styles.userRow}>
+          <View style={styles.userBubble}>
+            <Text style={styles.userText}>{item.content}</Text>
+          </View>
+        </View>
+      );
+    }
+    if (item.role === "assistant") {
+      return (
+        <View style={styles.assistantRow}>
+          {(item.toolCalls ?? []).map((tc: any) => {
+            const toolMessage = (messages ?? []).find(
+              (m: any) => m.role === "tool" && m.toolCallId === tc.id,
+            );
+            return renderToolCall({ toolCall: tc, toolMessage });
+          })}
+          {item.content ? (
+            <View style={styles.assistantBubble}>
+              <StreamdownText
+                markdown={item.content}
+                flavor="github"
+                streamingAnimation
+                onLinkPress={handleLinkPress}
+                markdownStyle={markdownStyle}
+              />
+            </View>
+          ) : null}
+        </View>
+      );
+    }
+    // tool 结果消息不单独渲染（已并入 tool call 气泡）
+    return null;
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={headerHeight}
+    >
+      <FlatList
+        ref={listRef}
+        data={messages ?? []}
+        keyExtractor={(m: any) => m.id}
+        renderItem={renderItem}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        contentContainerStyle={styles.listContent}
+        style={styles.list}
+        ListFooterComponent={
+          showThinking ? (
+            <View style={styles.thinkingBubble}>
+              <ActivityIndicator size="small" color={colors.vermilion} />
+              <Text style={styles.thinkingText}>思考中…</Text>
+            </View>
+          ) : null
+        }
+      />
+      <View style={styles.inputBar}>
+        <TextInput
+          style={styles.input}
+          value={input}
+          onChangeText={setInput}
+          placeholder="继续追问…"
+          placeholderTextColor={colors.inkFaint}
+          multiline
+          onSubmitEditing={send}
+        />
+        {isRunning ? (
+          <Pressable style={styles.stopBtn} onPress={() => agent?.stop?.()}>
+            <View style={styles.stopSquare} />
+          </Pressable>
+        ) : (
+          <Pressable style={styles.sendBtn} onPress={send}>
+            <Text style={styles.sendIcon}>↑</Text>
+          </Pressable>
+        )}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+export function NewChatScreen({
+  route,
+}: NativeStackScreenProps<RootStackParamList, "NewChat">) {
+  const seedText = route.params?.seedText;
+  return (
+    <CopilotChat agentId="pali_agent">
+      <ChatUI seedText={seedText} />
+    </CopilotChat>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.paper,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  userRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  userBubble: {
+    maxWidth: "80%",
+    backgroundColor: colors.vermilion,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  userText: {
+    ...type.body,
+    color: colors.paperRaised,
+  },
+  assistantRow: {
+    alignItems: "flex-start",
+    gap: spacing.xs,
+  },
+  assistantBubble: {
+    maxWidth: "100%",
+    backgroundColor: colors.paperRaised,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  toolBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    alignSelf: "flex-start",
+    backgroundColor: colors.paperSunken,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  toolBubbleText: {
+    ...type.small,
+    color: colors.inkSoft,
+  },
+  thinkingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    alignSelf: "flex-start",
+    backgroundColor: colors.paperSunken,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  thinkingText: {
+    ...type.small,
+    color: colors.inkSoft,
+  },
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+    backgroundColor: colors.paperRaised,
+  },
+  input: {
+    flex: 1,
+    maxHeight: 120,
+    backgroundColor: colors.paperSunken,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...type.body,
+    color: colors.ink,
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.vermilion,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendIcon: {
+    color: colors.paperRaised,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  stopBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.inkSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stopSquare: {
+    width: 12,
+    height: 12,
+    backgroundColor: colors.paperRaised,
+    borderRadius: 2,
+  },
+});
