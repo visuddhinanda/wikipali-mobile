@@ -55,6 +55,7 @@ development build 的 APK **基本只装一次**：业务 JS/TS 代码不打包�
 - `metro.config.js` 有官方 jose 的 `node:buffer` 修复，勿删
 - Expo CLI/Metro 需写 `~/.expo`，在沙箱环境用 `__UNSAFE_EXPO_HOME_DIRECTORY=<工作区>/.expo-home` 重定向
 - EAS CLI 需写 `~/.config`，用 `XDG_CONFIG_HOME=<工作区>/.eas-config` 重定向
+- ⚠️ **Metro 文件监听会撞 inotify 上限**（本机无 watchman，Metro 用 Node `fs.watch` 逐目录监听，`node_modules` 有 8000+ 目录，`fs.watch` 约 3600 个就报 `ENOSPC: System limit for number of file watchers`）。症状：改 JS/TS 后**不触发重编译、设备拿到旧 bundle**（表现为「点了没反应」），或 `expo start --clear` 直接崩。**解决：用 `CI=1` 启动**（`CI=1 npx expo start --lan`）。注意：CI 模式关闭 Metro 监听，且 Metro 把文件地图**只在首次打包时构建一次并缓存**，所以**每次改代码后必须重启 `expo start` 才会生效**（重启后真机再手动 Reload 一次）；没有 Fast Refresh。`--clear` 可加可不加（CI 模式不再触发 `fs.watch`，`--clear` 不会崩，能确保全新构建）。
 
 ### 2.5 streamdown/worklets 版本冲突（已 patch-package 修复）
 
@@ -70,6 +71,20 @@ development build 的 APK **基本只装一次**：业务 JS/TS 代码不打包�
 - 不要删除 `patches/` 目录（已确认 `.gitignore` 未忽略）
 
 > 注意：这是绕过 worklets Bundle Mode，不是修复 worklets 本身。若以后升级 streamdown 到兼容 worklets 0.10.x 的版本，可移除该补丁并恢复官方 Bundle Mode 配置（`babel.config.js` + `metro.config.js` 的 Bundle Mode 设置）。
+
+### 2.6 CopilotKit 60s 超时导致「tool call 过程报 Network request failed」（已 patch-package 修复）
+
+**症状**：聊天时 tool call 能显示，但工具执行过程中报
+`TypeError: Network request failed`（伴随 `[CopilotKit] Error (agent_run_failed)`）。
+
+**根因**：`@copilotkit/react-native` 的 streaming-fetch polyfill（XHR 实现）写死 `xhr.timeout = 6e4`（60 秒）。RN Android 把 `xhr.timeout` 映射成 OkHttp 的 **`callTimeout`（整个请求的总时长上限，不是无数据间隔超时）**；而 agent 一次运行（DeepSeek 流式 + 多次 MCP 工具调用 next.wikipali.org）实测约 **70s+**，超过 60s 就被掐断。且 OkHttp `callTimeout` 抛的是 `InterruptedIOException`（不是 `SocketTimeoutException`），RN 的 `NetworkEventUtil` 只认 `SocketTimeoutException` 才置 `timeOutError=true`，于是被当成普通网络错误 → JS 侧走 `onerror` → 报「Network request failed」（而非「timed out」）。
+
+**修复**：patch 掉 `@copilotkit/react-native` 的 `dist/streaming-fetch-*.mjs`，把 `xhr.timeout = 6e4` 改为 `600000`（10 分钟）：
+
+- 补丁文件：`patches/@copilotkit+react-native+1.69.0.patch`
+- 该文件是 `dist/` 下带构建 hash 的文件名，升级 `@copilotkit/react-native` 后补丁可能因路径变化失效，需重新生成
+
+> 注意：backend（agent-poc，独立工作区 `/home/deploy/workspace/agent-poc`）一次 agent 运行约 70s 属正常（不是 bug）；runtime→backend 用 node fetch，默认 body/headers 超时 300s，当前够用。若以后问题更长，需同时排查 runtime 侧 undici 超时。
 
 ## 3. 当前文件状态
 
@@ -155,3 +170,99 @@ cd /home/deploy/workspace/wikipali-mobile
 - 本项目位于 `/home/deploy/workspace/wikipali-mobile`，若新会话的 workspace 就是这个目录，则无需特殊权限
 - 若 workspace 仍是 `agent-poc`，则写本目录（及 `.expo` 日志）需 `danger-full-access` 权限
 - backend/runtime/web 仍在 `/home/deploy/workspace/agent-poc/`（monorepo），未迁移
+
+## 9. P0（App 架构骨架）—— 2026-08-23 完成
+
+按 `DESIGN.md` 的 P0 落地：5 Tab 导航 + 米黄纸感主题 + 三藏目录树 → 章节列表 → 阅读器（WebView HTML）。
+
+### 9.1 目录结构
+
+```
+src/
+  theme/index.ts          米黄纸感主题（colors/spacing/type/serif/cardShadow）
+  catalog/                三藏目录树（仅 default.json 从 mint 复制）+ 类型 + 中文标签
+  api/                    client(config/env) + catalog(真实) + mock(回退) + index(门面)
+  navigation/             RootNavigator（根 Stack + 5 Tab）+ types
+  components/Screen.tsx   统一纸面容器
+  screens/                Discover / CategoryBrowse / ChapterList / Reader + Bookshelf/AiChat/Tools/Profile/NewChat
+```
+
+### 9.2 关键改动
+
+- **新增依赖（含原生代码 → 必须 EAS 重建 APK）**：`react-native-screens` 4.26、`react-native-safe-area-context` 5.7、`react-native-webview` 13.16、`@react-native-async-storage/async-storage` 2.2（纯 JS：`@react-navigation/*` 7、`@expo/vector-icons` 15）
+- **导航**：React Navigation v7（`@react-navigation/native` + `bottom-tabs` + `native-stack`），AI Chat 为中间凸起 Tab
+- **App.tsx**：`GestureHandlerRootView → SafeAreaProvider → CopilotKitProvider → RootNavigator`（CopilotKit 仍包住全树，`NewChat` 屏复用原 `CopilotChat`）
+- **数据源**：目录树 JSON 本地打包（离线可用）；书目/正文走 `src/api` 门面——后端地址 = `.env` 的 `EXPO_PUBLIC_API_URL`（测试覆盖）或「我 → 设置 → API 服务器」选择的域名（默认 `next.wikipali.org`）；请求失败回退 `mock.ts`（内置 8 篇知名经文 + Tufte sidenote 示例 HTML）
+- **阅读器**：`react-native-webview` 渲染，注入「纸面 + Tufte sidenote」CSS（宽屏右侧边注 / 窄屏行内折叠）
+- **设置**：`src/settings/server.ts` 用 AsyncStorage 持久化 API 服务器选择；「我 → 设置」提供 4 个域名选项（next.wikipali.cc / www.wikipali.cc / next.wikipali.org / www.wikipali.org）
+
+### 9.3 真机验证前必做
+
+1. **重建 development build**（新增了 4 个原生依赖，旧 APK 不含这些模块，直接 reload 会崩）
+2. 真机选后端：进「我 → 设置 → API 服务器」选域名（默认 `next.wikipali.org`）；`.env` 的 `EXPO_PUBLIC_API_URL` 仅开发测试用，会覆盖该选择
+3. `npx expo start`（需 `__UNSAFE_EXPO_HOME_DIRECTORY`、`npm_config_cache` 两个重定向，见下）
+
+### 9.4 沙箱下 Expo/npm 重定向（本会话已踩）
+
+```bash
+export __UNSAFE_EXPO_HOME_DIRECTORY="/home/deploy/workspace/wikipali-mobile/.expo-home"
+export npm_config_cache="/home/deploy/workspace/wikipali-mobile/.npm-cache"
+export EXPO_NO_TELEMETRY=1
+```
+
+### 9.5 已核实 / 待办
+
+- ✅ `tsc --noEmit` 通过；`npx expo export --platform android` 打包成功（2505 modules）
+- ⏭️ P1：阅读器增强（术语 drawer / 版本切换 / 长按选文本菜单）、书架三态、全局搜索；mint 阅读正文的真实 `chapter-content` 结构化拼装为 HTML（`src/api/catalog.ts` 里已留 best-effort 集成点）
+
+#### 阅读器升级计划（对应 `DESIGN.md` §3）
+
+> 现状核对（§3）：已完成 WebView HTML 渲染、顶栏返回+标题、sidenote CSS（含响应式断点）、单列阅读；**未完成**：顶栏设置（字号/主题/版本切换）、正文内版本切换、术语 drawer、就此段落提问、长按选文本菜单、横屏/桌面双列对照。
+
+**阶段 A —— 基础能力（不新增原生依赖，无需重建 APK）**
+
+- **A1 顶栏设置面板**：`ReaderScreen.tsx` 顶栏 settings 按钮（现 `onPress={() => undefined}`）接 `@gorhom/bottom-sheet` 设置面板。
+  - 字号：`buildReaderHtml` 的 CSS 增加 `:root { --base: 18px }` 并让正文 `font-size` 引用该变量；选项 15/18/21/24，通过重渲染 `html` 或 `injectedJavaScript` 改根字号；持久化到 AsyncStorage（新增 `src/settings/reader.ts`）。
+  - 主题：亮/暗切换。暗色在 `buildReaderHtml` 换 CSS 变量，RN 顶栏/面板配色同步（`src/theme/index.ts` 需补 dark palette，当前仅亮色）。
+  - 版本切换入口：见 A2。
+- **A2 阅读器内版本切换 Tab**：把「版本选择」从 `BookChannelsScreen` 前移进阅读器。`Reader` 路由参数增加可选 `channels?: ChapterChannel[]`、`activeChannelId?: string`（由 `BookChannelsScreen` 一次传入，避免重复请求）；顶栏下方渲染横向版本 Tab（自绘 `ScrollView + Pressable`，或引纯 JS 的 `react-native-tab-view`），切换时按 `channelId` 复用 `getChapterByChannel` 重载。
+- **A3 正文内容完善**：`src/api/catalog.ts` 的 `flattenReadHtml` 按 mint `makeContentObj` 真实结构核对，识别 sidenote / 段落号（`data-para`）/ 句（`data-sentence`），产出带 `.sidenote`、`data-*` 标记的 HTML（当前是 best-effort 递归拼接，未专门处理 sidenote）。
+
+**阶段 B —— 交互增强（术语 + 长按选文本）**
+
+- **B1 术语点击 drawer**：WebView 注入事件委托 JS，点击带 `data-term`/`data-word` 的节点 → `window.ReactNativeWebView.postMessage(...)`；RN 层 `onMessage` → 打开 `@gorhom/bottom-sheet`（手机底部 drawer / 平板居中 popover）。新增 `src/api/terms.ts`（`WbwLookup` / `Term` 接口，复用 `resolveBaseUrl` + `request`）与词条组件 `src/components/TermSheet.tsx`。前提：后端正文 HTML 需在术语节点带标识；若无，先做「长按选词查字典」兜底（见 B2）。
+- **B2 长按选文本菜单（查字典 / 提问）**：WebView 注入 `selectionchange` 监听 + 长按触发，把选中文本 `postMessage` 给 RN → RN 弹 action sheet / 自绘浮层。动作：「查字典」→ 选中词走 B1 的 `TermSheet`；「提问」→ 携带选中文本 + 当前段落 id 跳 `NewChat`（见 C1）。
+
+**阶段 C —— 段落提问 + 多版本对照**
+
+- **C1 底部悬浮「就此段落提问」**：`ReaderScreen` 底部悬浮按钮（absolute 定位），点击 `navigation.navigate("NewChat", { passageRef: { book, paragraph, title }, seedText })`。`NewChat` 路由参数由 `undefined` 改为可选 `{ passageRef?; seedText? }`；`NewChatScreen` 用 `useCopilotChatContext().submitMessage` 预置「关于《X》第 N 段…」上下文。
+- **C2 双列对照（平板横屏/桌面）**：`useWindowDimensions` 判断宽屏（≥ ~900px）→ 左右两个 WebView 并排（原文 | 译文）；窄屏保持单列 + A2 的版本 Tab。先做「双列只读对照」，再按需加「滚动同步」。
+
+**依赖 / 构建影响**
+
+- 本计划**不新增原生依赖**：`@gorhom/bottom-sheet`、`react-native-gesture-handler`、`reanimated`、AsyncStorage 均已安装（`GestureHandlerRootView` 已在 `App.tsx` 包好）；版本 Tab 自绘即可（`react-native-tab-view` 为纯 JS）。按 §2.3 判断标准，**预计无需重建 APK**。
+- 后端依赖：术语点击（B1）与 sidenote（A3）依赖 mint 正文 HTML 带结构化标记；`WbwLookup` / `Term` 接口后端已存在（见 `DESIGN.md` §7 映射），仅需前端新增 `src/api/terms.ts`。
+
+**验收清单（对齐 `DESIGN.md` §3）**
+
+| §3 设计项 | 完成于 |
+|---|---|
+| 顶部返回 / 标题 | 已有 |
+| 顶部设置（字号/主题/版本） | A1 |
+| 正文版本切换 | A2 |
+| sidenote 侧边栏 | A3（CSS 已有，补内容拼装） |
+| 术语点击 drawer | B1 |
+| 长按选文本菜单（查字典/提问） | B2 |
+| 底部「就此段落提问」 | C1 |
+| 横屏/桌面双列对照 | C2 |
+
+#### 已落地（2026-08-25 会话）
+
+- **目录/章节导航**：新增 `src/catalog/headings.ts`（加载 `src/data/tipitaka_heading.json`，建章节树 + `resolveDisplayNode` 按体量下沉 + `nextHeading/prevHeading`）。阈值 `CHAPTER_STR_LEN_THRESHOLD = 20_000`（字符），先按常规阅读器设定，后续可调。
+- **阅读器导航条**：`ReaderScreen.tsx` 新增「目录 / 上一章 / 下一章 / 版本切换」四条；目录按钮打开右侧抽屉 `src/components/ChapterDrawer.tsx`（默认只显示第一层，展开当前章节父层级，高亮当前章节）。
+- **A1 顶栏设置**：`ReaderScreen.tsx` 设置按钮 → 底部弹层（字号 15/18/21/24 + 亮/深主题），偏好持久化到 `src/settings/reader.ts`；深色作用于 WebView CSS + 阅读器镶边（`src/theme/reader.ts`）。
+- **C1 就此段落提问**：阅读器底部悬浮按钮 → `NewChat` 传 `passageRef`/`seedText`，`NewChatScreen.tsx` 用 `submitMessage` 自动提交一次追问。
+- **版本切换**：导航条「版本」打开 `getBookChannels(book, 当前段落)` 列表，选后 `getChapterByChannel` 重载。
+- ⚠️ 注意：`tipitaka_heading.json` 5.47MB 以静态 import 打进 bundle（首启解析 + 包体积增大）；若后续觉得慢，可改为 `expo-asset`/`expo-file-system` 惰性加载。
+- 标题上下文（面包屑）：阅读器顶栏现显示「当前显示单元标题」为主标题，副标题为「书名 › 中间父标题 · 版本 · 段落 起–止」。例：输入 93-3 下沉到 93-5 时 → 主标题 `Paribbājakakathā`，副标题 `Sīlakkhandhavagga › 1. Brahmajālasuttaṃ · 版本 · 段落 5–11`（即用户所说的「3-11」= 标题 3、4 作上下文 + 正文 5–11）。
+- 尚未做：A3 sidenote 结构拼装、B1 术语 drawer、B2 长按选文本、C2 双列对照（仍为待办）。
