@@ -1,75 +1,151 @@
-# mobile/ —— Expo App（Android 真机，development build）
+<div align="center">
 
-Expo SDK 57（React Native 0.86，TypeScript 模板）+ `@copilotkit/react-native` 1.69：
+# Wikipali Mobile · 法音
 
-- 入口 `index.ts`：最前面导入 polyfill（顺序是强制的，勿调整）：
-  `react-native-get-random-values`（第 1 行）→ `@copilotkit/react-native/polyfills`
-- `App.tsx`：`<CopilotKitProvider runtimeUrl={...}>` 包住预制 `<CopilotChat agentName="pali_agent" />`
-- `metro.config.js`：官方文档的 jose 修复（否则 Metro 打 bundle 报 `Unable to resolve module node:buffer`）
+**A mobile app for reading the Pāli Tipiṭaka on Android and iOS** —— browse the
+canon, compare translations side by side, and ask an AI that answers with citations
 
-> ⚠️ **不能用 Expo Go**。项目依赖 `react-native-enriched-markdown`（含 android/ios/cpp **原生代码**）等原生模块，
-> Expo Go 预编译运行时**不含**这些模块，AI 一输出 markdown 回答就会报
-> `EnrichedMarkdownText ... not found in ViewManagerRegistry` 并闪退。
-> 必须使用 **development build**（已装 `expo-dev-client`），见下方「启动」。
+Built on the [WikiPali](https://www.wikipali.org) corpus · Expo SDK 57 · React Native 0.86 · TypeScript
 
-## 端口
+**English** · [简体中文](README.zh-CN.md)
 
-- Expo/Metro **8081**（`npx expo start`）
-- 依赖 runtime **3001**（再往前 backend **8000**），两个服务均已绑定 `0.0.0.0`
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Expo SDK](https://img.shields.io/badge/Expo%20SDK-57-blue.svg)](https://docs.expo.dev/versions/v57.0.0/)
+[![React Native](https://img.shields.io/badge/React%20Native-0.86-61dafb.svg)](https://reactnative.dev)
+[![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-3ddc84.svg)](docs/development.md#4-run-modes)
 
-## 真机测试前必做
+</div>
 
-1. **手机和电脑连同一个 WiFi**
-2. **电脑防火墙放行 3001（runtime）和 8081（Metro）端口**，否则手机连不上
-3. 把 runtime 地址改成电脑的局域网 IP：
+---
+
+Wikipali Mobile (**法音**) is the phone client for [wikipali.org](https://www.wikipali.org):
+the Pāli canon, its translations in several languages, and an AI study assistant,
+in your pocket. It is a React Native app built with Expo — one codebase, one
+Android and iOS app. This repository contains that app; the corpus and the API it
+reads live in the [mint](https://github.com/iapt-platform/mint) backend.
+
+## Quick start
 
 ```bash
-cd mobile
+git clone <repo-url> wikipali-mobile
+cd wikipali-mobile
+npm install               # postinstall applies the patches in patches/ — do not skip
 cp .env.example .env
-# 编辑 .env：EXPO_PUBLIC_RUNTIME_URL=http://<电脑IP>:3001/api/copilotkit
-# 查看电脑 IP：Windows `ipconfig`；macOS/Linux `ifconfig` 或 `ip addr`
+npx expo start --lan
 ```
 
-> 手机上不能用 localhost/127.0.0.1（那指向手机自己）。
+Open the development build on the phone and connect to `exp://<computer-ip>:8081`.
+With an empty `.env` the app reads from the public `next.wikipali.org` server —
+nothing else to configure.
 
-## 启动（先启动 backend 和 runtime）
+> [!IMPORTANT]
+> **Expo Go cannot run this app.** It depends on native modules that the prebuilt
+> Expo Go runtime does not contain, so you must install a **development build**
+> APK once — see [First run](#first-run-installing-the-development-build) below
+> ([why](docs/troubleshooting.md#expo-go-crashes)).
 
-### 1. 构建并安装 development build
+> [!NOTE]
+> The patches in [`patches/`](patches) are required —
+> [what they fix](docs/troubleshooting.md#patched-dependencies).
 
-```bash
-cd mobile
-npm install
-# 云端构建（需 EAS 账号/robot token）：
-eas build -p android --profile development
-# 或本地构建：eas build -p android --profile development --local
-# 把生成的 APK 装到手机上
+## Features
+
+| Area | What it does |
+|---|---|
+| **Canon browsing** | Sutta / Vinaya / Abhidhamma category tree down to chapters, bundled offline so the tree opens without a network |
+| **Versions & translations** | Per-chapter channel list grouped by type, with a progress ring and last-updated time per version |
+| **Reader** | HTML reading view with a chapter drawer and adjustable reading settings |
+| **Explore (AI)** | Streaming Q&A over the corpus via a CopilotKit agent, with tool-call status and citations that jump into the reader |
+| **Bookshelf** | Local reading history, merged per book, with progress |
+| **Settings** | Switch between WikiPali API servers at runtime |
+
+## First run: installing the development build
+
+You need this once per device; afterwards Metro serves every JS/TS change live.
+
+1. **Requirements** — Node.js ≥ 20.19, npm 10+, an Android device/emulator or an
+   iOS device/Simulator, and a free [Expo account](https://expo.dev/signup)
+   ([what Expo is and why an account is needed](docs/development.md#do-i-need-an-expo-account)).
+
+2. **One-time Expo setup** — sign up, then `eas login` and `eas init` to point the
+   project at your own EAS project. Full walkthrough:
+   [One-time setup](docs/development.md#one-time-setup).
+
+3. **Build and install it:**
+
+   ```bash
+   eas build -p android --profile development
+   eas build -p ios --profile development       # see the iOS notes below
+   ```
+
+   The CLI prints a build page with a QR code; open it on the phone and install.
+
+   iOS on a **physical device** additionally needs a paid Apple Developer account
+   and the device registered with `eas device:create`; the **Simulator** needs
+   neither, but does need a simulator build profile —
+   [iOS builds](docs/development.md#ios-builds).
+
+> [!TIP]
+> Rebuild only when a **native** dependency or native config changes —
+> [rebuild rules](docs/development.md#when-do-i-need-to-rebuild-the-apk).
+> Don't want an Expo account? Build locally with Android Studio or Xcode instead:
+> [`npx expo run:android` / `run:ios`](docs/development.md#building-without-an-expo-account).
+
+## Run modes
+
+| Mode | What you get | Setup |
+|---|---|---|
+| **Device + public API** | Full reading experience against `next.wikipali.org`; AI tab offline | Nothing — works with an empty `.env` |
+| **Device + local AI stack** | Adds streaming AI Q&A | Run the `agent-poc` services, point `EXPO_PUBLIC_RUNTIME_URL` at your LAN IP |
+| **Android emulator** | Same APK via `adb install` | Use `10.0.2.2` instead of the LAN IP |
+| **iOS device / Simulator** | Same app on iOS | The Simulator shares the host network, so `localhost` works as-is |
+
+Web is not a supported target. Step-by-step for every mode:
+[Development Guide → Run modes](docs/development.md#4-run-modes).
+
+<details>
+<summary><b>Configuration (both variables are optional)</b></summary>
+
+| Variable | Purpose |
+|---|---|
+| `EXPO_PUBLIC_RUNTIME_URL` | CopilotKit runtime endpoint for the AI tab |
+| `EXPO_PUBLIC_API_URL` | Override the content API base URL |
+
+With an empty `.env` the app uses the server chosen in **Me → Settings → API
+server** (default `next.wikipali.org`).
+
+On a device `localhost` points at the phone itself — always use your computer's
+LAN IP, and restart `expo start` after editing `.env`, because `EXPO_PUBLIC_*`
+values are inlined at bundle time.
+</details>
+
+## Repository layout
+
+```
+index.ts           polyfill imports (order is mandatory) → App
+App.tsx            GestureHandler → SafeArea → CopilotKit → RootNavigator
+metro.config.js    jose / node:* resolver fix
+src/               api · catalog · components · navigation · screens · settings · theme
+patches/           required patch-package patches
+docs/              development guide and troubleshooting
 ```
 
-> development build 的 APK **基本只装一次**：纯 JS/TS 改动无需重新构建，Metro 现拉热更；
-> 只有「新增/升级含原生代码的依赖」或「改 `app.json` 原生配置」时才需要重新 `eas build`。
-> 详细的 EAS/沙箱注意事项见 `STATUS.md`。
+## Documentation
 
-### 2. 启动 Metro 并连接
+| Document | Contents |
+|---|---|
+| [Development Guide](docs/development.md) | Prerequisites, configuration, run modes, EAS builds, project layout |
+| [Troubleshooting](docs/troubleshooting.md) | Expo Go, Metro/jose, polyfill order, patches, file-watcher limits, networking |
+| [DESIGN.md](DESIGN.md) | Product and architecture design (Chinese) |
+| [DESIGN.chat.md](DESIGN.chat.md) | AI explore/chat design (Chinese) |
+| [STATUS.md](STATUS.md) | Running progress log (Chinese) |
 
-```bash
-cd mobile
-npx expo start          # 或 npm start
-# 手机打开已安装的 development build，输入开发服务器地址：exp://<电脑IP>:8081
-# 改过 .env 后需要重启 expo start
-```
+## Related links
 
-## 验证
+- [WikiPali](https://www.wikipali.org) —— the corpus this app reads
+- [iapt-platform/mint](https://github.com/iapt-platform/mint) —— the Laravel backend API
+- [Expo SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/)
 
-1. 打开 development build 应用并连接 Metro（首次 bundle 可能要等 1-2 分钟）
-2. 输入「什么是四圣谛？」发送
-3. 预期：先看到工具调用状态（`retrieve_sutta_passage`），随后流式回答
-   （引用 SN 56.11 经文；未配置 DEEPSEEK_API_KEY 时带「mock 演示模式」前缀）
-4. 若一直转圈：确认手机浏览器能打开 `http://<电脑IP>:3001/api/copilotkit/info`（通则网络/防火墙 OK）
+## License
 
-## 已知坑（已处理）
-
-- **不能用 Expo Go**：原生依赖（`react-native-enriched-markdown` 等）不在 Expo Go 运行时内，必须 development build
-- **jose 的 node:* 导入**：Metro 打包报错，`metro.config.js` 里用官方 resolveRequest 修复
-- **polyfill 顺序**：安全随机源必须第一行，否则 CopilotKit 锁死非加密随机回退
-- **导入面**：`/components`（CopilotChat）与根入口都要装全 peer 依赖
-  （@gorhom/bottom-sheet、expo-document-picker、expo-file-system 等，已用 expo install 装好）
+[MIT](LICENSE) © visuddhinanda

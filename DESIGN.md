@@ -40,6 +40,25 @@
 
 > 注：设计文档中出现的 `RagContextBuilder`（结构化 citations）属目标架构命名。当前 `agent-poc` 的检索已从 mock 平文本升级为 **MCP 真实 wikipali 语料 + DeepSeek**（一次 agent 运行约 70s，含多次工具调用）；`mint` 的 `ChatController` 仍是 **CRUD**（尚无结构化 citations，问答广场/公开问题列表仍需按 §6.2 补齐）。
 
+### 0.3 关键工程约束（不可随意改动）
+
+以下约束原先散落在 `README.md`，属于架构层决定，迁入本文档统一维护；具体报错与排查步骤见
+[`docs/troubleshooting.md`](./docs/troubleshooting.md)。
+
+| 约束 | 说明 |
+|---|---|
+| **必须 development build** | 依赖含原生代码的模块，Expo Go 预编译运行时不含这些模块，渲染 markdown 回答时会报 `... not found in ViewManagerRegistry` 并闪退；已装 `expo-dev-client` |
+| **polyfill 导入顺序强制** | `index.ts`：`react-native-get-random-values`（第 1 行，抢占 `crypto.getRandomValues`）→ `@copilotkit/react-native/polyfills`（先于任何 CopilotKit 导入） |
+| **Metro 的 jose 修复** | `metro.config.js` 用官方 `resolveRequest` 把 `jose` 解析到 browser 构建，否则打包报 `Unable to resolve module node:buffer`；不要全局设 `unstable_conditionNames` |
+| **patch-package 补丁** | `patches/` 两个补丁随 `postinstall` 应用：CopilotKit 60s 超时 → 10min；streamdown 与 worklets 0.10.x 冲突修复 |
+| **CopilotChat 从 `/components` 子路径导入** | 该子路径的 peer 依赖（`@gorhom/bottom-sheet`、`expo-document-picker`、`expo-file-system` 等）需一并用 `expo install` 装齐 |
+| **APK 何时重建** | 只动 JS/TS = Metro 热更；动了原生依赖或 `app.json` 原生配置才需 `eas build` |
+
+**服务端口**：Metro 8081（本仓库）· CopilotKit runtime 3001 · backend 8000 · MCP 3000。
+真机调试用电脑局域网 IP（模拟器用 `10.0.2.2`），不能用 `localhost`。
+
+---
+
 ---
 
 ## 1. 整体信息架构（5 Tab 底部导航）
