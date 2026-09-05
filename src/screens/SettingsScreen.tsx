@@ -1,71 +1,85 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
-import {
-  API_SERVERS,
-  DEFAULT_SERVER,
-  getApiServer,
-  setApiServer,
-} from "../settings/server";
+import { API_SERVERS, DEFAULT_SERVER, getApiServer } from "../settings/server";
 import { ENV_API_URL } from "../api/config";
 import { colors, radius, spacing, type } from "../theme";
-import { useT } from "../i18n/I18nContext";
+import type { RootStackParamList } from "../navigation/types";
+import { useI18n } from "../i18n/I18nContext";
+import { LOCALE_OPTIONS } from "../i18n";
 import type { MessageKey } from "../i18n";
 
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
 export function SettingsScreen() {
+  const navigation = useNavigation<Nav>();
   const [server, setServer] = useState<string>(DEFAULT_SERVER);
-  const t = useT();
+  const { t, preference, locale } = useI18n();
 
-  useEffect(() => {
-    getApiServer().then(setServer);
-  }, []);
+  // 「跟随系统」时显示实际生效的语言，让用户一眼看到当前是哪种。
+  const currentLanguageLabel =
+    preference === "system"
+      ? `${t("settings.language.system")} · ${
+          LOCALE_OPTIONS.find((o) => o.id === locale)?.label ?? locale
+        }`
+      : (LOCALE_OPTIONS.find((o) => o.id === preference)?.label ?? preference);
 
-  const choose = (id: string) => {
-    setServer(id);
-    void setApiServer(id);
-  };
+  // .env 覆盖时选择不生效，直接显示真正在用的地址，免得看起来像 bug。
+  const currentServerLabel =
+    ENV_API_URL ||
+    (API_SERVERS.find((s) => s.id === server)?.label ?? server);
+
+  // 从下级页面返回时要反映刚改过的选择，所以每次获得焦点都重读一次。
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      getApiServer().then((v) => {
+        if (alive) setServer(v);
+      });
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
 
   return (
     <Screen contentStyle={styles.content}>
+      {/* 界面语言：详情在下级页面，这里只显示当前值 */}
+      <Text style={styles.sectionTitle}>{t("settings.language")}</Text>
+      <Pressable
+        style={styles.row}
+        onPress={() => navigation.navigate("LanguageSettings")}
+      >
+        <Ionicons name="language" size={20} color={colors.inkSoft} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowLabel}>{currentLanguageLabel}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
+      </Pressable>
+
+      <View style={styles.divider} />
+
+      {/* API 服务器：详情在下级页面，这里只显示当前生效的值 */}
       <Text style={styles.sectionTitle}>{t("settings.apiServer")}</Text>
-      <Text style={styles.sectionHint}>{t("settings.apiServerHint")}</Text>
-
-      {API_SERVERS.map((s) => {
-        const active = s.id === server;
-        return (
-          <Pressable
-            key={s.id}
-            style={[styles.row, active && styles.rowActive]}
-            onPress={() => choose(s.id)}
-          >
-            <View style={styles.rowBody}>
-              <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>
-                {s.label}
-              </Text>
-              <Text style={styles.rowSub}>{s.baseUrl}</Text>
-            </View>
-            <Ionicons
-              name={active ? "radio-button-on" : "radio-button-off"}
-              size={22}
-              color={active ? colors.vermilion : colors.inkFaint}
-            />
-          </Pressable>
-        );
-      })}
-
-      {ENV_API_URL ? (
-        <Text style={styles.overrideNote}>
-          {t("settings.envOverride", { url: ENV_API_URL })}
-        </Text>
-      ) : null}
+      <Pressable
+        style={styles.row}
+        onPress={() => navigation.navigate("ApiServerSettings")}
+      >
+        <Ionicons name="server-outline" size={20} color={colors.inkSoft} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowLabel}>{currentServerLabel}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
+      </Pressable>
 
       <View style={styles.divider} />
 
       <Text style={styles.sectionTitle}>{t("settings.others")}</Text>
       {(
         [
-          { icon: "language", label: "settings.language" as MessageKey },
           { icon: "text", label: "settings.display" as MessageKey },
           { icon: "download", label: "settings.downloads" as MessageKey },
           { icon: "information-circle", label: "settings.about" as MessageKey },
@@ -89,11 +103,6 @@ const styles = StyleSheet.create({
     ...type.heading,
     marginBottom: spacing.xs,
   },
-  sectionHint: {
-    ...type.caption,
-    color: colors.inkSoft,
-    marginBottom: spacing.md,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -106,29 +115,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
   },
-  rowActive: {
-    borderColor: colors.vermilion,
-  },
   rowBody: {
     flex: 1,
   },
   rowLabel: {
     ...type.body,
-  },
-  rowLabelActive: {
-    color: colors.vermilion,
-    fontWeight: "600",
-  },
-  rowSub: {
-    ...type.small,
-    marginTop: 2,
-    color: colors.inkSoft,
-  },
-  overrideNote: {
-    ...type.small,
-    color: colors.ochre,
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
