@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
+import { useLayout } from "../hooks/useLayout";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -13,11 +14,19 @@ const TOOLS: { icon: IoniconName; title: string; desc: string }[] = [
 ];
 
 export function ToolsScreen() {
+  // 卡片列数随宽度档变化（DESIGN.md §4.5）。
+  const { cardWidth } = useLayout();
+  const width = cardWidth(spacing.md);
+
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.grid}>
         {TOOLS.map((t) => (
-          <Pressable key={t.title} style={styles.card} onPress={() => undefined}>
+          <Pressable
+            key={t.title}
+            style={[styles.card, { width }]}
+            onPress={() => undefined}
+          >
             <View style={styles.cardIcon}>
               <Ionicons name={t.icon} size={24} color={colors.vermilion} />
             </View>
@@ -40,7 +49,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   card: {
-    width: "47%",
     backgroundColor: colors.paperRaised,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,

@@ -9,6 +9,7 @@ import {
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { colors } from "../theme";
+import { useLayout } from "../hooks/useLayout";
 import type { RootStackParamList, TabParamList } from "./types";
 import { DiscoverScreen } from "../screens/DiscoverScreen";
 import { CategoryBrowseScreen } from "../screens/CategoryBrowseScreen";
@@ -88,6 +89,11 @@ function TabBarIcon({
 }
 
 function TabNavigator() {
+  // 导航容器随窗口宽度切换（DESIGN.md §4.3）：
+  // compact 底部 Tab bar / medium·expanded 左侧 rail(80) / large 常驻侧边栏(280)。
+  const { navKind, navWidth, isShort } = useLayout();
+  const vertical = navKind !== "tabs";
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -98,7 +104,15 @@ function TabNavigator() {
         headerShadowVisible: false,
         tabBarActiveTintColor: colors.vermilion,
         tabBarInactiveTintColor: colors.inkFaint,
-        tabBarStyle: styles.tabBar,
+        tabBarPosition: vertical ? "left" : "bottom",
+        tabBarVariant: vertical ? "material" : "uikit",
+        tabBarLabelPosition:
+          navKind === "sidebar" ? "beside-icon" : "below-icon",
+        // 矮窗口（手机横屏 / 桌面矮窗）只留图标，把纵向空间还给正文。
+        tabBarShowLabel: !(navKind === "tabs" && isShort),
+        tabBarStyle: vertical
+          ? [styles.rail, { width: navWidth }]
+          : styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ focused }) => {
           const meta = TAB_ICONS[route.name as keyof TabParamList];
@@ -106,7 +120,9 @@ function TabNavigator() {
             <TabBarIcon
               name={focused ? meta.active : meta.inactive}
               focused={focused}
-              raised={route.name === "AiChat"}
+              // 凸起中央按钮只存在于 compact 的底部 Tab；
+              // rail / 侧边栏里「探索」退化为普通高亮项（保留强调色）。
+              raised={!vertical && route.name === "AiChat"}
             />
           );
         },
@@ -214,6 +230,11 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 11,
+  },
+  rail: {
+    backgroundColor: colors.paperRaised,
+    borderRightColor: colors.hairline,
+    borderRightWidth: StyleSheet.hairlineWidth,
   },
   raised: {
     width: 46,

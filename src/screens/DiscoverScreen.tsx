@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
+import { useLayout } from "../hooks/useLayout";
 import { getTree } from "../catalog";
 import { labelZh } from "../catalog/labels";
 import { colors, radius, spacing, type, cardShadow, serifFont } from "../theme";
@@ -23,6 +24,9 @@ const FEATURED = [
 export function DiscoverScreen() {
   const navigation = useNavigation<Nav>();
   const roots = getTree();
+  // 卡片列数随宽度档变化（DESIGN.md §4.5）。
+  const { cardWidth } = useLayout();
+  const basketWidth = cardWidth(spacing.md);
 
   return (
     <Screen contentStyle={styles.content}>
@@ -38,7 +42,7 @@ export function DiscoverScreen() {
         {roots.map((node) => (
           <Pressable
             key={node.name}
-            style={styles.basketCard}
+            style={[styles.basketCard, { width: basketWidth }]}
             onPress={() =>
               navigation.navigate("CategoryBrowse", {
                 node,
@@ -123,7 +127,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   basketCard: {
-    width: "48%",
     backgroundColor: colors.paperRaised,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
