@@ -94,7 +94,7 @@ npx expo start --lan
 | **真机 + 线上 API** | 完整阅读链路（走 `next.wikipali.org`），AI 页不可用 | 无需配置，`.env` 留空即可 |
 | **真机 + 本地 AI 服务** | 增加流式 AI 问答 | 启动 `agent-poc` 各服务，并把 `EXPO_PUBLIC_RUNTIME_URL` 指向电脑局域网 IP |
 | **Android 模拟器** | 同一个 APK，`adb install` 安装 | 用 `10.0.2.2` 代替局域网 IP |
-| **Waydroid** | 在 Linux 的 Android 容器里运行 | 用 `waydroid app install` 安装，连接宿主机局域网 IP（或 `waydroid0` 网桥上的 `192.168.240.1`） |
+| **Waydroid** | 在 Linux 桌面的 Android 容器里运行同一个 App | `waydroid app install` 装 APK，连宿主机局域网 IP（不是 `10.0.2.2`）——[安装与多窗口模式](docs/development.md#6-waydroid-android-on-a-linux-desktop) |
 | **iOS 真机 / 模拟器** | 同一套代码跑在 iOS 上 | 模拟器与电脑共用网络，直接用 `localhost` 即可 |
 
 Web 不作为支持目标。各环境的详细步骤见
@@ -129,7 +129,7 @@ docs/              开发指南与问题排查
 
 | 文档 | 内容 |
 |---|---|
-| [开发指南](docs/development.md) | 环境要求、配置、运行环境、EAS 构建、目录结构（英文） |
+| [开发指南](docs/development.md) | 环境要求、配置、运行环境、EAS 构建、Waydroid、目录结构（英文） |
 | [问题排查](docs/troubleshooting.md) | Expo Go、Metro/jose、polyfill 顺序、补丁、文件监听上限、网络（英文） |
 | [DESIGN.md](DESIGN.md) | 产品与架构设计文档 |
 | [DESIGN.chat.md](DESIGN.chat.md) | AI 探索 / 问答页设计 |

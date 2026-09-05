@@ -236,7 +236,7 @@ export EXPO_NO_TELEMETRY=1
 **阶段 C —— 段落提问 + 多版本对照**
 
 - **C1 底部悬浮「就此段落提问」**：`ReaderScreen` 底部悬浮按钮（absolute 定位），点击 `navigation.navigate("NewChat", { passageRef: { book, paragraph, title }, seedText })`。`NewChat` 路由参数由 `undefined` 改为可选 `{ passageRef?; seedText? }`；`NewChatScreen` 用 `useCopilotChatContext().submitMessage` 预置「关于《X》第 N 段…」上下文。
-- **C2 双列对照（平板横屏/桌面）**：`useWindowDimensions` 判断宽屏（≥ ~900px）→ 左右两个 WebView 并排（原文 | 译文）；窄屏保持单列 + A2 的版本 Tab。先做「双列只读对照」，再按需加「滚动同步」。
+- **C2 双列对照（平板横屏/桌面）**：按**阅读区净宽 ≥ 880dp** 开启（`useLayout()`；expanded 平板横屏收起列表栏后即满足，见 `DESIGN.md` §4.7）→ 左右两个 WebView 并排（原文 | 译文）；窄屏保持单列 + A2 的版本 Tab。先做「双列只读对照」，再按需加「滚动同步」。
 
 **依赖 / 构建影响**
 

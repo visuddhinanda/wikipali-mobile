@@ -109,6 +109,12 @@ The **Simulator** shares the host's network, so `http://localhost:3001/...` and
 `http://127.0.0.1:4000/...` work as-is — no LAN IP needed. A **physical iPhone**
 needs the LAN IP, same as Android.
 
+### Mode E — Waydroid (Android container on Linux)
+
+Runs the same development build APK in an Android container on a Linux desktop —
+no phone, no AVD. `10.0.2.2` does **not** work here; use the host's LAN IP.
+Full command list: [6. Waydroid](#6-waydroid-android-on-a-linux-desktop).
+
 ### Web
 
 `npm run web` exists but is **not a supported target** — the reader relies on
@@ -259,7 +265,108 @@ one-time install.
 | Native config in `app.json` (permissions, package id, icons, plugins) | **Yes** |
 | Upgrade `expo-dev-client` or the Expo SDK major | **Yes** |
 
-## 6. Project layout
+## 6. Waydroid (Android on a Linux desktop)
+
+[Waydroid](https://waydro.id) boots Android in a container on your own machine
+and runs the development build APK there. It requires a **Wayland** session — it
+does not work under X11 — and a kernel with the `binder` modules (mainline 5.18+
+ships them; otherwise install `linux-headers` + the `binder_linux` DKMS package
+your distro provides).
+
+### Install
+
+Debian / Ubuntu (official repo):
+
+```bash
+sudo apt update
+sudo apt install -y curl ca-certificates
+curl -s https://repo.waydro.id | sudo bash
+sudo apt install -y waydroid
+```
+
+Arch / Manjaro:
+
+```bash
+yay -S waydroid          # plus binder_linux-dkms if your kernel lacks binder
+```
+
+Fedora:
+
+```bash
+sudo dnf install -y waydroid
+```
+
+Then download the Android image once (a few hundred MB):
+
+```bash
+sudo waydroid init                 # vanilla LineageOS image
+sudo waydroid init -s GAPPS -f     # or with Google apps; -f re-downloads
+```
+
+### Start
+
+```bash
+sudo systemctl enable --now waydroid-container    # background service, survives reboots
+waydroid session start &                          # your user's Android session
+waydroid show-full-ui                             # open the Android home screen
+```
+
+Check it came up, and stop it when you are done:
+
+```bash
+waydroid status
+waydroid session stop
+sudo systemctl stop waydroid-container
+```
+
+### Multi-window mode
+
+By default Waydroid paints one full-screen Android display. Multi-window gives
+each Android app its own host window, which sits next to an editor much better:
+
+```bash
+waydroid prop set persist.waydroid.multi_windows true
+waydroid session stop
+waydroid session start &
+```
+
+To turn it off again, set the same prop to `false` and restart the session. In
+multi-window mode launch the app directly rather than through `show-full-ui`:
+
+```bash
+waydroid app install ~/Downloads/wikipali-mobile-dev.apk
+waydroid app list                       # find the package name if unsure
+waydroid app launch com.iapt.mobile
+```
+
+### Put the window on a specific monitor
+
+Waydroid has no monitor setting; placement belongs to your compositor. In
+multi-window mode, match the window class `Waydroid` (`eDP-1` is usually the
+laptop panel — confirm with `hyprctl monitors` / `swaymsg -t get_outputs`):
+
+| Compositor | Rule |
+|---|---|
+| Hyprland | `windowrulev2 = monitor eDP-1, class:^(Waydroid)$` in `hyprland.conf` |
+| Sway | `for_window [app_id="waydroid"] move container to output eDP-1` in the config |
+| KWin (KDE) | Title bar → More Actions → Configure Special Window Settings → add **Screen**, Apply Initially |
+| GNOME | No built-in rules; use the *Auto Move Windows* extension |
+
+### Connect it to Metro
+
+Waydroid is not an AVD, so `10.0.2.2` is meaningless here. Use either the host's
+LAN IP or its address on the `waydroid0` bridge (usually `192.168.240.1`; check
+with `ip -4 addr show waydroid0`):
+
+```bash
+npx expo start --lan
+# in the development build's "Enter URL manually" box:
+#   http://<computer-ip>:8081
+```
+
+The same address rule applies to `EXPO_PUBLIC_RUNTIME_URL` in `.env`.
+
+## 7. Project layout
 
 ```
 index.ts                 polyfill imports (order is mandatory) → App

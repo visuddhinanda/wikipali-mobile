@@ -98,7 +98,7 @@ You need this once per device; afterwards Metro serves every JS/TS change live.
 | **Device + public API** | Full reading experience against `next.wikipali.org`; AI tab offline | Nothing — works with an empty `.env` |
 | **Device + local AI stack** | Adds streaming AI Q&A | Run the `agent-poc` services, point `EXPO_PUBLIC_RUNTIME_URL` at your LAN IP |
 | **Android emulator** | Same APK via `adb install` | Use `10.0.2.2` instead of the LAN IP |
-| **Waydroid** | Same app on a Linux Android container | Install with `waydroid app install`, then connect to the host LAN IP (or `192.168.240.1` on the `waydroid0` bridge) |
+| **Waydroid** | Same app in an Android container on a Linux desktop | `waydroid app install` the APK, connect to the host LAN IP (not `10.0.2.2`) — [setup](docs/development.md#6-waydroid-android-on-a-linux-desktop) |
 | **iOS device / Simulator** | Same app on iOS | The Simulator shares the host network, so `localhost` works as-is |
 
 Web is not a supported target. Step-by-step for every mode:
@@ -135,7 +135,7 @@ docs/              development guide and troubleshooting
 
 | Document | Contents |
 |---|---|
-| [Development Guide](docs/development.md) | Prerequisites, configuration, run modes, EAS builds, project layout |
+| [Development Guide](docs/development.md) | Prerequisites, configuration, run modes, EAS builds, Waydroid, project layout |
 | [Troubleshooting](docs/troubleshooting.md) | Expo Go, Metro/jose, polyfill order, patches, file-watcher limits, networking |
 | [DESIGN.md](DESIGN.md) | Product and architecture design (Chinese) |
 | [DESIGN.chat.md](DESIGN.chat.md) | AI explore/chat design (Chinese) |
