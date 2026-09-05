@@ -145,6 +145,15 @@ const en: Messages = {
   "settings.about": "About / Feedback",
 
 
+  "about.version": "Version {version}",
+  "about.section.about": "About",
+  "about.website": "WikiPali website",
+  "about.sourceCode": "Source code",
+  "about.license": "License",
+  "about.section.feedback": "Feedback",
+  "about.sendFeedback": "Send feedback",
+  "about.feedbackHint": "Tell us what could work better.",
+  "about.feedbackUnset": "Feedback address not configured yet",
   "error.network": "Network request failed",
   "error.badJson": "Response is not valid JSON",
   "error.backend": "The server returned an error",

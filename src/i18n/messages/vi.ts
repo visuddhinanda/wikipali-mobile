@@ -146,6 +146,15 @@ const vi: Messages = {
   "settings.about": "Giới thiệu / Phản hồi",
 
 
+  "about.version": "Phiên bản {version}",
+  "about.section.about": "Giới thiệu",
+  "about.website": "Trang web WikiPali",
+  "about.sourceCode": "Mã nguồn",
+  "about.license": "Giấy phép",
+  "about.section.feedback": "Phản hồi",
+  "about.sendFeedback": "Gửi phản hồi",
+  "about.feedbackHint": "Cho chúng tôi biết điều gì có thể tốt hơn.",
+  "about.feedbackUnset": "Chưa cấu hình địa chỉ phản hồi",
   "error.network": "Yêu cầu mạng thất bại",
   "error.badJson": "Phản hồi không phải JSON hợp lệ",
   "error.backend": "Máy chủ trả về lỗi",

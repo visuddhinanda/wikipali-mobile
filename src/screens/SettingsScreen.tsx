@@ -80,12 +80,22 @@ export function SettingsScreen() {
       <Text style={styles.sectionTitle}>{t("settings.others")}</Text>
       {(
         [
+          // 尚未实现的项没有 route，点击暂不响应。
           { icon: "text", label: "settings.display" as MessageKey },
           { icon: "download", label: "settings.downloads" as MessageKey },
-          { icon: "information-circle", label: "settings.about" as MessageKey },
+          {
+            icon: "information-circle",
+            label: "settings.about" as MessageKey,
+            route: "About" as const,
+          },
         ]
       ).map((row) => (
-        <Pressable key={row.label} style={styles.row} onPress={() => undefined}>
+        <Pressable
+          key={row.label}
+          style={styles.row}
+          onPress={() => row.route && navigation.navigate(row.route)}
+          disabled={!row.route}
+        >
           <Ionicons name={row.icon as any} size={20} color={colors.inkSoft} />
           <Text style={styles.rowLabel}>{t(row.label)}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />

@@ -146,6 +146,15 @@ const my: Messages = {
   "settings.about": "အကြောင်း / အကြံပြုရန်",
 
 
+  "about.version": "ဗားရှင်း {version}",
+  "about.section.about": "အကြောင်း",
+  "about.website": "WikiPali ဝဘ်ဆိုက်",
+  "about.sourceCode": "အရင်းအမြစ် ကုဒ်",
+  "about.license": "လိုင်စင်",
+  "about.section.feedback": "အကြံပြုချက်",
+  "about.sendFeedback": "အကြံပြုချက် ပေးပို့ရန်",
+  "about.feedbackHint": "ပိုမိုကောင်းမွန်စေရန် အကြံပြုပါ။",
+  "about.feedbackUnset": "အကြံပြုချက် လိပ်စာ မသတ်မှတ်ရသေးပါ",
   "error.network": "ကွန်ရက် တောင်းဆိုမှု မအောင်မြင်ပါ",
   "error.badJson": "တုံ့ပြန်မှုသည် တရားဝင် JSON မဟုတ်ပါ",
   "error.backend": "ဆာဗာမှ အမှား ပြန်ပို့သည်",

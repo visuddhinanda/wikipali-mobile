@@ -146,6 +146,15 @@ const th: Messages = {
   "settings.about": "เกี่ยวกับ / แจ้งปัญหา",
 
 
+  "about.version": "เวอร์ชัน {version}",
+  "about.section.about": "เกี่ยวกับ",
+  "about.website": "เว็บไซต์ WikiPali",
+  "about.sourceCode": "ซอร์สโค้ด",
+  "about.license": "สัญญาอนุญาต",
+  "about.section.feedback": "แจ้งปัญหา",
+  "about.sendFeedback": "ส่งความคิดเห็น",
+  "about.feedbackHint": "บอกเราว่าอะไรที่ควรปรับปรุง",
+  "about.feedbackUnset": "ยังไม่ได้ตั้งค่าที่อยู่สำหรับส่งความคิดเห็น",
   "error.network": "การเชื่อมต่อล้มเหลว",
   "error.badJson": "การตอบกลับไม่ใช่ JSON ที่ถูกต้อง",
   "error.backend": "เซิร์ฟเวอร์ตอบกลับข้อผิดพลาด",

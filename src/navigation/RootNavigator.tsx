@@ -25,6 +25,7 @@ import { SettingsScreen } from "../screens/SettingsScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { LanguageSettingsScreen } from "../screens/LanguageSettingsScreen";
 import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
+import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
@@ -237,6 +238,11 @@ function ProfileStack() {
         name="ApiServerSettings"
         component={ApiServerSettingsScreen}
         options={{ title: t("settings.apiServer") }}
+      />
+      <Stack.Screen
+        name="About"
+        component={AboutScreen}
+        options={{ title: t("settings.about") }}
       />
       <Stack.Screen
         name="SignIn"

@@ -142,6 +142,16 @@ const zhHant: Messages = {
   "settings.about": "關於 / 意見回饋",
 
 
+  // 關於 / 意見回饋
+  "about.version": "版本 {version}",
+  "about.section.about": "關於",
+  "about.website": "WikiPali 官網",
+  "about.sourceCode": "原始碼",
+  "about.license": "開源授權",
+  "about.section.feedback": "意見回饋",
+  "about.sendFeedback": "提交意見",
+  "about.feedbackHint": "告訴我們哪裡可以做得更好。",
+  "about.feedbackUnset": "意見回饋位址尚未設定",
   "error.network": "網路請求失敗",
   "error.badJson": "回應不是合法 JSON",
   "error.backend": "後端返回錯誤",

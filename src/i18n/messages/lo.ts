@@ -146,6 +146,15 @@ const lo: Messages = {
   "settings.about": "ກ່ຽວກັບ / ແຈ້ງບັນຫາ",
 
 
+  "about.version": "ເວີຊັນ {version}",
+  "about.section.about": "ກ່ຽວກັບ",
+  "about.website": "ເວັບໄຊ WikiPali",
+  "about.sourceCode": "ຊອສໂຄດ",
+  "about.license": "ໃບອະນຸຍາດ",
+  "about.section.feedback": "ຄຳຕິຊົມ",
+  "about.sendFeedback": "ສົ່ງຄຳຕິຊົມ",
+  "about.feedbackHint": "ບອກພວກເຮົາວ່າສິ່ງໃດຄວນປັບປຸງ.",
+  "about.feedbackUnset": "ຍັງບໍ່ໄດ້ຕັ້ງຄ່າທີ່ຢູ່ສຳລັບຄຳຕິຊົມ",
   "error.network": "ການເຊື່ອມຕໍ່ລົ້ມເຫຼວ",
   "error.badJson": "ການຕອບກັບບໍ່ແມ່ນ JSON ທີ່ຖືກຕ້ອງ",
   "error.backend": "ເຊີບເວີຕອບກັບຂໍ້ຜິດພາດ",

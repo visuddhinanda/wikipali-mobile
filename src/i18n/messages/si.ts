@@ -146,6 +146,15 @@ const si: Messages = {
   "settings.about": "පිළිබඳව / ප්‍රතිපෝෂණ",
 
 
+  "about.version": "අනුවාදය {version}",
+  "about.section.about": "පිළිබඳව",
+  "about.website": "WikiPali වෙබ් අඩවිය",
+  "about.sourceCode": "මූලාශ්‍ර කේතය",
+  "about.license": "බලපත්‍රය",
+  "about.section.feedback": "ප්‍රතිපෝෂණ",
+  "about.sendFeedback": "ප්‍රතිපෝෂණ එවන්න",
+  "about.feedbackHint": "වඩා හොඳ කළ හැක්කේ කුමක්දැයි අපට කියන්න.",
+  "about.feedbackUnset": "ප්‍රතිපෝෂණ ලිපිනය තවම සකසා නැත",
   "error.network": "ජාල ඉල්ලීම අසාර්ථකයි",
   "error.badJson": "ප්‍රතිචාරය වලංගු JSON නොවේ",
   "error.backend": "සේවාදායකය දෝෂයක් ලබා දුන්නේය",

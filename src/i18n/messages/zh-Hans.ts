@@ -159,6 +159,16 @@ const zhHans = {
 
   // 错误
 
+  // 关于 / 反馈
+  "about.version": "版本 {version}",
+  "about.section.about": "关于",
+  "about.website": "WikiPali 官网",
+  "about.sourceCode": "源代码",
+  "about.license": "开源许可",
+  "about.section.feedback": "反馈",
+  "about.sendFeedback": "提交反馈",
+  "about.feedbackHint": "告诉我们哪里可以做得更好。",
+  "about.feedbackUnset": "反馈地址尚未配置",
   "error.network": "网络请求失败",
   "error.badJson": "响应不是合法 JSON",
   "error.backend": "后端返回错误",
