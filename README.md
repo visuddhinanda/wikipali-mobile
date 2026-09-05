@@ -136,6 +136,7 @@ docs/              development guide and troubleshooting
 | Document | Contents |
 |---|---|
 | [Development Guide](docs/development.md) | Prerequisites, configuration, run modes, EAS builds, Waydroid, project layout |
+| [Commentary layers](docs/commentary-layers.md) | How a chapter's commentary layer is resolved and its counterparts found |
 | [Troubleshooting](docs/troubleshooting.md) | Expo Go, Metro/jose, polyfill order, patches, file-watcher limits, networking |
 | [DESIGN.md](DESIGN.md) | Product and architecture design (Chinese) |
 | [DESIGN.chat.md](DESIGN.chat.md) | AI explore/chat design (Chinese) |
