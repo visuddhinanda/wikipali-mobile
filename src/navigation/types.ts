@@ -1,4 +1,3 @@
-import type { NavigatorScreenParams } from "@react-navigation/native";
 import type { CategoryNode } from "../catalog";
 
 export type TabParamList = {
@@ -9,8 +8,16 @@ export type TabParamList = {
   Profile: undefined;
 };
 
+/**
+ * 各 Tab 内部 Stack 的路由表（同一份类型供所有 Tab Stack 复用；
+ * 每个 Stack 只注册其中一部分屏幕）。
+ */
 export type RootStackParamList = {
-  Tabs: NavigatorScreenParams<TabParamList> | undefined;
+  Discover: undefined;
+  Bookshelf: undefined;
+  AiChat: undefined;
+  Tools: undefined;
+  Profile: undefined;
   CategoryBrowse: {
     node: CategoryNode;
     breadcrumb: string[]; // 从根到当前节点的显示名
