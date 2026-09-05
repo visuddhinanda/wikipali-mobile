@@ -1,4 +1,4 @@
-# wikipali-mobile 进度记录（2026-08-23）
+# wikipali-mobile 进度记录（更新至 2026-09-05）
 
 > 本文件记录 mobile 项目的完整进展与交接信息，供后续会话续接使用。
 
@@ -266,3 +266,78 @@ export EXPO_NO_TELEMETRY=1
 - ⚠️ 注意：`tipitaka_heading.json` 5.47MB 以静态 import 打进 bundle（首启解析 + 包体积增大）；若后续觉得慢，可改为 `expo-asset`/`expo-file-system` 惰性加载。
 - 标题上下文（面包屑）：阅读器顶栏现显示「当前显示单元标题」为主标题，副标题为「书名 › 中间父标题 · 版本 · 段落 起–止」。例：输入 93-3 下沉到 93-5 时 → 主标题 `Paribbājakakathā`，副标题 `Sīlakkhandhavagga › 1. Brahmajālasuttaṃ · 版本 · 段落 5–11`（即用户所说的「3-11」= 标题 3、4 作上下文 + 正文 5–11）。
 - 尚未做：A3 sidenote 结构拼装、B1 术语 drawer、B2 长按选文本、C2 双列对照（仍为待办）。
+
+---
+
+## 10. 响应式布局 + 义注复注对读（2026-09-05 会话）
+
+### 10.1 环境（重要，踩过坑）
+
+- **Metro 必须能监听文件**。此前用 `CI=1` 规避 inotify 上限，代价是 Metro
+  **完全不监听文件变化**，一直发启动那一刻的旧包 —— 表现为「改了代码 reload 没反应」。
+  正确做法是抬高上限；本机是 LXC 容器，须在**宿主机**执行：
+  `sudo sysctl -w fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=1024`，
+  并写入 `/etc/sysctl.d/60-inotify.conf` 持久化（系统自带的
+  `30-lxc-inotify.conf` 设的是 65536，靠文件名顺序被 60- 覆盖）。
+  已验证：不重启 Metro，改文件后重新取包即可见新代码。
+- **Waydroid 调试**：多窗口模式下 dp = 像素 × 160 ÷ density。
+  `sudo waydroid shell wm density 160` 后 1dp = 1px，拖窗口即可跨断点。
+  安装/启动/多窗口/指定显示器的完整命令见 `docs/development.md` §6。
+
+### 10.2 响应式布局（对应 `DESIGN.md` §4，已重写为断点唯一真源）
+
+静态界面图：<https://claude.ai/code/artifact/4a3189e4-d0e4-4b76-a714-b43e08169d5a>
+
+已落地：
+
+- `src/theme/breakpoints.ts` —— 断点与各档数值唯一来源
+  （compact <600 / medium 600–839 / expanded 840–1199 / large ≥1200，对齐 sw600dp）
+- `src/hooks/useLayout.ts` —— 唯一入口 hook；分档用 `width / fontScale`
+- `Screen.tsx` —— 统一限宽居中（720/800/840）+ 分档外边距，`fullBleed` 可关闭
+- `RootNavigator` —— medium/expanded 左侧 rail(80)，large 侧边栏(280)；
+  **下钻页面已移入各 Tab 内部 Stack**，否则最外层 Stack 会盖住导航容器
+- 阅读器 —— expanded/large 常驻左侧章节栏（进入时收起，选中后自动收起，
+  手动展开则固定）；阅读区净宽改为 `onLayout` 实测；
+  **WebView 不再自写 `@media`**，限宽与边注形态由 RN 注入
+- 「我 → 布局调试」（仅 `__DEV__`）实时显示断点判定
+
+未做：
+
+- **双列并排对照本身**（条件 `canDualColumn()` 已就位，缺同时取第二 channel
+  的正文、版本配对 UI、可选滚动同步）
+- 探索页历史侧栏（`DESIGN.chat.md` §4）
+- 宽屏术语 popover（依赖尚未实现的术语 drawer）
+- expanded 的 list-detail 是否该加高度条件（手机横屏 852pt 会落进 expanded）
+
+### 10.3 义注复注对读
+
+**数据**：`assets/db/tipitaka.db3`（43.9 MB），由 mint/api-v13 的
+`php artisan export:mobile.heading --copy-to=…` 生成（mint 提交在 `development` 分支）。
+单表 `pali_text` 523284 行：`book, paragraph, level, toc, length,
+chapter_len, chapter_strlen, parent, tags, cs_para, book_name`。
+
+- `length` 即原表拼写错误的 `lenght`，导出时已纠正
+- `cs_para` / `book_name` 由 `related_paragraphs` 合并而来（每段落至多对应一部
+  注释书，已核对无例外）；`cs_para` 取该段落关联区间的 **min**，即起始位置；
+  **区间终点未导出**，若之后需要「对应范围」得补 `cs_para_end`
+- 无对应注释书时两列为 NULL（523284 行中 408573 行有值）
+
+**算法**：`docs/commentary-layers.md` + `src/catalog/commentary.ts`
+（`resolveLayer` / `findRelatedChapters`），校验脚本
+`node scripts/check-commentary.mjs [book] [paragraph]`。
+
+- 层次序列：`mūla`/`pāḷi`（两者同层，无区别）→ `aṭṭhakathā` → `ṭīkā`
+  → `mūlaṭīkā` → `anuṭīkā`
+- 标签只打在书（level 1/2）上，故层次须沿 `parent` 向上找
+- `(book_name, cs_para)` 相同即互为对应段落
+- 实测 `abhi7/cs_para=1` 可正确列出 4 部原文 + 义注 + 根本复注 + 再复注
+
+### 10.4 下一步（明天从这里继续）
+
+1. **把 SQLite 接进 App**：`expo-sqlite` 打开 `assets/db/tipitaka.db3`。
+   需要定：43.9MB 资产的打包方式、首次启动是否要拷贝到可写目录、
+   `expo-sqlite` 是原生模块 —— **加依赖后必须重建开发版 APK**。
+2. 切换 `src/catalog/headings.ts` 由 JSON 改读 SQLite，然后删除
+   `src/data/tipitaka_heading.json`（5.47MB，目前仍在仓库里）。
+3. 用户会说明「章节数据如何加载」，据此接入对读的正文获取。
+4. 之后才是双列对照 UI（§10.2 未做项第一条）。
