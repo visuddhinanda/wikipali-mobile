@@ -41,34 +41,29 @@ interface Row {
   depth: number;
 }
 
-export function ChapterDrawer({
-  visible,
+/**
+ * 章节树列表 —— 抽屉（compact）与宽屏常驻列表栏（expanded/large，DESIGN.md §4.6）共用。
+ */
+export function ChapterTree({
   book,
   currentParagraph,
-  dark,
-  onClose,
+  c,
   onSelect,
-}: Props) {
-  const c = readerColors(dark);
-  const { width } = useWindowDimensions();
-  const panelW = Math.min(width * 0.84, 360);
-
-  const slide = useRef(new Animated.Value(panelW)).current;
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-
+}: {
+  book: number;
+  currentParagraph: number;
+  c: ReaderChrome;
+  onSelect: (book: number, paragraph: number) => void;
+}) {
   const roots = useMemo(() => getBookTree(book), [book]);
+  const [expanded, setExpanded] = useState<Set<number>>(
+    () => new Set(ancestorParagraphs(findNode(book, currentParagraph))),
+  );
 
+  // 换书 / 换章时自动展开当前章节的所有父层级
   useEffect(() => {
-    if (!visible) return;
-    const node = findNode(book, currentParagraph);
-    setExpanded(new Set(ancestorParagraphs(node)));
-    slide.setValue(panelW);
-    Animated.timing(slide, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, book, currentParagraph, panelW, slide]);
+    setExpanded(new Set(ancestorParagraphs(findNode(book, currentParagraph))));
+  }, [book, currentParagraph]);
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -95,6 +90,51 @@ export function ChapterDrawer({
       else next.add(paragraph);
       return next;
     });
+
+  return (
+    <FlatList
+      data={rows}
+      keyExtractor={(r) => r.key}
+      style={styles.list}
+      contentContainerStyle={styles.listContent}
+      renderItem={({ item }) => (
+        <RowItem
+          node={item.node}
+          depth={item.depth}
+          expanded={expanded.has(item.node.heading.paragraph)}
+          current={item.node.heading.paragraph === currentParagraph}
+          c={c}
+          onToggle={toggle}
+          onSelect={(n) => onSelect(n.heading.book, n.heading.paragraph)}
+        />
+      )}
+    />
+  );
+}
+
+export function ChapterDrawer({
+  visible,
+  book,
+  currentParagraph,
+  dark,
+  onClose,
+  onSelect,
+}: Props) {
+  const c = readerColors(dark);
+  const { width } = useWindowDimensions();
+  const panelW = Math.min(width * 0.84, 360);
+
+  const slide = useRef(new Animated.Value(panelW)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    slide.setValue(panelW);
+    Animated.timing(slide, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, panelW, slide]);
 
   return (
     <Modal
@@ -127,22 +167,11 @@ export function ChapterDrawer({
               <Ionicons name="close" size={22} color={c.inkSoft} />
             </Pressable>
           </View>
-          <FlatList
-            data={rows}
-            keyExtractor={(r) => r.key}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <RowItem
-                node={item.node}
-                depth={item.depth}
-                expanded={expanded.has(item.node.heading.paragraph)}
-                current={item.node.heading.paragraph === currentParagraph}
-                c={c}
-                onToggle={toggle}
-                onSelect={(n) => onSelect(n.heading.book, n.heading.paragraph)}
-              />
-            )}
+          <ChapterTree
+            book={book}
+            currentParagraph={currentParagraph}
+            c={c}
+            onSelect={onSelect}
           />
         </Animated.View>
       </View>

@@ -22,8 +22,16 @@ import {
 } from "../catalog/headings";
 import type { ChapterChannel } from "../catalog";
 import { saveReadingRecord } from "../data/history";
-import { ChapterDrawer } from "../components/ChapterDrawer";
+import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
 import { serifFont } from "../theme";
+import { useLayout } from "../hooks/useLayout";
+import {
+  LIST_PANE_WIDTH,
+  MAX_CONTENT_WIDTH,
+  SIDENOTE_MARGIN_MIN_WIDTH,
+  SIDENOTE_WIDTH,
+  widthClassOf,
+} from "../theme/breakpoints";
 import { readerColors, type ReaderChrome } from "../theme/reader";
 import {
   FONT_OPTIONS,
@@ -52,18 +60,34 @@ function escapeHtml(s: string): string {
 
 function buildReaderHtml(
   doc: ReaderDoc,
-  opts: { fontSizePx: number; dark: boolean },
+  opts: {
+    fontSizePx: number;
+    dark: boolean;
+    /**
+     * 阅读区净宽（dp）与正文限宽 —— 由 RN 层注入（`DESIGN.md` §4.7）。
+     * WebView 内不再写 `@media`，否则会出现「RN 认为是平板、WebView 认为是手机」的错档。
+     */
+    contentWidth: number;
+    measure: number;
+    /** 边注形态：窄屏行内折叠 / 宽屏右侧 Tufte 边注栏。 */
+    sidenote: "inline" | "margin";
+  },
 ): string {
   const vars = opts.dark
     ? "--paper:#211d17;--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
     : "--paper:#f7f3ea;--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
   return `<!DOCTYPE html>
-<html lang="zh">
+<html lang="zh" data-sidenote="${opts.sidenote}" data-content-width="${opts.contentWidth}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { ${vars} --base:${opts.fontSizePx}px; }
+  :root {
+    ${vars}
+    --base:${opts.fontSizePx}px;
+    --measure:${opts.measure}px;
+    --sidenote-w:${SIDENOTE_WIDTH}px;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -75,9 +99,13 @@ function buildReaderHtml(
     -webkit-text-size-adjust: 100%;
   }
   .paper {
-    max-width: 720px;
+    max-width: var(--measure);
     margin: 0 auto;
     padding: 20px 18px 60px;
+  }
+  /* 边注栏模式下正文整体左移，右侧空出边注栏的宽度 */
+  [data-sidenote="margin"] .paper {
+    margin-right: calc(var(--sidenote-w) + 24px);
   }
   .doc-title { font-size: 1.45em; font-weight: 700; margin: 8px 0 4px; }
   .doc-subtitle { color: var(--ink-soft); font-size: 0.82em; margin-bottom: 24px; }
@@ -125,17 +153,16 @@ function buildReaderHtml(
     padding-left: 10px;
     margin: 4px 0 18px;
   }
-  @media (min-width: 760px) {
-    .sidenote {
-      float: right;
-      clear: right;
-      width: 28%;
-      margin-right: -34%;
-      margin-top: 4px;
-      border-left: none;
-      border-top: 2px solid var(--hairline);
-      padding: 4px 0 0;
-    }
+  /* 宽屏：真 Tufte 边注，落在正文右侧留白里。开关由 RN 注入，不用 @media。 */
+  [data-sidenote="margin"] .sidenote {
+    float: right;
+    clear: right;
+    width: var(--sidenote-w);
+    margin-right: calc(-1 * (var(--sidenote-w) + 24px));
+    margin-top: 4px;
+    border-left: none;
+    border-top: 2px solid var(--hairline);
+    padding: 4px 0 0;
   }
 </style>
 </head>
@@ -195,6 +222,12 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
+  // 宽屏 list-detail（DESIGN.md §4.6）：expanded 及以上把目录做成常驻左栏，
+  // 选中一章后自动收起，把宽度让给正文；用户手动展开过一次后本次会话不再自动收起。
+  const { listDetail } = useLayout();
+  // 进入阅读器时用户已经选定章节，直接以收起态进入（深链接同理，DESIGN.md §4.6）
+  const [paneOpen, setPaneOpen] = useState(false);
+  const [panePinned, setPanePinned] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [versionVisible, setVersionVisible] = useState(false);
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
@@ -283,6 +316,19 @@ export function ReaderScreen({ route, navigation }: Props) {
     };
   }, [book, channelId, channelName, p, toc]);
 
+  // 阅读区净宽以 onLayout 实测为准：列表栏收起、窗口拖动都会改变它，
+  // 双列 / 边注栏的开关按这个宽度判断，不按设备档位硬编码（DESIGN.md §4.7）。
+  const [readerWidth, setReaderWidth] = useState(0);
+  const sidenoteMode: "inline" | "margin" =
+    readerWidth >= SIDENOTE_MARGIN_MIN_WIDTH ? "margin" : "inline";
+  const measure = useMemo(() => {
+    if (!readerWidth) return MAX_CONTENT_WIDTH.medium ?? 720;
+    const cap = MAX_CONTENT_WIDTH[widthClassOf(readerWidth)] ?? readerWidth;
+    const usable =
+      sidenoteMode === "margin" ? readerWidth - SIDENOTE_WIDTH - 24 : readerWidth;
+    return Math.max(280, Math.min(cap, usable));
+  }, [readerWidth, sidenoteMode]);
+
   const html = useMemo(
     () =>
       doc
@@ -291,10 +337,13 @@ export function ReaderScreen({ route, navigation }: Props) {
             {
               fontSizePx: fontSizePx(settings.fontSize),
               dark: isDark,
+              contentWidth: readerWidth,
+              measure,
+              sidenote: sidenoteMode,
             },
           )
         : "",
-    [doc, headerSubtitle, settings.fontSize, isDark],
+    [doc, headerSubtitle, settings.fontSize, isDark, readerWidth, measure, sidenoteMode],
   );
 
   const navigateTo = (b: number, para: number) => {
@@ -367,7 +416,20 @@ export function ReaderScreen({ route, navigation }: Props) {
 
       {/* 导航条：目录 / 上一章 / 下一章 / 版本切换 */}
       <View style={[styles.navBar, { backgroundColor: c.paperRaised, borderBottomColor: c.hairline }]}>
-        <NavBtn icon="list-outline" label="目录" c={c} onPress={() => setDrawerVisible(true)} />
+        <NavBtn
+          icon="list-outline"
+          label="目录"
+          c={c}
+          onPress={() => {
+            if (listDetail) {
+              // 手动展开过就固定住，不再自动收起
+              if (!paneOpen) setPanePinned(true);
+              setPaneOpen((v) => !v);
+            } else {
+              setDrawerVisible(true);
+            }
+          }}
+        />
         <NavBtn icon="chevron-back" label="上一章" disabled={!hasPrev} c={c} onPress={goPrev} />
         <NavBtn icon="chevron-forward" label="下一章" disabled={!hasNext} c={c} onPress={goNext} />
         <NavBtn
@@ -378,25 +440,49 @@ export function ReaderScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {/* 正文 */}
-      <View style={styles.body}>
-        {error ? (
-          <View style={styles.center}>
-            <Ionicons name="cloud-offline" size={40} color={c.inkFaint} />
-            <Text style={[styles.centerText, { color: c.inkSoft }]}>{error}</Text>
+      {/* 正文（宽屏为 list-detail 双栏：左列表 + 右阅读区） */}
+      <View style={styles.bodyRow}>
+        {listDetail && paneOpen ? (
+          <View
+            style={[
+              styles.listPane,
+              { width: LIST_PANE_WIDTH, backgroundColor: c.paperRaised, borderRightColor: c.hairline },
+            ]}
+          >
+            <ChapterTree
+              book={book}
+              currentParagraph={p}
+              c={c}
+              onSelect={(b, para) => {
+                navigateTo(b, para);
+                // 选中一章后自动收起（除非用户手动展开过）
+                if (!panePinned) setPaneOpen(false);
+              }}
+            />
           </View>
-        ) : !doc ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={c.vermilion} />
-          </View>
-        ) : (
-          <WebView
-            source={{ html }}
-            originWhitelist={["*"]}
-            style={[styles.web, { backgroundColor: c.paper }]}
-            setSupportMultipleWindows={false}
-          />
-        )}
+        ) : null}
+        <View
+          style={styles.body}
+          onLayout={(e) => setReaderWidth(Math.round(e.nativeEvent.layout.width))}
+        >
+          {error ? (
+            <View style={styles.center}>
+              <Ionicons name="cloud-offline" size={40} color={c.inkFaint} />
+              <Text style={[styles.centerText, { color: c.inkSoft }]}>{error}</Text>
+            </View>
+          ) : !doc ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={c.vermilion} />
+            </View>
+          ) : (
+            <WebView
+              source={{ html }}
+              originWhitelist={["*"]}
+              style={[styles.web, { backgroundColor: c.paper }]}
+              setSupportMultipleWindows={false}
+            />
+          )}
+        </View>
       </View>
 
       {/* 底部悬浮：就此段落提问 */}
@@ -611,8 +697,15 @@ const styles = StyleSheet.create({
   navBtnLabel: {
     fontSize: 13,
   },
+  bodyRow: {
+    flex: 1,
+    flexDirection: "row",
+  },
   body: {
     flex: 1,
+  },
+  listPane: {
+    borderRightWidth: StyleSheet.hairlineWidth,
   },
   web: {
     flex: 1,
