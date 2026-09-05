@@ -34,7 +34,7 @@ cp .env.example .env
 npx expo start --lan
 ```
 
-Open the development build on the phone and connect to `exp://<computer-ip>:8081`.
+Open the development build on the phone and connect to `http://<computer-ip>:8081`.
 With an empty `.env` the app reads from the public `next.wikipali.org` server —
 nothing else to configure.
 
@@ -98,6 +98,7 @@ You need this once per device; afterwards Metro serves every JS/TS change live.
 | **Device + public API** | Full reading experience against `next.wikipali.org`; AI tab offline | Nothing — works with an empty `.env` |
 | **Device + local AI stack** | Adds streaming AI Q&A | Run the `agent-poc` services, point `EXPO_PUBLIC_RUNTIME_URL` at your LAN IP |
 | **Android emulator** | Same APK via `adb install` | Use `10.0.2.2` instead of the LAN IP |
+| **Waydroid** | Same app on a Linux Android container | Install with `waydroid app install`, then connect to the host LAN IP (or `192.168.240.1` on the `waydroid0` bridge) |
 | **iOS device / Simulator** | Same app on iOS | The Simulator shares the host network, so `localhost` works as-is |
 
 Web is not a supported target. Step-by-step for every mode:

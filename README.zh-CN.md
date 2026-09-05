@@ -33,7 +33,7 @@ cp .env.example .env
 npx expo start --lan
 ```
 
-打开手机上的 development build，连接 `exp://<电脑IP>:8081`。
+打开手机上的 development build，连接 `http://<电脑IP>:8081`。
 `.env` 留空时 App 直接读线上的 `next.wikipali.org`，不需要任何额外配置。
 
 > [!IMPORTANT]
@@ -94,6 +94,7 @@ npx expo start --lan
 | **真机 + 线上 API** | 完整阅读链路（走 `next.wikipali.org`），AI 页不可用 | 无需配置，`.env` 留空即可 |
 | **真机 + 本地 AI 服务** | 增加流式 AI 问答 | 启动 `agent-poc` 各服务，并把 `EXPO_PUBLIC_RUNTIME_URL` 指向电脑局域网 IP |
 | **Android 模拟器** | 同一个 APK，`adb install` 安装 | 用 `10.0.2.2` 代替局域网 IP |
+| **Waydroid** | 在 Linux 的 Android 容器里运行 | 用 `waydroid app install` 安装，连接宿主机局域网 IP（或 `waydroid0` 网桥上的 `192.168.240.1`） |
 | **iOS 真机 / 模拟器** | 同一套代码跑在 iOS 上 | 模拟器与电脑共用网络，直接用 `localhost` 即可 |
 
 Web 不作为支持目标。各环境的详细步骤见

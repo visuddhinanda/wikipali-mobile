@@ -62,7 +62,7 @@ npx expo start --lan       # add CI=1 if Metro hits the watcher limit (see troub
 ```
 
 Open the installed development build on the phone and enter
-`exp://<computer-ip>:8081`.
+`http://<computer-ip>:8081`.
 
 ### Mode B — Device + local AI stack
 
