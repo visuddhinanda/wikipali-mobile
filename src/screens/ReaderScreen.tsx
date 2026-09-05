@@ -33,6 +33,7 @@ import {
   widthClassOf,
 } from "../theme/breakpoints";
 import { readerColors, type ReaderChrome } from "../theme/reader";
+import { useT } from "../i18n/I18nContext";
 import {
   FONT_OPTIONS,
   fontSizePx,
@@ -204,6 +205,7 @@ function NavBtn({
 }
 
 export function ReaderScreen({ route, navigation }: Props) {
+  const t = useT();
   const { book, paragraph, title } = route.params;
 
   const [settings, setSettings] = useState<ReaderSettings>({
@@ -308,7 +310,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         if (alive) setDoc(d);
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : "加载失败");
+        if (alive) setError(err instanceof Error ? err.message : t("common.loadFailed"));
       });
 
     return () => {
@@ -369,7 +371,7 @@ export function ReaderScreen({ route, navigation }: Props) {
     getBookChannels(book, p)
       .then(setChannels)
       .catch((e) =>
-        setChannelsError(e instanceof Error ? e.message : "加载失败"),
+        setChannelsError(e instanceof Error ? e.message : t("common.loadFailed")),
       );
   };
 
@@ -418,7 +420,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       <View style={[styles.navBar, { backgroundColor: c.paperRaised, borderBottomColor: c.hairline }]}>
         <NavBtn
           icon="list-outline"
-          label="目录"
+          label={t("reader.toc")}
           c={c}
           onPress={() => {
             if (listDetail) {
@@ -430,11 +432,23 @@ export function ReaderScreen({ route, navigation }: Props) {
             }
           }}
         />
-        <NavBtn icon="chevron-back" label="上一章" disabled={!hasPrev} c={c} onPress={goPrev} />
-        <NavBtn icon="chevron-forward" label="下一章" disabled={!hasNext} c={c} onPress={goNext} />
+        <NavBtn
+          icon="chevron-back"
+          label={t("reader.prevChapter")}
+          disabled={!hasPrev}
+          c={c}
+          onPress={goPrev}
+        />
+        <NavBtn
+          icon="chevron-forward"
+          label={t("reader.nextChapter")}
+          disabled={!hasNext}
+          c={c}
+          onPress={goNext}
+        />
         <NavBtn
           icon="layers-outline"
-          label={channelName ? "版本" : "版本"}
+          label={t("reader.version")}
           c={c}
           onPress={openVersion}
         />
@@ -488,7 +502,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       {/* 底部悬浮：就此段落提问 */}
       <Pressable style={[styles.askFab, { backgroundColor: c.vermilion }]} onPress={askAboutParagraph}>
         <Ionicons name="chatbubble-ellipses-outline" size={17} color="#fdfaf1" />
-        <Text style={styles.askFabText}>就此段落提问</Text>
+        <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
       </Pressable>
 
       {/* 目录抽屉 */}
@@ -540,13 +554,18 @@ function SettingsSheet({
   onClose: () => void;
   onChange: (s: ReaderSettings) => void;
 }) {
+  const t = useT();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: c.paperRaised, borderTopColor: c.border }]}>
-        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>阅读设置</Text>
+        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>
+          {t("reader.settings")}
+        </Text>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>字号</Text>
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.fontSize")}
+        </Text>
         <View style={styles.fontRow}>
           {FONT_OPTIONS.map((f) => {
             const active = settings.fontSize === f.id;
@@ -560,32 +579,36 @@ function SettingsSheet({
                 onPress={() => onChange({ ...settings, fontSize: f.id as ReaderFontSize })}
               >
                 <Text style={{ color: active ? "#fdfaf1" : c.ink, fontSize: f.px }}>
-                  {f.label}
+                  {t(f.labelKey)}
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>主题</Text>
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.theme")}
+        </Text>
         <View style={styles.fontRow}>
           {(
             [
-              { id: "light", label: "亮色" },
-              { id: "dark", label: "深色" },
+              { id: "light", labelKey: "reader.theme.light" },
+              { id: "dark", labelKey: "reader.theme.dark" },
             ] as const
-          ).map((t) => {
-            const active = settings.theme === t.id;
+          ).map((opt) => {
+            const active = settings.theme === opt.id;
             return (
               <Pressable
-                key={t.id}
+                key={opt.id}
                 style={[
                   styles.fontPill,
                   { backgroundColor: active ? c.vermilion : c.paperSunken },
                 ]}
-                onPress={() => onChange({ ...settings, theme: t.id })}
+                onPress={() => onChange({ ...settings, theme: opt.id })}
               >
-                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>{t.label}</Text>
+                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
+                  {t(opt.labelKey)}
+                </Text>
               </Pressable>
             );
           })}
@@ -612,11 +635,14 @@ function VersionSheet({
   onClose: () => void;
   onPick: (ch: ChapterChannel) => void;
 }) {
+  const t = useT();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]} onPress={onClose} />
       <View style={[styles.sheet, { backgroundColor: c.paperRaised, borderTopColor: c.border }]}>
-        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>切换版本</Text>
+        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>
+          {t("reader.switchVersion")}
+        </Text>
         {channelsError ? (
           <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{channelsError}</Text>
         ) : !channels ? (
@@ -624,7 +650,9 @@ function VersionSheet({
             <ActivityIndicator color={c.vermilion} />
           </View>
         ) : channels.length === 0 ? (
-          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>暂无可用版本</Text>
+          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+            {t("reader.noVersions")}
+          </Text>
         ) : (
           <ScrollView style={styles.versionList}>
             {channels.map((ch) => {

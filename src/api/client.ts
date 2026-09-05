@@ -1,4 +1,5 @@
 /** 极简 fetch 封装：超时 + JSON 解析 + 统一错误。 */
+import { t } from "../i18n";
 
 export class ApiError extends Error {
   constructor(
@@ -29,7 +30,7 @@ export async function request<T>(
     });
   } catch (err) {
     throw new ApiError(
-      err instanceof Error ? err.message : "网络请求失败",
+      err instanceof Error ? err.message : t("error.network"),
     );
   } finally {
     clearTimeout(timer);
@@ -44,6 +45,6 @@ export async function request<T>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new ApiError("响应不是合法 JSON");
+    throw new ApiError(t("error.badJson"));
   }
 }

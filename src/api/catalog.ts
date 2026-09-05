@@ -6,6 +6,7 @@
  */
 import { resolveBaseUrl, toApiV3Base } from "./config";
 import { request } from "./client";
+import { t } from "../i18n";
 import type {
   BookTitle,
   ChapterChannel,
@@ -22,7 +23,7 @@ interface Envelope<T> {
 
 function unwrap<T>(env: Envelope<T>): T {
   if (!env || env.ok === false) {
-    throw new Error(env?.message ?? "后端返回错误");
+    throw new Error(env?.message ?? t("error.backend"));
   }
   return env.data;
 }

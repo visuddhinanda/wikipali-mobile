@@ -24,6 +24,8 @@ import { NewChatScreen } from "../screens/NewChatScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -44,17 +46,21 @@ type IoniconName = keyof typeof Ionicons.glyphMap;
 
 const TAB_ICONS: Record<
   keyof TabParamList,
-  { active: IoniconName; inactive: IoniconName; label: string }
+  { active: IoniconName; inactive: IoniconName; label: MessageKey }
 > = {
-  Discover: { active: "grid", inactive: "grid-outline", label: "分类" },
-  Bookshelf: { active: "book", inactive: "book-outline", label: "书架" },
+  Discover: { active: "grid", inactive: "grid-outline", label: "nav.discover" },
+  Bookshelf: {
+    active: "book",
+    inactive: "book-outline",
+    label: "nav.bookshelf",
+  },
   AiChat: {
     active: "chatbubble-ellipses",
     inactive: "chatbubble-ellipses-outline",
-    label: "探索",
+    label: "nav.aiChat",
   },
-  Tools: { active: "apps", inactive: "apps-outline", label: "工具" },
-  Profile: { active: "person", inactive: "person-outline", label: "我" },
+  Tools: { active: "apps", inactive: "apps-outline", label: "nav.tools" },
+  Profile: { active: "person", inactive: "person-outline", label: "nav.profile" },
 };
 
 function TabBarIcon({
@@ -107,8 +113,10 @@ const stackScreenOptions = () => ({
   contentStyle: { backgroundColor: colors.paper },
 });
 
+type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
 /** 阅读链路：分类树 → 章节 → 版本 → 阅读器。多个 Tab 复用。 */
-function readingChainScreens() {
+function readingChainScreens(t: T) {
   return (
     <>
       <Stack.Screen
@@ -116,7 +124,8 @@ function readingChainScreens() {
         component={CategoryBrowseScreen}
         options={({ route }) => ({
           title:
-            route.params.breadcrumb[route.params.breadcrumb.length - 1] ?? "目录",
+            route.params.breadcrumb[route.params.breadcrumb.length - 1] ??
+            t("nav.catalog"),
         })}
       />
       <Stack.Screen
@@ -137,91 +146,96 @@ function readingChainScreens() {
       <Stack.Screen
         name="NewChat"
         component={NewChatScreen}
-        options={{ title: "新对话" }}
+        options={{ title: t("nav.newChat") }}
       />
     </>
   );
 }
 
 function BrowseStack() {
+  const t = useT();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions()}>
       <Stack.Screen
         name="Discover"
         component={DiscoverScreen}
-        options={{ title: "分类" }}
+        options={{ title: t("nav.discover") }}
       />
-      {readingChainScreens()}
+      {readingChainScreens(t)}
     </Stack.Navigator>
   );
 }
 
 function BookshelfStack() {
+  const t = useT();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions()}>
       <Stack.Screen
         name="Bookshelf"
         component={BookshelfScreen}
-        options={{ title: "书架" }}
+        options={{ title: t("nav.bookshelf") }}
       />
-      {readingChainScreens()}
+      {readingChainScreens(t)}
     </Stack.Navigator>
   );
 }
 
 function ChatStack() {
+  const t = useT();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions()}>
       <Stack.Screen
         name="AiChat"
         component={AiChatScreen}
-        options={{ title: "探索" }}
+        options={{ title: t("nav.aiChat") }}
       />
-      {readingChainScreens()}
+      {readingChainScreens(t)}
     </Stack.Navigator>
   );
 }
 
 function ToolsStack() {
+  const t = useT();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions()}>
       <Stack.Screen
         name="Tools"
         component={ToolsScreen}
-        options={{ title: "工具" }}
+        options={{ title: t("nav.tools") }}
       />
     </Stack.Navigator>
   );
 }
 
 function ProfileStack() {
+  const t = useT();
   return (
     <Stack.Navigator screenOptions={stackScreenOptions()}>
       <Stack.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: "我" }}
+        options={{ title: t("nav.profile") }}
       />
       <Stack.Screen
         name="NewChat"
         component={NewChatScreen}
-        options={{ title: "新对话" }}
+        options={{ title: t("nav.newChat") }}
       />
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ title: "设置" }}
+        options={{ title: t("nav.settings") }}
       />
       <Stack.Screen
         name="SignIn"
         component={SignInScreen}
-        options={{ title: "登录" }}
+        options={{ title: t("nav.signIn") }}
       />
       {__DEV__ ? (
         <Stack.Screen
           name="DebugLayout"
           component={DebugLayoutScreen}
-          options={{ title: "布局调试" }}
+          options={{ title: t("nav.debugLayout") }}
         />
       ) : null}
     </Stack.Navigator>
@@ -240,6 +254,7 @@ export function RootNavigator() {
   // 导航容器随窗口宽度切换（DESIGN.md §4.3）：
   // compact 底部 Tab bar / medium·expanded 左侧 rail(80) / large 常驻侧边栏(280)。
   const { navKind, navWidth, isShort } = useLayout();
+  const t = useT();
   const vertical = navKind !== "tabs";
 
   return (
@@ -279,7 +294,7 @@ export function RootNavigator() {
             key={name}
             name={name}
             component={TAB_STACKS[name]}
-            options={{ title: TAB_ICONS[name].label }}
+            options={{ title: t(TAB_ICONS[name].label) }}
           />
         ))}
       </Tab.Navigator>

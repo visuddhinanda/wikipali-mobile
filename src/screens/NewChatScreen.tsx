@@ -27,6 +27,8 @@ import { StreamdownText } from "react-native-streamdown";
 import { z } from "zod";
 import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -57,25 +59,25 @@ function parsePassage(url: string): {
   return { book: Number(m[1]), paragraph: Number(m[2]), channel };
 }
 
-/** 工具名 → 中文标签。 */
-const TOOL_LABELS: Record<string, string> = {
-  wikipali_forms: "展开词形",
-  wikipali_search: "检索经文",
-  wikipali_get: "取经文原文",
-  wikipali_dist: "统计出处分布",
-  wikipali_word: "查词典",
-  wikipali_count: "词频统计",
-  wikipali_terms: "查术语",
-  wikipali_books: "分类目录",
-  wikipali_toc: "章节目录",
-  wikipali_paras: "段落清单",
-  wikipali_chapter: "章节体量",
-  wikipali_chapter_fetch: "整章取文",
-  wikipali_versions: "查译本",
-  wikipali_related: "关联段落",
-  wikipali_articles: "文章列表",
-  wikipali_article: "读文章",
-  wikipali_anthology: "文集",
+/** 工具名 → 文案 key。 */
+const TOOL_LABELS: Record<string, MessageKey> = {
+  wikipali_forms: "tool.wikipali_forms",
+  wikipali_search: "tool.wikipali_search",
+  wikipali_get: "tool.wikipali_get",
+  wikipali_dist: "tool.wikipali_dist",
+  wikipali_word: "tool.wikipali_word",
+  wikipali_count: "tool.wikipali_count",
+  wikipali_terms: "tool.wikipali_terms",
+  wikipali_books: "tool.wikipali_books",
+  wikipali_toc: "tool.wikipali_toc",
+  wikipali_paras: "tool.wikipali_paras",
+  wikipali_chapter: "tool.wikipali_chapter",
+  wikipali_chapter_fetch: "tool.wikipali_chapter_fetch",
+  wikipali_versions: "tool.wikipali_versions",
+  wikipali_related: "tool.wikipali_related",
+  wikipali_articles: "tool.wikipali_articles",
+  wikipali_article: "tool.wikipali_article",
+  wikipali_anthology: "tool.wikipali_anthology",
 };
 
 /** 引用链接的 tag 样式（按 URL 模式匹配 wikipali 阅读器链接）。 */
@@ -95,8 +97,11 @@ const markdownStyle = {
 
 function ToolCallBubble(props: any) {
   const { name, status } = props;
+  const t = useT();
   const running = String(status) !== "complete";
-  const label = TOOL_LABELS[name] ?? name;
+  const key = TOOL_LABELS[name];
+  // 后端可能加了新工具，没有对应文案时直接显示工具名。
+  const label = key ? t(key) : name;
   return (
     <View style={styles.toolBubble}>
       {running ? (
@@ -105,7 +110,7 @@ function ToolCallBubble(props: any) {
         <Ionicons name="checkmark-circle" size={14} color={colors.success} />
       )}
       <Text style={styles.toolBubbleText}>
-        {label} {running ? "进行中…" : "完成"}
+        {label} {running ? t("chat.toolRunning") : t("chat.toolDone")}
       </Text>
     </View>
   );
@@ -113,6 +118,7 @@ function ToolCallBubble(props: any) {
 
 function ChatUI({ seedText }: { seedText?: string }) {
   const navigation = useNavigation<Nav>();
+  const t = useT();
   const { agent, messages, isRunning, submitMessage } = useCopilotChatContext();
   const renderToolCall = useRenderToolCall();
   const [input, setInput] = React.useState("");
@@ -147,7 +153,7 @@ function ChatUI({ seedText }: { seedText?: string }) {
   useRenderTool(
     {
       name: "*",
-      description: "显示工具调用状态",
+      description: t("chat.toolStatusDesc"),
       parameters: z.object({}),
       render: ToolCallBubble,
     },
@@ -240,7 +246,7 @@ function ChatUI({ seedText }: { seedText?: string }) {
           showThinking ? (
             <View style={styles.thinkingBubble}>
               <ActivityIndicator size="small" color={colors.vermilion} />
-              <Text style={styles.thinkingText}>思考中…</Text>
+              <Text style={styles.thinkingText}>{t("chat.thinking")}</Text>
             </View>
           ) : null
         }
@@ -250,7 +256,7 @@ function ChatUI({ seedText }: { seedText?: string }) {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="继续追问…"
+          placeholder={t("chat.followUp")}
           placeholderTextColor={colors.inkFaint}
           multiline
           onSubmitEditing={send}

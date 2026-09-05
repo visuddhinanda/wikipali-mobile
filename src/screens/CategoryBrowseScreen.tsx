@@ -4,7 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { isLeaf } from "../catalog";
-import { labelZh } from "../catalog/labels";
+import { label } from "../catalog/labels";
+import { useI18n } from "../i18n/I18nContext";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -13,17 +14,18 @@ type Props = NativeStackScreenProps<RootStackParamList, "CategoryBrowse">;
 export function CategoryBrowseScreen({ route, navigation }: Props) {
   const { node, breadcrumb } = route.params;
   const children = node.children ?? [];
+  const { t, locale } = useI18n();
 
   const openChild = (child: (typeof children)[number]) => {
     if (isLeaf(child)) {
       navigation.navigate("ChapterList", {
         tagPath: child.tag,
-        title: labelZh(child.name),
+        title: label(child.name, locale),
       });
     } else {
       navigation.push("CategoryBrowse", {
         node: child,
-        breadcrumb: [...breadcrumb, labelZh(child.name)],
+        breadcrumb: [...breadcrumb, label(child.name, locale)],
       });
     }
   };
@@ -38,7 +40,9 @@ export function CategoryBrowseScreen({ route, navigation }: Props) {
             {name}
           </Text>
         ))}
-        <Text style={styles.breadcrumbCount}> · {children.length} 项</Text>
+        <Text style={styles.breadcrumbCount}>
+          {t("categoryBrowse.count", { n: children.length })}
+        </Text>
       </View>
 
       <FlatList
@@ -51,7 +55,7 @@ export function CategoryBrowseScreen({ route, navigation }: Props) {
           return (
             <Pressable style={styles.row} onPress={() => openChild(item)}>
               <View style={styles.rowBody}>
-                <Text style={styles.rowZh}>{labelZh(item.name)}</Text>
+                <Text style={styles.rowZh}>{label(item.name, locale)}</Text>
                 <Text style={styles.rowPali}>{item.name}</Text>
               </View>
               <Text style={styles.rowCount}>{item.children?.length ?? ""}</Text>

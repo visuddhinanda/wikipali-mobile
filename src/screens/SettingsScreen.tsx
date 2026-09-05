@@ -10,9 +10,12 @@ import {
 } from "../settings/server";
 import { ENV_API_URL } from "../api/config";
 import { colors, radius, spacing, type } from "../theme";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 
 export function SettingsScreen() {
   const [server, setServer] = useState<string>(DEFAULT_SERVER);
+  const t = useT();
 
   useEffect(() => {
     getApiServer().then(setServer);
@@ -25,8 +28,8 @@ export function SettingsScreen() {
 
   return (
     <Screen contentStyle={styles.content}>
-      <Text style={styles.sectionTitle}>API 服务器</Text>
-      <Text style={styles.sectionHint}>选择读取经文数据所用的后端服务器。</Text>
+      <Text style={styles.sectionTitle}>{t("settings.apiServer")}</Text>
+      <Text style={styles.sectionHint}>{t("settings.apiServerHint")}</Text>
 
       {API_SERVERS.map((s) => {
         const active = s.id === server;
@@ -53,22 +56,24 @@ export function SettingsScreen() {
 
       {ENV_API_URL ? (
         <Text style={styles.overrideNote}>
-          当前由 .env 的 EXPO_PUBLIC_API_URL 覆盖：{ENV_API_URL}
+          {t("settings.envOverride", { url: ENV_API_URL })}
         </Text>
       ) : null}
 
       <View style={styles.divider} />
 
-      <Text style={styles.sectionTitle}>其他设置</Text>
-      {[
-        { icon: "language", label: "语言偏好" },
-        { icon: "text", label: "显示设置（字号 / 主题）" },
-        { icon: "download", label: "下载管理" },
-        { icon: "information-circle", label: "关于 / 反馈" },
-      ].map((row) => (
+      <Text style={styles.sectionTitle}>{t("settings.others")}</Text>
+      {(
+        [
+          { icon: "language", label: "settings.language" as MessageKey },
+          { icon: "text", label: "settings.display" as MessageKey },
+          { icon: "download", label: "settings.downloads" as MessageKey },
+          { icon: "information-circle", label: "settings.about" as MessageKey },
+        ]
+      ).map((row) => (
         <Pressable key={row.label} style={styles.row} onPress={() => undefined}>
           <Ionicons name={row.icon as any} size={20} color={colors.inkSoft} />
-          <Text style={styles.rowLabel}>{row.label}</Text>
+          <Text style={styles.rowLabel}>{t(row.label)}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
         </Pressable>
       ))}

@@ -4,16 +4,27 @@ import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import { useLayout } from "../hooks/useLayout";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
-const TOOLS: { icon: IoniconName; title: string; desc: string }[] = [
-  { icon: "search", title: "字典", desc: "逐词查询 · 最近历史" },
-  { icon: "calendar", title: "佛教日历", desc: "布萨日 · 结夏安居" },
-  { icon: "swap-horizontal", title: "编码转换", desc: "罗马转写 · 悉昙 · 缅泰文" },
+const TOOLS: { icon: IoniconName; title: MessageKey; desc: MessageKey }[] = [
+  { icon: "search", title: "tools.dict.title", desc: "tools.dict.desc" },
+  {
+    icon: "calendar",
+    title: "tools.calendar.title",
+    desc: "tools.calendar.desc",
+  },
+  {
+    icon: "swap-horizontal",
+    title: "tools.transcode.title",
+    desc: "tools.transcode.desc",
+  },
 ];
 
 export function ToolsScreen() {
+  const t = useT();
   // 卡片列数随宽度档变化（DESIGN.md §4.5）。
   const { cardWidth } = useLayout();
   const width = cardWidth(spacing.md);
@@ -21,17 +32,17 @@ export function ToolsScreen() {
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.grid}>
-        {TOOLS.map((t) => (
+        {TOOLS.map((tool) => (
           <Pressable
-            key={t.title}
+            key={tool.title}
             style={[styles.card, { width }]}
             onPress={() => undefined}
           >
             <View style={styles.cardIcon}>
-              <Ionicons name={t.icon} size={24} color={colors.vermilion} />
+              <Ionicons name={tool.icon} size={24} color={colors.vermilion} />
             </View>
-            <Text style={styles.cardTitle}>{t.title}</Text>
-            <Text style={styles.cardDesc}>{t.desc}</Text>
+            <Text style={styles.cardTitle}>{t(tool.title)}</Text>
+            <Text style={styles.cardDesc}>{t(tool.desc)}</Text>
           </Pressable>
         ))}
       </View>

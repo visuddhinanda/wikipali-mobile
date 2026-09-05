@@ -3,39 +3,47 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
-import { getBooksByTags, bookKindLabel } from "../catalog";
+import { getBooksByTags, bookKind, type BookKind } from "../catalog";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ChapterList">;
 
 /** 书目分类排序：根本 → 义注 → 复注。 */
-const KIND_RANK: Record<string, number> = {
-  根本: 0,
-  义注: 1,
-  复注: 2,
+const KIND_RANK: Record<BookKind, number> = {
+  root: 0,
+  atthakatha: 1,
+  tika: 2,
+};
+
+const KIND_LABEL: Record<BookKind, MessageKey> = {
+  root: "layer.root",
+  atthakatha: "layer.atthakatha",
+  tika: "layer.tika",
 };
 
 export function ChapterListScreen({ route, navigation }: Props) {
   const { tagPath, title } = route.params;
+  const t = useT();
   const books = getBooksByTags(tagPath).sort(
     (a, b) =>
-      (KIND_RANK[bookKindLabel(a.tags)] ?? 0) -
-      (KIND_RANK[bookKindLabel(b.tags)] ?? 0),
+      KIND_RANK[bookKind(a.tags)] - KIND_RANK[bookKind(b.tags)],
   );
 
   return (
     <Screen scroll={false} contentStyle={styles.contentFill}>
       <View style={styles.subheader}>
         <Text style={styles.subheaderText}>
-          {title} · {books.length} 篇
+          {t("chapterList.count", { title, n: books.length })}
         </Text>
       </View>
 
       {books.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={40} color={colors.inkFaint} />
-          <Text style={styles.centerText}>该目录暂无书籍</Text>
+          <Text style={styles.centerText}>{t("chapterList.empty")}</Text>
         </View>
       ) : (
         <FlatList
@@ -55,7 +63,7 @@ export function ChapterListScreen({ route, navigation }: Props) {
               }
             >
               <View style={styles.kind}>
-                <Text style={styles.kindText}>{bookKindLabel(item.tags)}</Text>
+                <Text style={styles.kindText}>{t(KIND_LABEL[bookKind(item.tags)])}</Text>
               </View>
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>{item.title}</Text>

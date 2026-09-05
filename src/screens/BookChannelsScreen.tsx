@@ -15,16 +15,17 @@ import { getBookChannels } from "../api";
 import type { ChapterChannel } from "../catalog";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
+import { useI18n } from "../i18n/I18nContext";
+import type { Locale, MessageKey } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BookChannels">;
 
-/** 频道类型 → 分组标题。 */
-const TYPE_LABEL: Record<string, string> = {
-  translation: "译文",
-  nissaya: "Nissaya",
-  original: "原文",
-  wbw: "逐词",
-  commentary: "义注",
+/** 频道类型 → 分组标题的文案 key（Nissaya 是专名，不翻译）。 */
+const TYPE_LABEL: Record<string, MessageKey> = {
+  translation: "channels.translation",
+  original: "channels.original",
+  wbw: "channels.wbw",
+  commentary: "channels.commentary",
 };
 
 /** 分组展示顺序；不在列表里的类型追加到末尾。 */
@@ -48,8 +49,15 @@ function toCn(n: number): string {
   return String(n);
 }
 
-/** 把 updated_at（ISO 8601）换算成「三天前 / 一个月前 / 一年前」这类相对时间。 */
-function formatRelativeTime(iso?: string): string {
+/**
+ * 把 updated_at（ISO 8601）换算成「三天前 / 一个月前 / 一年前」这类相对时间。
+ * 中文用汉字数字（「三天前」），其他语言用阿拉伯数字。
+ */
+function formatRelativeTime(
+  iso: string | undefined,
+  locale: Locale,
+  t: (k: MessageKey, v?: Record<string, string | number>) => string,
+): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
@@ -60,13 +68,18 @@ function formatRelativeTime(iso?: string): string {
   const day = 24 * hour;
   const month = 30 * day;
   const year = 365 * day;
+  const num = (n: number) => (locale === "zh-Hans" ? toCn(n) : String(n));
 
-  if (diffMs < minute) return "刚刚";
-  if (diffMs < hour) return `${toCn(Math.floor(diffMs / minute))}分钟前`;
-  if (diffMs < day) return `${toCn(Math.floor(diffMs / hour))}小时前`;
-  if (diffMs < month) return `${toCn(Math.floor(diffMs / day))}天前`;
-  if (diffMs < year) return `${toCn(Math.floor(diffMs / month))}个月前`;
-  return `${toCn(Math.floor(diffMs / year))}年前`;
+  if (diffMs < minute) return t("common.justNow");
+  if (diffMs < hour)
+    return t("common.minutesAgo", { n: num(Math.floor(diffMs / minute)) });
+  if (diffMs < day)
+    return t("common.hoursAgo", { n: num(Math.floor(diffMs / hour)) });
+  if (diffMs < month)
+    return t("common.daysAgo", { n: num(Math.floor(diffMs / day)) });
+  if (diffMs < year)
+    return t("common.monthsAgo", { n: num(Math.floor(diffMs / month)) });
+  return t("common.yearsAgo", { n: num(Math.floor(diffMs / year)) });
 }
 
 interface ChannelSection {
@@ -83,6 +96,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const { t, locale } = useI18n();
 
   useEffect(() => {
     let alive = true;
@@ -91,7 +105,8 @@ export function BookChannelsScreen({ route, navigation }: Props) {
         if (alive) setChannels(rows);
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : "加载失败");
+        if (alive)
+          setError(err instanceof Error ? err.message : t("common.loadFailed"));
       });
     return () => {
       alive = false;
@@ -112,14 +127,16 @@ export function BookChannelsScreen({ route, navigation }: Props) {
     }
 
     return order
-      .map((t) => {
-        const data = channels.filter((c) => c.type === t);
+      .map((kind) => {
+        const data = channels.filter((c) => c.type === kind);
         const total = data.length;
         const over = total > COLLAPSE_AT;
-        const isExpanded = !!expanded[t];
+        const isExpanded = !!expanded[kind];
+        const key = TYPE_LABEL[kind];
         return {
-          key: t,
-          label: TYPE_LABEL[t] ?? t,
+          key: kind,
+          // 未知类型没有对应文案，直接显示后端给的原值。
+          label: key ? t(key) : kind,
           total,
           over,
           expanded: isExpanded,
@@ -127,7 +144,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
         };
       })
       .filter((s) => s.total > 0);
-  }, [channels, expanded]);
+  }, [channels, expanded, t]);
 
   const toggle = (key: string) =>
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -153,13 +170,13 @@ export function BookChannelsScreen({ route, navigation }: Props) {
     <Screen scroll={false} contentStyle={styles.contentFill}>
       <View style={styles.subheader}>
         <Text style={styles.subheaderText}>
-          {title} · {channels.length} 个版本
+          {t("channels.count", { title, n: channels.length })}
         </Text>
       </View>
       {channels.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={40} color={colors.inkFaint} />
-          <Text style={styles.centerText}>该书暂无可用版本</Text>
+          <Text style={styles.centerText}>{t("channels.empty")}</Text>
         </View>
       ) : (
         <SectionList
@@ -171,7 +188,9 @@ export function BookChannelsScreen({ route, navigation }: Props) {
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionLabel}>{section.label}</Text>
-              <Text style={styles.sectionCount}>{section.total} 个</Text>
+              <Text style={styles.sectionCount}>
+                {t("channels.groupCount", { n: section.total })}
+              </Text>
             </View>
           )}
           renderSectionFooter={({ section }) =>
@@ -183,8 +202,10 @@ export function BookChannelsScreen({ route, navigation }: Props) {
               >
                 <Text style={styles.foldBtnText}>
                   {section.expanded
-                    ? "收起"
-                    : `展开其余 ${section.total - COLLAPSE_AT} 个`}
+                    ? t("channels.collapse")
+                    : t("channels.expandRest", {
+                        n: section.total - COLLAPSE_AT,
+                      })}
                 </Text>
                 <Ionicons
                   name={section.expanded ? "chevron-up" : "chevron-down"}
@@ -214,7 +235,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
                 ) : null}
                 {item.updated_at ? (
                   <Text style={styles.rowTime}>
-                    {formatRelativeTime(item.updated_at)}
+                    {formatRelativeTime(item.updated_at, locale, t)}
                   </Text>
                 ) : null}
               </View>

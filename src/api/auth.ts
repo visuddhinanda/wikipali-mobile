@@ -11,6 +11,7 @@
 import { resolveBaseUrl } from "./config";
 import { ApiError } from "./client";
 import { getTokenSync, type AuthUser } from "../auth/session";
+import { t } from "../i18n";
 
 interface Envelope<T> {
   ok: boolean;
@@ -33,7 +34,7 @@ async function callJson<T>(url: string, init: RequestInit): Promise<Envelope<T>>
   try {
     res = await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
-    throw new ApiError(err instanceof Error ? err.message : "网络请求失败");
+    throw new ApiError(err instanceof Error ? err.message : t("error.network"));
   } finally {
     clearTimeout(timer);
   }
@@ -46,7 +47,7 @@ async function callJson<T>(url: string, init: RequestInit): Promise<Envelope<T>>
   try {
     return JSON.parse(text) as Envelope<T>;
   } catch {
-    throw new ApiError("响应不是合法 JSON", res.status);
+    throw new ApiError(t("error.badJson"), res.status);
   }
 }
 
@@ -65,7 +66,7 @@ export async function signIn(
     body: JSON.stringify({ username, password }),
   });
   if (!env.ok || !env.data) {
-    throw new ApiError(env.message || "用户名或密码错误");
+    throw new ApiError(env.message || t("signIn.badCredentials"));
   }
   return env.data;
 }
@@ -85,7 +86,7 @@ export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
     },
   });
   if (!env.ok || !env.data) {
-    throw new ApiError(env.message || "登录状态已失效");
+    throw new ApiError(env.message || t("signIn.expired"));
   }
   return env.data;
 }

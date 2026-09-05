@@ -6,7 +6,8 @@ import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { useLayout } from "../hooks/useLayout";
 import { getTree } from "../catalog";
-import { labelZh } from "../catalog/labels";
+import { label } from "../catalog/labels";
+import { useI18n } from "../i18n/I18nContext";
 import { colors, radius, spacing, type, cardShadow, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -26,6 +27,7 @@ export function DiscoverScreen() {
   const roots = getTree();
   // 卡片列数随宽度档变化（DESIGN.md §4.5）。
   const { cardWidth } = useLayout();
+  const { t, locale } = useI18n();
   const basketWidth = cardWidth(spacing.md);
 
   return (
@@ -33,11 +35,13 @@ export function DiscoverScreen() {
       {/* 搜索入口（常驻，跳转全局搜索） */}
       <Pressable style={styles.searchBar} onPress={() => undefined}>
         <Ionicons name="search" size={18} color={colors.inkFaint} />
-        <Text style={styles.searchPlaceholder}>搜索经文、词条…</Text>
+        <Text style={styles.searchPlaceholder}>
+          {t("discover.searchPlaceholder")}
+        </Text>
       </Pressable>
 
       {/* 巴利三藏入口 */}
-      <Text style={styles.sectionTitle}>巴利三藏</Text>
+      <Text style={styles.sectionTitle}>{t("discover.tipitaka")}</Text>
       <View style={styles.basketGrid}>
         {roots.map((node) => (
           <Pressable
@@ -46,11 +50,11 @@ export function DiscoverScreen() {
             onPress={() =>
               navigation.navigate("CategoryBrowse", {
                 node,
-                breadcrumb: [labelZh(node.name)],
+                breadcrumb: [label(node.name, locale)],
               })
             }
           >
-            <Text style={styles.basketZh}>{labelZh(node.name)}</Text>
+            <Text style={styles.basketZh}>{label(node.name, locale)}</Text>
             <Text style={styles.basketEn}>{node.name}</Text>
             <Ionicons
               name="chevron-forward"
@@ -63,7 +67,7 @@ export function DiscoverScreen() {
       </View>
 
       {/* 推荐 / 最近更新 */}
-      <Text style={styles.sectionTitle}>推荐 · 最近更新</Text>
+      <Text style={styles.sectionTitle}>{t("discover.featured")}</Text>
       {FEATURED.map((f) => (
         <Pressable
           key={f.book}
@@ -85,7 +89,7 @@ export function DiscoverScreen() {
       ))}
 
       {/* 作者（语文）筛选 */}
-      <Text style={styles.sectionTitle}>作者（语文）</Text>
+      <Text style={styles.sectionTitle}>{t("discover.authors")}</Text>
       <View style={styles.chips}>
         {LANGUAGES.map((l) => (
           <View key={l} style={styles.chip}>

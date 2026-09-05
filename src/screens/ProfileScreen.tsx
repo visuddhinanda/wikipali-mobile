@@ -15,18 +15,20 @@ import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useAuth } from "../auth/AuthContext";
+import { useT } from "../i18n/I18nContext";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function ProfileScreen() {
   const navigation = useNavigation<Nav>();
   const { restoring, user, signOut } = useAuth();
+  const t = useT();
 
   function confirmSignOut() {
-    Alert.alert("退出登录", "退出后将无法同步书架与提问历史。", [
-      { text: "取消", style: "cancel" },
+    Alert.alert(t("profile.signOut"), t("profile.signOutConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "退出",
+        text: t("profile.signOutAction"),
         style: "destructive",
         onPress: () => void signOut(),
       },
@@ -51,20 +53,20 @@ export function ProfileScreen() {
             <Text style={styles.title}>
               {user.nickName || user.realName || user.id}
             </Text>
-            <Text style={styles.subtitle}>已登录</Text>
+            <Text style={styles.subtitle}>{t("profile.signedIn")}</Text>
             <Pressable style={styles.logoutBtn} onPress={confirmSignOut}>
-              <Text style={styles.logoutBtnText}>退出登录</Text>
+              <Text style={styles.logoutBtnText}>{t("profile.signOut")}</Text>
             </Pressable>
           </>
         ) : (
           <>
-            <Text style={styles.title}>尚未登录</Text>
-            <Text style={styles.subtitle}>登录后同步书架、进度与提问历史</Text>
+            <Text style={styles.title}>{t("profile.signedOut")}</Text>
+            <Text style={styles.subtitle}>{t("profile.signedOutHint")}</Text>
             <Pressable
               style={styles.loginBtn}
               onPress={() => navigation.navigate("SignIn")}
             >
-              <Text style={styles.loginBtnText}>登录 / 注册</Text>
+              <Text style={styles.loginBtnText}>{t("profile.signInOrUp")}</Text>
             </Pressable>
           </>
         )}
@@ -77,7 +79,7 @@ export function ProfileScreen() {
         onPress={() => navigation.navigate("NewChat")}
       >
         <Ionicons name="chatbubble-outline" size={20} color={colors.inkSoft} />
-        <Text style={styles.rowLabel}>我的提问历史</Text>
+        <Text style={styles.rowLabel}>{t("profile.history")}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
       </Pressable>
 
@@ -86,7 +88,7 @@ export function ProfileScreen() {
         onPress={() => navigation.navigate("Settings")}
       >
         <Ionicons name="settings-outline" size={20} color={colors.inkSoft} />
-        <Text style={styles.rowLabel}>设置</Text>
+        <Text style={styles.rowLabel}>{t("nav.settings")}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
       </Pressable>
 
@@ -97,7 +99,7 @@ export function ProfileScreen() {
           onPress={() => navigation.navigate("DebugLayout")}
         >
           <Ionicons name="bug-outline" size={20} color={colors.inkSoft} />
-          <Text style={styles.rowLabel}>布局调试</Text>
+          <Text style={styles.rowLabel}>{t("nav.debugLayout")}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
         </Pressable>
       ) : null}

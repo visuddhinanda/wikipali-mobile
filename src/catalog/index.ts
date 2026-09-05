@@ -40,12 +40,15 @@ export function getBooksByTags(tags: string[]): BookTitle[] {
   });
 }
 
+/** 书名左侧类型徽标的种类；显示名交给 i18n（`layer.*`）。 */
+export type BookKind = "root" | "atthakatha" | "tika";
+
 /**
  * 书名左侧的类型徽标：根本（原文）→ 义注（aṭṭhakathā）→ 复注（ṭīkā）。
  * 依 tags 里的分类标签判断；无分类标签的藏外单行本默认「根本」。
  */
-export function bookKindLabel(tags: string[] = []): string {
-  if (tags.some((t) => t.includes("ṭīkā") || t.includes("dīpanī"))) return "复注";
-  if (tags.some((t) => t.includes("aṭṭhakathā"))) return "义注";
-  return "根本";
+export function bookKind(tags: string[] = []): BookKind {
+  if (tags.some((t) => t.includes("ṭīkā") || t.includes("dīpanī"))) return "tika";
+  if (tags.some((t) => t.includes("aṭṭhakathā"))) return "atthakatha";
+  return "root";
 }

@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n";
+
 /**
  * 目录节点的多语言显示名映射（Pali 转写名 → 中文 / 英文）。
  * 未知节点回退到 Pali 原名。
@@ -115,4 +117,19 @@ export function labelZh(name: string): string {
 
 export function labelEn(name: string): string | undefined {
   return LABELS[name]?.en;
+}
+
+/**
+ * 按界面语言取目录节点的显示名。
+ *
+ * 这张表目前只有 `zh` / `en` 两栏：
+ * - 简体、繁体中文都取 `zh`（繁体暂无独立译名，见 `docs/i18n.md` 的待办）
+ * - 其余语言取 `en`，缺条目时回退 Pali 转写原名 —— Pali 本身就是各国
+ *   佛教文献里通行的写法，比强行显示中文更可读。
+ */
+export function label(name: string, locale: Locale): string {
+  const entry = LABELS[name];
+  if (!entry) return name;
+  const zhLike = locale === "zh-Hans" || locale === "zh-Hant";
+  return (zhLike ? entry.zh : entry.en) ?? name;
 }

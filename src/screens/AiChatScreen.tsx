@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
+import { useT } from "../i18n/I18nContext";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -18,16 +19,17 @@ const FEED = [
 
 export function AiChatScreen() {
   const navigation = useNavigation<Nav>();
+  const t = useT();
 
   return (
     <Screen contentStyle={styles.content}>
       {/* 顶部标语 + 输入框 → 新对话页 */}
-      <Text style={styles.tagline}>与ai助手一起探索三藏奥义</Text>
+      <Text style={styles.tagline}>{t("chat.tagline")}</Text>
       <Pressable
         style={styles.inputBar}
         onPress={() => navigation.navigate("NewChat")}
       >
-        <Text style={styles.inputPlaceholder}>提出一个新问题…</Text>
+        <Text style={styles.inputPlaceholder}>{t("chat.newQuestion")}</Text>
         <View style={styles.sendBtn}>
           <Ionicons name="arrow-up" size={18} color={colors.paperRaised} />
         </View>
@@ -48,7 +50,7 @@ export function AiChatScreen() {
             {item.cited ? (
               <View style={styles.citeTag}>
                 <Ionicons name="book" size={12} color={colors.ochre} />
-                <Text style={styles.citeTagText}>引用经文</Text>
+                <Text style={styles.citeTagText}>{t("chat.cited")}</Text>
               </View>
             ) : null}
           </View>

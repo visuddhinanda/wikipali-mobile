@@ -7,44 +7,58 @@ import { Screen } from "../components/Screen";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
+import { useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const TABS = ["在读", "已下载", "收藏"] as const;
+/** Tab 的稳定 id（不再用中文当键，文案交给 i18n）。 */
+const TABS = ["reading", "downloaded", "starred"] as const;
+type TabId = (typeof TABS)[number];
 
-const EMPTY: Record<(typeof TABS)[number], { title: string; sub: string }> = {
-  在读: {
-    title: "还没有阅读记录",
-    sub: "从「分类」进入经文开始阅读，进度会自动出现在这里。",
+const TAB_LABEL: Record<TabId, MessageKey> = {
+  reading: "bookshelf.tab.reading",
+  downloaded: "bookshelf.tab.downloaded",
+  starred: "bookshelf.tab.starred",
+};
+
+const EMPTY: Record<TabId, { title: MessageKey; sub: MessageKey }> = {
+  reading: {
+    title: "bookshelf.empty.reading.title",
+    sub: "bookshelf.empty.reading.sub",
   },
-  已下载: {
-    title: "暂无下载",
-    sub: "下载的经文会出现在这里，可离线阅读。",
+  downloaded: {
+    title: "bookshelf.empty.downloaded.title",
+    sub: "bookshelf.empty.downloaded.sub",
   },
-  收藏: {
-    title: "暂无收藏",
-    sub: "收藏的经文会出现在这里。",
+  starred: {
+    title: "bookshelf.empty.starred.title",
+    sub: "bookshelf.empty.starred.sub",
   },
 };
 
 /** epoch ms → 相对时间。 */
-function formatRelative(ts?: number): string {
+function formatRelative(
+  ts: number | undefined,
+  t: (k: MessageKey, v?: Record<string, string | number>) => string,
+): string {
   if (!ts) return "";
   const diff = Date.now() - ts;
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  if (diff < minute) return "刚刚";
-  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
+  if (diff < minute) return t("common.justNow");
+  if (diff < hour) return t("common.minutesAgo", { n: Math.floor(diff / minute) });
+  if (diff < day) return t("common.hoursAgo", { n: Math.floor(diff / hour) });
+  if (diff < 7 * day) return t("common.daysAgo", { n: Math.floor(diff / day) });
   const d = new Date(ts);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 export function BookshelfScreen() {
   const navigation = useNavigation<Nav>();
-  const [active, setActive] = useState<(typeof TABS)[number]>("在读");
+  const t = useT();
+  const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
 
   // 每次回到「书架」Tab 时重新加载阅读记录（读完返回可即时看到更新）。
@@ -66,25 +80,28 @@ export function BookshelfScreen() {
     <Screen contentStyle={styles.content}>
       {/* 二级切换 */}
       <View style={styles.segment}>
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <Pressable
-            key={t}
-            style={[styles.segmentItem, active === t && styles.segmentItemActive]}
-            onPress={() => setActive(t)}
+            key={tab}
+            style={[
+              styles.segmentItem,
+              active === tab && styles.segmentItemActive,
+            ]}
+            onPress={() => setActive(tab)}
           >
             <Text
               style={[
                 styles.segmentText,
-                active === t && styles.segmentTextActive,
+                active === tab && styles.segmentTextActive,
               ]}
             >
-              {t}
+              {t(TAB_LABEL[tab])}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      {active === "在读" && readingList.length > 0 ? (
+      {active === "reading" && readingList.length > 0 ? (
         <View>
           {readingList.map((r) => {
             const sub = [
@@ -116,7 +133,7 @@ export function BookshelfScreen() {
                     {sub}
                   </Text>
                 </View>
-                <Text style={styles.rowTime}>{formatRelative(r.updatedAt)}</Text>
+                <Text style={styles.rowTime}>{formatRelative(r.updatedAt, t)}</Text>
                 <Ionicons
                   name="chevron-forward"
                   size={18}
@@ -129,8 +146,8 @@ export function BookshelfScreen() {
       ) : (
         <View style={styles.empty}>
           <Ionicons name="book-outline" size={44} color={colors.inkFaint} />
-          <Text style={styles.emptyTitle}>{EMPTY[active].title}</Text>
-          <Text style={styles.emptySubtitle}>{EMPTY[active].sub}</Text>
+          <Text style={styles.emptyTitle}>{t(EMPTY[active].title)}</Text>
+          <Text style={styles.emptySubtitle}>{t(EMPTY[active].sub)}</Text>
         </View>
       )}
     </Screen>

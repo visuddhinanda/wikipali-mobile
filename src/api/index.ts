@@ -24,6 +24,7 @@ import {
   mockGetChapterToc,
 } from "./mock";
 import { ApiError } from "./client";
+import { t } from "../i18n";
 
 /** 一本书可读的版本/频道列表（原文 + 各译文/逐词版本）。 */
 export async function getBookChannels(
@@ -72,7 +73,7 @@ export async function getChapterByChannel(
       return mockGetChapterByChannel(book, paragraph, channelId);
     }
     if (err instanceof Error && /no such index/i.test(err.message)) {
-      throw new Error("该版本暂无此章节的在线阅读内容");
+      throw new Error(t("error.noOnlineContent"));
     }
     throw err;
   }

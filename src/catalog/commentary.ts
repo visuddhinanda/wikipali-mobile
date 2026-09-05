@@ -28,6 +28,16 @@ const TAG_TO_LAYER: Record<string, CommentaryLayer> = {
   "anuṭīkā": "anutika",
 };
 
+/** UI 显示用的文案 key（`scripts/check-commentary.mjs` 仍用下面的中文常量）。 */
+export const LAYER_MESSAGE_KEY: Record<CommentaryLayer, string> = {
+  mula: "layer.mula",
+  atthakatha: "layer.atthakatha",
+  tika: "layer.tika",
+  mulatika: "layer.mulatika",
+  anutika: "layer.anutika",
+};
+
+/** 调试脚本输出用的中文名（不进 UI）。 */
 export const LAYER_LABEL: Record<CommentaryLayer, string> = {
   mula: "原文",
   atthakatha: "义注",

@@ -19,10 +19,12 @@ import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import { useAuth } from "../auth/AuthContext";
+import { useT } from "../i18n/I18nContext";
 
 export function SignInScreen() {
   const navigation = useNavigation();
   const { signIn } = useAuth();
+  const t = useT();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +45,7 @@ export function SignInScreen() {
       await signIn(name, pwd);
       navigation.goBack();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
+      setError(err instanceof Error ? err.message : t("signIn.failed"));
     } finally {
       setBusy(false);
     }
@@ -61,7 +63,7 @@ export function SignInScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.label}>用户名 / 邮箱</Text>
+        <Text style={styles.label}>{t("signIn.username")}</Text>
         <TextInput
           style={styles.input}
           value={username}
@@ -71,12 +73,12 @@ export function SignInScreen() {
           autoComplete="username"
           textContentType="username"
           maxLength={255}
-          placeholder="请输入用户名或邮箱"
+          placeholder={t("signIn.usernamePlaceholder")}
           placeholderTextColor={colors.inkFaint}
           returnKeyType="next"
         />
 
-        <Text style={styles.label}>密码</Text>
+        <Text style={styles.label}>{t("signIn.password")}</Text>
         <View style={styles.passwordRow}>
           <TextInput
             style={[styles.input, styles.passwordInput]}
@@ -87,7 +89,7 @@ export function SignInScreen() {
             autoComplete="current-password"
             textContentType="password"
             maxLength={32}
-            placeholder="请输入密码"
+            placeholder={t("signIn.passwordPlaceholder")}
             placeholderTextColor={colors.inkFaint}
             returnKeyType="go"
             onSubmitEditing={onSubmit}
@@ -113,13 +115,11 @@ export function SignInScreen() {
           {busy ? (
             <ActivityIndicator color={colors.paperRaised} />
           ) : (
-            <Text style={styles.submitText}>登录</Text>
+            <Text style={styles.submitText}>{t("signIn.submit")}</Text>
           )}
         </Pressable>
 
-        <Text style={styles.hint}>
-          登录服务器可在「我 → 设置 → API 服务器」中切换。
-        </Text>
+        <Text style={styles.hint}>{t("signIn.serverHint")}</Text>
       </KeyboardAvoidingView>
     </Screen>
   );

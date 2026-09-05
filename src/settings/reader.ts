@@ -5,21 +5,22 @@
  * 全局深色主题仍留给「我 → 设置」阶段接入。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { MessageKey } from "../i18n";
 
 export type ReaderTheme = "light" | "dark";
 export type ReaderFontSize = "sm" | "md" | "lg" | "xl";
 
 export interface ReaderFontOption {
   id: ReaderFontSize;
-  label: string;
+  labelKey: MessageKey;
   px: number;
 }
 
 export const FONT_OPTIONS: ReaderFontOption[] = [
-  { id: "sm", label: "小", px: 15 },
-  { id: "md", label: "标准", px: 18 },
-  { id: "lg", label: "大", px: 21 },
-  { id: "xl", label: "特大", px: 24 },
+  { id: "sm", labelKey: "reader.size.sm", px: 15 },
+  { id: "md", labelKey: "reader.size.md", px: 18 },
+  { id: "lg", labelKey: "reader.size.lg", px: 21 },
+  { id: "xl", labelKey: "reader.size.xl", px: 24 },
 ];
 
 export function fontSizePx(id: ReaderFontSize): number {
