@@ -42,4 +42,6 @@ export type RootStackParamList = {
       }
     | undefined;
   Settings: undefined;
+  /** 布局调试页（仅 __DEV__ 从「我」进入）。 */
+  DebugLayout: undefined;
 };

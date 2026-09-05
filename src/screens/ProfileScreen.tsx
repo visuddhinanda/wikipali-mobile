@@ -44,6 +44,18 @@ export function ProfileScreen() {
         <Text style={styles.rowLabel}>设置</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
       </Pressable>
+
+      {/* 仅开发构建可见：实时查看响应式断点判定（DESIGN.md §4.9） */}
+      {__DEV__ ? (
+        <Pressable
+          style={styles.row}
+          onPress={() => navigation.navigate("DebugLayout")}
+        >
+          <Ionicons name="bug-outline" size={20} color={colors.inkSoft} />
+          <Text style={styles.rowLabel}>布局调试</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
+        </Pressable>
+      ) : null}
     </Screen>
   );
 }

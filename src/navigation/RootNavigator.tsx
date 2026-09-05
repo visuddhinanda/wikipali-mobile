@@ -22,6 +22,7 @@ import { ToolsScreen } from "../screens/ToolsScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { NewChatScreen } from "../screens/NewChatScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -207,6 +208,13 @@ export function RootNavigator() {
           component={SettingsScreen}
           options={{ title: "设置" }}
         />
+        {__DEV__ ? (
+          <Stack.Screen
+            name="DebugLayout"
+            component={DebugLayoutScreen}
+            options={{ title: "布局调试" }}
+          />
+        ) : null}
       </Stack.Navigator>
     </NavigationContainer>
   );
