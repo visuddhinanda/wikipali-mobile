@@ -27,6 +27,9 @@
         "projectId": "97a761eb-3495-419b-aba9-1cc195dd8d5c"
       }
     },
-    "owner": "iapt"
+    "owner": "iapt",
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

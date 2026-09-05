@@ -22,6 +22,7 @@ import { ToolsScreen } from "../screens/ToolsScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { NewChatScreen } from "../screens/NewChatScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { SignInScreen } from "../screens/SignInScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -210,6 +211,11 @@ function ProfileStack() {
         name="Settings"
         component={SettingsScreen}
         options={{ title: "设置" }}
+      />
+      <Stack.Screen
+        name="SignIn"
+        component={SignInScreen}
+        options={{ title: "登录" }}
       />
       {__DEV__ ? (
         <Stack.Screen

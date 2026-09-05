@@ -1,28 +1,73 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
+import { useAuth } from "../auth/AuthContext";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function ProfileScreen() {
   const navigation = useNavigation<Nav>();
+  const { restoring, user, signOut } = useAuth();
+
+  function confirmSignOut() {
+    Alert.alert("退出登录", "退出后将无法同步书架与提问历史。", [
+      { text: "取消", style: "cancel" },
+      {
+        text: "退出",
+        style: "destructive",
+        onPress: () => void signOut(),
+      },
+    ]);
+  }
 
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color={colors.paperRaised} />
-        </View>
-        <Text style={styles.title}>尚未登录</Text>
-        <Text style={styles.subtitle}>登录后同步书架、进度与提问历史</Text>
-        <Pressable style={styles.loginBtn} onPress={() => undefined}>
-          <Text style={styles.loginBtnText}>登录 / 注册</Text>
-        </Pressable>
+        {user?.avatar ? (
+          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={40} color={colors.paperRaised} />
+          </View>
+        )}
+
+        {restoring ? (
+          <ActivityIndicator color={colors.vermilion} />
+        ) : user ? (
+          <>
+            <Text style={styles.title}>
+              {user.nickName || user.realName || user.id}
+            </Text>
+            <Text style={styles.subtitle}>已登录</Text>
+            <Pressable style={styles.logoutBtn} onPress={confirmSignOut}>
+              <Text style={styles.logoutBtnText}>退出登录</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Text style={styles.title}>尚未登录</Text>
+            <Text style={styles.subtitle}>登录后同步书架、进度与提问历史</Text>
+            <Pressable
+              style={styles.loginBtn}
+              onPress={() => navigation.navigate("SignIn")}
+            >
+              <Text style={styles.loginBtnText}>登录 / 注册</Text>
+            </Pressable>
+          </>
+        )}
       </View>
 
       <View style={styles.divider} />
@@ -91,6 +136,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
+  },
+  logoutBtn: {
+    marginTop: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  logoutBtnText: {
+    color: colors.inkSoft,
+    fontWeight: "600",
+    fontSize: 15,
   },
   loginBtnText: {
     color: colors.paperRaised,
