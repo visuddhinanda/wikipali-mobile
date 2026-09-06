@@ -159,6 +159,21 @@ const th: Messages = {
   "error.badJson": "การตอบกลับไม่ใช่ JSON ที่ถูกต้อง",
   "error.backend": "เซิร์ฟเวอร์ตอบกลับข้อผิดพลาด",
   "error.noOnlineContent": "ฉบับนี้ยังไม่มีเนื้อหาออนไลน์สำหรับบทนี้",
+
+  // ดาวน์โหลดออฟไลน์
+  "download.section": "ดาวน์โหลดออฟไลน์",
+  "download.notDownloaded": "ยังไม่ได้ดาวน์โหลด",
+  "download.downloading": "กำลังดาวน์โหลด",
+  "download.paused": "หยุดชั่วคราว",
+  "download.done": "ดาวน์โหลดแล้ว",
+  "download.failed": "ดาวน์โหลดไม่สำเร็จ",
+  "download.start": "ดาวน์โหลด",
+  "download.resume": "ทำต่อ",
+  "download.pause": "หยุดชั่วคราว",
+  "download.delete": "ลบ",
+  "download.deleteConfirm": "หลังจากลบแล้วจะอ่านหนังสือเล่มนี้แบบออฟไลน์ไม่ได้ ต้องดาวน์โหลดใหม่",
+  "download.paraCount": "{done} / {total} ย่อหน้า",
+  "download.pickVersionFirst": "กรุณาเลือกฉบับก่อนดาวน์โหลด",
 };
 
 export default th;

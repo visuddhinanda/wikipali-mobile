@@ -159,6 +159,21 @@ const lo: Messages = {
   "error.badJson": "ການຕອບກັບບໍ່ແມ່ນ JSON ທີ່ຖືກຕ້ອງ",
   "error.backend": "ເຊີບເວີຕອບກັບຂໍ້ຜິດພາດ",
   "error.noOnlineContent": "ສະບັບນີ້ຍັງບໍ່ມີເນື້ອຫາອອນໄລນ໌ສຳລັບບົດນີ້",
+
+  // ດາວໂຫຼດແບບອອບໄລນ໌
+  "download.section": "ດາວໂຫຼດແບບອອບໄລນ໌",
+  "download.notDownloaded": "ຍັງບໍ່ໄດ້ດາວໂຫຼດ",
+  "download.downloading": "ກຳລັງດາວໂຫຼດ",
+  "download.paused": "ຢຸດຊົ່ວຄາວ",
+  "download.done": "ດາວໂຫຼດແລ້ວ",
+  "download.failed": "ດາວໂຫຼດບໍ່ສຳເລັດ",
+  "download.start": "ດາວໂຫຼດ",
+  "download.resume": "ສືບຕໍ່",
+  "download.pause": "ຢຸດຊົ່ວຄາວ",
+  "download.delete": "ລຶບ",
+  "download.deleteConfirm": "ຫຼັງຈາກລຶບແລ້ວຈະອ່ານປຶ້ມນີ້ແບບອອບໄລນ໌ບໍ່ໄດ້ ຕ້ອງດາວໂຫຼດໃໝ່.",
+  "download.paraCount": "{done} / {total} ວັກ",
+  "download.pickVersionFirst": "ກະລຸນາເລືອກສະບັບກ່ອນດາວໂຫຼດ.",
 };
 
 export default lo;

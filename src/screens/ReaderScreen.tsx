@@ -25,6 +25,8 @@ import {
 import type { ChapterChannel } from "../catalog";
 import { saveReadingRecord } from "../data/history";
 import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
+import { DownloadControl } from "../components/DownloadControl";
+import { DownloadIconButton } from "../components/DownloadIconButton";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import {
@@ -451,6 +453,10 @@ export function ReaderScreen({ route, navigation }: Props) {
             {headerSubtitle}
           </Text>
         </View>
+        {/* 离线下载：顶栏一键开始/暂停；删除等管理操作在设置弹层里 */}
+        {channelId ? (
+          <DownloadIconButton book={book} channelId={channelId} color={c.ink} size={21} />
+        ) : null}
         <Pressable onPress={() => setSettingsVisible(true)} hitSlop={8}>
           <Ionicons name="settings-outline" size={22} color={c.ink} />
         </Pressable>
@@ -562,6 +568,8 @@ export function ReaderScreen({ route, navigation }: Props) {
       <SettingsSheet
         visible={settingsVisible}
         settings={settings}
+        book={book}
+        channelId={channelId}
         c={c}
         onClose={() => setSettingsVisible(false)}
         onChange={updateSettings}
@@ -584,12 +592,16 @@ export function ReaderScreen({ route, navigation }: Props) {
 function SettingsSheet({
   visible,
   settings,
+  book,
+  channelId,
   c,
   onClose,
   onChange,
 }: {
   visible: boolean;
   settings: ReaderSettings;
+  book: number;
+  channelId?: string;
   c: ReaderChrome;
   onClose: () => void;
   onChange: (s: ReaderSettings) => void;
@@ -653,6 +665,22 @@ function SettingsSheet({
             );
           })}
         </View>
+
+        {/* 离线下载：整本缓存到 reading.db3，支持断点续传（docs/reading-content.md §4.4） */}
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("download.section")}
+        </Text>
+        <DownloadControl
+          book={book}
+          channelId={channelId}
+          colors={{
+            ink: c.ink,
+            inkSoft: c.inkSoft,
+            inkFaint: c.inkFaint,
+            accent: c.vermilion,
+            track: c.hairline,
+          }}
+        />
       </View>
     </Modal>
   );

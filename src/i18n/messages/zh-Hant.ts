@@ -156,6 +156,21 @@ const zhHant: Messages = {
   "error.badJson": "回應不是合法 JSON",
   "error.backend": "後端返回錯誤",
   "error.noOnlineContent": "該版本暫無此章節的線上閱讀內容",
+
+  // 離線下載
+  "download.section": "離線下載",
+  "download.notDownloaded": "未下載",
+  "download.downloading": "下載中",
+  "download.paused": "已暫停",
+  "download.done": "已下載",
+  "download.failed": "下載失敗",
+  "download.start": "下載",
+  "download.resume": "繼續",
+  "download.pause": "暫停",
+  "download.delete": "刪除",
+  "download.deleteConfirm": "刪除後將無法離線閱讀本書，需重新下載。",
+  "download.paraCount": "{done} / {total} 段",
+  "download.pickVersionFirst": "請先選擇版本，再下載。",
 };
 
 export default zhHant;

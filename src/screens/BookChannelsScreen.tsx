@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { ProgressRing } from "../components/ProgressRing";
+import { DownloadIconButton } from "../components/DownloadIconButton";
 import { getBookChannels } from "../api";
 import type { ChapterChannel } from "../catalog";
 import { colors, radius, spacing, type, serifFont } from "../theme";
@@ -239,12 +240,21 @@ export function BookChannelsScreen({ route, navigation }: Props) {
                   </Text>
                 ) : null}
               </View>
+              {/* 这个环是「译文完成度」，不是下载进度 —— 别混淆 */}
               <View style={styles.ringWrap}>
                 <ProgressRing
                   progress={item.progress}
                   size={30}
                   strokeWidth={3}
                   trackColor={colors.border}
+                />
+              </View>
+              {/* 离线下载：选哪个版本就下哪个，不必先进阅读器 */}
+              <View style={styles.downloadWrap}>
+                <DownloadIconButton
+                  book={book}
+                  channelId={item.channel_id}
+                  color={colors.inkSoft}
                 />
               </View>
               <Ionicons
@@ -351,6 +361,9 @@ const styles = StyleSheet.create({
     ...type.small,
     marginTop: 2,
     color: colors.inkFaint,
+  },
+  downloadWrap: {
+    marginRight: spacing.sm,
   },
   ringWrap: {
     marginRight: spacing.sm,

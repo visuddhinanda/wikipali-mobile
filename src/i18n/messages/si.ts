@@ -159,6 +159,21 @@ const si: Messages = {
   "error.badJson": "ප්‍රතිචාරය වලංගු JSON නොවේ",
   "error.backend": "සේවාදායකය දෝෂයක් ලබා දුන්නේය",
   "error.noOnlineContent": "මෙම සංස්කරණයේ මෙම පරිච්ඡේදය සඳහා මාර්ගගත පෙළ නොමැත",
+
+  // නොබැඳි බාගැනීම
+  "download.section": "නොබැඳි බාගැනීම",
+  "download.notDownloaded": "බාගෙන නැත",
+  "download.downloading": "බාගනිමින්",
+  "download.paused": "විරාම කර ඇත",
+  "download.done": "බාගෙන ඇත",
+  "download.failed": "බාගැනීම අසාර්ථකයි",
+  "download.start": "බාගන්න",
+  "download.resume": "දිගටම",
+  "download.pause": "විරාම කරන්න",
+  "download.delete": "මකන්න",
+  "download.deleteConfirm": "මකා දැමූ පසු මෙම පොත නොබැඳිව කියවිය නොහැක; නැවත බාගත යුතුය.",
+  "download.paraCount": "ඡේද {done} / {total}",
+  "download.pickVersionFirst": "බාගැනීමට පෙර සංස්කරණයක් තෝරන්න.",
 };
 
 export default si;

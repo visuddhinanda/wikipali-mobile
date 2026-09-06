@@ -159,6 +159,21 @@ const my: Messages = {
   "error.badJson": "တုံ့ပြန်မှုသည် တရားဝင် JSON မဟုတ်ပါ",
   "error.backend": "ဆာဗာမှ အမှား ပြန်ပို့သည်",
   "error.noOnlineContent": "ဤဗားရှင်းတွင် ဤအခန်းအတွက် အွန်လိုင်း စာသား မရှိသေးပါ",
+
+  // အော့ဖ်လိုင်း ဒေါင်းလုဒ်
+  "download.section": "အော့ဖ်လိုင်း ဒေါင်းလုဒ်",
+  "download.notDownloaded": "မဒေါင်းလုဒ်ရသေး",
+  "download.downloading": "ဒေါင်းလုဒ်ဆွဲနေသည်",
+  "download.paused": "ခေတ္တရပ်ထားသည်",
+  "download.done": "ဒေါင်းလုဒ်ပြီး",
+  "download.failed": "ဒေါင်းလုဒ် မအောင်မြင်ပါ",
+  "download.start": "ဒေါင်းလုဒ်",
+  "download.resume": "ဆက်လုပ်ရန်",
+  "download.pause": "ခေတ္တရပ်ရန်",
+  "download.delete": "ဖျက်ရန်",
+  "download.deleteConfirm": "ဖျက်ပြီးလျှင် ဤစာအုပ်ကို အော့ဖ်လိုင်းဖြင့် ဖတ်၍မရတော့ဘဲ ပြန်လည်ဒေါင်းလုဒ်ရန် လိုအပ်ပါမည်။",
+  "download.paraCount": "စာပိုဒ် {done} / {total}",
+  "download.pickVersionFirst": "ဒေါင်းလုဒ်မဆွဲမီ ဗားရှင်းကို ရွေးပါ။",
 };
 
 export default my;

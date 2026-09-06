@@ -159,6 +159,21 @@ const en: Messages = {
   "error.backend": "The server returned an error",
   "error.noOnlineContent":
     "This version has no online text for the current chapter",
+
+  // Offline download
+  "download.section": "Offline download",
+  "download.notDownloaded": "Not downloaded",
+  "download.downloading": "Downloading",
+  "download.paused": "Paused",
+  "download.done": "Downloaded",
+  "download.failed": "Download failed",
+  "download.start": "Download",
+  "download.resume": "Resume",
+  "download.pause": "Pause",
+  "download.delete": "Delete",
+  "download.deleteConfirm": "You will no longer be able to read this book offline and will need to download it again.",
+  "download.paraCount": "{done} / {total} paragraphs",
+  "download.pickVersionFirst": "Choose a version before downloading.",
 };
 
 export default en;

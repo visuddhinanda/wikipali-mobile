@@ -173,6 +173,21 @@ const zhHans = {
   "error.badJson": "响应不是合法 JSON",
   "error.backend": "后端返回错误",
   "error.noOnlineContent": "该版本暂无此章节的在线阅读内容",
+
+  // 离线下载（docs/reading-content.md §4.4）
+  "download.section": "离线下载",
+  "download.notDownloaded": "未下载",
+  "download.downloading": "下载中",
+  "download.paused": "已暂停",
+  "download.done": "已下载",
+  "download.failed": "下载失败",
+  "download.start": "下载",
+  "download.resume": "继续",
+  "download.pause": "暂停",
+  "download.delete": "删除",
+  "download.deleteConfirm": "删除后将无法离线阅读本书，需重新下载。",
+  "download.paraCount": "{done} / {total} 段",
+  "download.pickVersionFirst": "请先选择版本，再下载。",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

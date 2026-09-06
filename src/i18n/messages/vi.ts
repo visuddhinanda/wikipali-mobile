@@ -159,6 +159,21 @@ const vi: Messages = {
   "error.badJson": "Phản hồi không phải JSON hợp lệ",
   "error.backend": "Máy chủ trả về lỗi",
   "error.noOnlineContent": "Bản này chưa có nội dung trực tuyến cho chương hiện tại",
+
+  // Tải về ngoại tuyến
+  "download.section": "Tải về ngoại tuyến",
+  "download.notDownloaded": "Chưa tải",
+  "download.downloading": "Đang tải",
+  "download.paused": "Đã tạm dừng",
+  "download.done": "Đã tải",
+  "download.failed": "Tải thất bại",
+  "download.start": "Tải về",
+  "download.resume": "Tiếp tục",
+  "download.pause": "Tạm dừng",
+  "download.delete": "Xóa",
+  "download.deleteConfirm": "Sau khi xóa sẽ không đọc ngoại tuyến được cuốn này, cần tải lại.",
+  "download.paraCount": "{done} / {total} đoạn",
+  "download.pickVersionFirst": "Hãy chọn phiên bản trước khi tải.",
 };
 
 export default vi;

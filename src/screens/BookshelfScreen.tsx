@@ -4,6 +4,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
+import { DownloadControl } from "../components/DownloadControl";
+import { BOOK_TITLES } from "../catalog";
+import { listDownloads, type DownloadProgress } from "../reading";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -60,13 +63,21 @@ export function BookshelfScreen() {
   const t = useT();
   const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
+  const [downloads, setDownloads] = useState<DownloadProgress[] | null>(null);
 
-  // 每次回到「书架」Tab 时重新加载阅读记录（读完返回可即时看到更新）。
+  const refreshDownloads = useCallback(() => {
+    listDownloads().then(setDownloads);
+  }, []);
+
+  // 每次回到「书架」Tab 时重新加载（读完/下载完返回可即时看到更新）。
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       loadReadingHistory().then((r) => {
         if (alive) setRecords(r);
+      });
+      listDownloads().then((d) => {
+        if (alive) setDownloads(d);
       });
       return () => {
         alive = false;
@@ -75,6 +86,13 @@ export function BookshelfScreen() {
   );
 
   const readingList = records ?? [];
+  const downloadList = downloads ?? [];
+
+  /** 书名：优先用阅读记录里的，其次查内嵌书目，最后退回 book id。 */
+  const bookTitle = (book: number): string =>
+    records?.find((r) => r.book === book)?.title ??
+    BOOK_TITLES.find((b) => b.book === book)?.title ??
+    String(book);
 
   return (
     <Screen contentStyle={styles.content}>
@@ -143,6 +161,44 @@ export function BookshelfScreen() {
             );
           })}
         </View>
+      ) : active === "downloaded" && downloadList.length > 0 ? (
+        <View>
+          {downloadList.map((d) => (
+            <View key={`${d.channel}-${d.book}`} style={styles.downloadCard}>
+              <Pressable
+                style={styles.downloadHead}
+                onPress={() =>
+                  navigation.navigate("Reader", {
+                    book: d.book,
+                    title: bookTitle(d.book),
+                    channelId: d.channel,
+                  })
+                }
+              >
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {bookTitle(d.book)}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.vermilion}
+                />
+              </Pressable>
+              <DownloadControl
+                book={d.book}
+                channelId={d.channel}
+                colors={{
+                  ink: colors.ink,
+                  inkSoft: colors.inkSoft,
+                  inkFaint: colors.inkFaint,
+                  accent: colors.vermilion,
+                  track: colors.hairline,
+                }}
+                onDeleted={refreshDownloads}
+              />
+            </View>
+          ))}
+        </View>
       ) : (
         <View style={styles.empty}>
           <Ionicons name="book-outline" size={44} color={colors.inkFaint} />
@@ -195,6 +251,20 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flex: 1,
+  },
+  downloadCard: {
+    backgroundColor: colors.paperRaised,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.md,
+  },
+  downloadHead: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   rowTitle: {
     ...type.body,
