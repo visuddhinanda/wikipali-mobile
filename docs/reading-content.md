@@ -86,7 +86,7 @@ GET /api/v3/tipitaka-read-para
 - `display` 内的 `data-para` / `data-sid` 是既有阅读器 CSS 依赖的锚点
   （`src/screens/ReaderScreen.tsx` 的 `buildReaderHtml`），格式不变，直接拼接即可。
 - 区间过大时服务端是 `foreach range()` 逐段查库，**没有上限保护**。
-  客户端自己限制单次请求段数（建议 200 段一批，见 §5.2）。
+  客户端自己按巴利文字符数与段数双重限制分批，见 §4.6。
 
 
 ## 3. 阅读单元切分算法
@@ -356,9 +356,9 @@ SELECT count(*) FROM para_html WHERE channel = ? AND book = ?;
 
 下载循环：
 
-1. 按 200 段一批，从本书最小 paragraph 向后扫；
-2. 每批开始前先查该批已缓存的段，**已有的跳过**（这就是断点续传——
-   中断在哪都不用记，重启时自然从缺口继续）；
+1. 先查该书已缓存的段，算出**还缺哪些段**（这就是断点续传——中断在哪都不用记，
+   重启时自然从缺口继续）；
+2. 只对缺口按 §4.6 的规则分批；
 3. 每批写入是一个事务，进程被杀不会留下半截数据；
 4. 每批结束更新 `download_state.done`，UI 据此显示百分比；
 5. 暂停 / 取消 = 停止循环，已写入的数据全部有效，`status` 置 `paused`。
@@ -387,6 +387,47 @@ SELECT channel, count(*) paras, sum(length(html)) bytes
 ```
 
 
+### 4.6 请求分批：按字符数，不按段数
+
+段落大小差两个数量级（全库最短几个字符，最长 **30138** 个字符），
+按固定段数分批会让批次体量剧烈摆动。200 段一批时实测：
+
+| | 固定 200 段 | 30000 字符 / 300 段 |
+|---|---|---|
+| 每批字符 中位 | 24.6 K | 30.1 K |
+| 99% | 125 K | 31.6 K |
+| **最大** | **321 K**（书 24 段 201–400） | **54 K** |
+| 每批段数 最大 | 200 | 300 |
+| 全库批次 | 2728 | 3682 |
+
+321 K 字符的 HTML 接近 1 MB，必然撞上 `src/api/client.ts` 的 12 秒超时。
+
+段落字符数 `pali_text.length` 本地就有，扫一遍即可自适应分批
+（`src/reading/batch.ts` 的 `planRanges`）。**两个约束缺一不可，谁先到算谁**：
+
+- **`FETCH_BATCH_STRLEN = 30000`（字符）** —— 管住段落大的书。
+  书 24：434 段切 19 批，每批 11–38 段不等，字符稳定卡在 3 万。
+- **`FETCH_BATCH_MAX_PARAS = 300`（段）** —— 管住偈颂类的书。
+  光按字符数会攒出 1700 段一批，而服务端是 `foreach range()` **逐段查库**，
+  段数才是它的成本。书 59：每批顶到 300 段就断，字符只有 7–10 K。
+
+新方案的最大值 54037 = 阈值 + 那个 30138 字符的单段 —— 段落不可再分，切不动了。
+
+两点说明：
+
+- `length` 是**巴利原文**的字符数。译文频道的实际 HTML 体量与它不成正比，
+  但这是本地唯一可得的体量代理，用来分批足够了 —— 目的是消掉数量级差异，
+  不是精确预测响应大小。
+- `planRanges` 只合并**连续**的段落。中间有缺口说明那些段已缓存，不必重取。
+
+`planRanges` 是纯函数（只接 `SqlRunner`），校验脚本跑的是同一份实现：
+
+```
+node scripts/check-batch.mjs        # 全库统计 + 覆盖性校验
+node scripts/check-batch.mjs 24     # 某本书的分批明细
+```
+
+
 ## 5. 阅读位置与导航
 
 ### 5.1 进入阅读器的两种情形
@@ -406,7 +447,8 @@ SELECT channel, count(*) paras, sum(length(html)) bytes
 | `READING_UNIT_MAX` | 5000 | 阅读单元字符上限（§3.2）|
 | `READING_UNIT_MIN` | 1500 | 阅读单元字符下限，触发向后扩展（§3.2）|
 | `CHAPTER_MAX_LEVEL` | 7 | 章节行 level 上限，复用 `commentary.ts` |
-| `FETCH_BATCH_PARAS` | 200 | 单次接口请求的最大段数（§2）|
+| `FETCH_BATCH_STRLEN` | 30000 | 单次请求的目标字符数（§4.6）|
+| `FETCH_BATCH_MAX_PARAS` | 300 | 单次请求的最大段数（§4.6）|
 | `CACHE_QUOTA_BYTES` | 200 MB | 被动缓存配额（§4.5）|
 
 ### 5.3 上一单元 / 下一单元
@@ -426,8 +468,9 @@ SELECT channel, count(*) paras, sum(length(html)) bytes
 
 ## 6. 实施进度
 
-已完成 1–8（`npx tsc --noEmit` 通过，Metro 打包通过，
-`node scripts/check-reading-unit.mjs` 全库校验通过）：
+已完成 1–10（`npx tsc --noEmit` 通过，Metro 打包通过，
+`check-reading-unit.mjs` / `check-batch.mjs` 全库校验通过，
+真机（waydroid + dev build）已验证阅读、翻页、换版本、缓存命中、整本下载与进度）：
 
 1. ✅ `expo-sqlite` + `expo-asset` 依赖；`metro.config.js` 把 `db3` 加进
    `assetExts`（默认只有 `db`，不加则 `require('…/tipitaka.db3')` 解析不到）。
@@ -447,11 +490,14 @@ SELECT channel, count(*) paras, sum(length(html)) bytes
    起点由 `resolveStartParagraph` 统一决定（§5.1）；没带 `channelId` 时
    自动选第一个可读频道（新接口必须带 channel）。
 8. ✅ `src/reading/download.ts`：§4.4 整本下载 + 进度 + 断点续传 + 暂停。
+9. ✅ 下载 UI 与入口：`DownloadControl`（进度环 + 状态 + 管理操作）与
+   `DownloadIconButton`（图标 + 百分比）；入口三处 —— 版本列表每行、
+   阅读器顶栏、阅读器设置弹层 / 书架「已下载」。
+10. ✅ 请求分批改为按巴利文字符数（§4.6）。
 
 待做：
 
-9. 书架接入下载入口与进度显示（`src/reading/download.ts` 已就绪，缺 UI）。
-10. **后续**：`src/catalog/headings.ts` 由读 JSON 改为读 `pali_text`，
+11. **后续**：`src/catalog/headings.ts` 由读 JSON 改为读 `pali_text`，
     删除 `src/data/tipitaka_heading.json`。目录抽屉目前是同步 API，
     改 SQLite 要一并改成异步，与本次改动解耦，单独做。
 
