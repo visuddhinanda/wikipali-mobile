@@ -342,12 +342,17 @@ CREATE TABLE IF NOT EXISTS download_state (
 进度不需要单独的状态机，**由数据本身推出来**：
 
 ```sql
--- 分母：该书正文段总数（只读库，离线可算）
-SELECT count(*) FROM pali_text WHERE book = ? AND level = 100;
+-- 分母：该书段落总数（只读库，离线可算）
+SELECT count(*) FROM pali_text WHERE book = ?;
 
 -- 分子：已缓存段数
 SELECT count(*) FROM para_html WHERE channel = ? AND book = ?;
 ```
+
+⚠️ 分母数的是**全部行**，不是只数 `level = 100` 的正文行。章节标题行同样有
+正文（接口对标题行也返回 `display`，如书 93 的 `para 5` 是个 `<h4>`），
+下载与缓存都会把它们存进 `para_html`。只数正文行会让分子大于分母，
+进度冲破 100%。
 
 下载循环：
 

@@ -19,7 +19,7 @@ export interface DownloadProgress {
   channel: string;
   book: number;
   status: DownloadStatus;
-  /** 该书正文段总数。 */
+  /** 该书段落总数（含章节标题行）。 */
   total: number;
   /** 已缓存段数。 */
   done: number;
@@ -33,17 +33,28 @@ export function percent(p: Pick<DownloadProgress, "total" | "done">): number {
   return Math.min(100, Math.round((p.done / p.total) * 100));
 }
 
-/** 该书正文段总数（只读库，离线可算）——进度的分母。 */
+/**
+ * 该书段落总数（只读库，离线可算）——进度的分母。
+ *
+ * 数的是**全部行**，不是只数 `level = 100` 的正文行：章节标题行同样有正文
+ * （接口对标题行也返回 display，如书 93 的 para 5 是个 `<h4>`），下载与缓存
+ * 都会把它们存进 para_html。只数正文行会让分子大于分母，进度冲破 100%。
+ */
 async function totalParas(book: number): Promise<number> {
   const sql = await tipitakaRunner();
   const rows = await sql.all<{ n: number }>(
-    "SELECT count(*) n FROM pali_text WHERE book = ? AND level = 100",
+    "SELECT count(*) n FROM pali_text WHERE book = ?",
     [book],
   );
   return rows[0]?.n ?? 0;
 }
 
-/** 该书的段落范围（下载时按 paragraph 从小到大扫）。 */
+/**
+ * 该书的段落范围（下载时按 paragraph 从小到大扫）。
+ *
+ * 全库 217 本的段落号都是连续的（`count(*) == max - min + 1`，已校验），
+ * 所以直接按 `lo..hi` 扫不会请求到不存在的段，`done` 也不会超过 `total`。
+ */
 async function paraRange(book: number): Promise<[number, number] | null> {
   const sql = await tipitakaRunner();
   const rows = await sql.all<{ lo: number; hi: number }>(
