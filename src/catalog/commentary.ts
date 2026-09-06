@@ -4,7 +4,9 @@
  * 算法与数据来源见 `docs/commentary-layers.md`。要点：
  * - 层次标签只打在书（level 1/2）上，段落层次要沿 `parent` 向上找；
  * - `(book_name, cs_para)` 相同的段落互为对应段落；
- * - 一个坐标下可能有上千行正文段落，必须收敛到章节行再按书去重。
+ * - 一个坐标下可能有上千行正文段落，必须收敛到章节行再按书去重；
+ * - 标题行自己的 `cs_para` 常常是上一章遗留的旧值（导出时没有随标题推进），
+ *   不能拿来对齐 —— 要用标题下面第一个正文段落的 `(book_name, cs_para)`。
  */
 
 /** 从根本到最外层的注释层次序列。 */
@@ -66,6 +68,11 @@ interface TextRow {
   tags: string | null;
   cs_para: number | null;
   book_name: string | null;
+}
+
+interface Coordinate {
+  book_name: string;
+  cs_para: number;
 }
 
 export interface LayerResult {
@@ -142,9 +149,54 @@ export async function resolveLayer(
 }
 
 /**
+ * 取一行用于跨书对齐的坐标。
+ *
+ * 标题本身没有义注复注 —— 用标题自己的 `cs_para` 去找“对应章节”没有意义，
+ * 而且经常是错的：它常常是上一章结尾遗留的旧值，跟真正的下一章共享同一个值
+ * （例子见 `docs/commentary-layers.md` §3）。真正该对齐的是**标题下面第一个
+ * 正文段落**的 `(book_name, cs_para)`；正文段落（`level = 100`）本身已经是
+ * 对齐用的最小单位，直接用自己的坐标。
+ *
+ * 标题下面没有可用的正文段落（罕见，如空标题）时返回 `null`：不要退回标题
+ * 自己的坐标，那样查出来的“对应章节”没有意义。
+ */
+export async function chapterCoordinate(
+  db: SqlRunner,
+  self: TextRow,
+): Promise<Coordinate | null> {
+  if (self.level <= CHAPTER_MAX_LEVEL) {
+    const rows = await db.all<Pick<TextRow, "book_name" | "cs_para">>(
+      `SELECT book_name, cs_para FROM pali_text
+        WHERE book = ? AND parent = ?
+        ORDER BY paragraph LIMIT 1`,
+      [self.book, self.paragraph],
+    );
+    const child = rows[0];
+    if (!child || child.book_name === null || child.cs_para === null) return null;
+    return { book_name: child.book_name, cs_para: child.cs_para };
+  }
+  if (self.book_name === null || self.cs_para === null) return null;
+  return { book_name: self.book_name, cs_para: self.cs_para };
+}
+
+/** 从给定行沿 `parent` 向上找最近的章节行（`level <= 7`）；行本身已是章节行则原样返回。 */
+async function climbToChapter(
+  db: SqlRunner,
+  row: TextRow,
+): Promise<TextRow | null> {
+  let cur: TextRow | null = row;
+  for (let hop = 0; cur && hop < MAX_ANCESTOR_HOPS; hop++) {
+    if (cur.level <= CHAPTER_MAX_LEVEL) return cur;
+    if (cur.parent === null || cur.parent < 0) return null;
+    cur = await getRow(db, cur.book, cur.parent);
+  }
+  return null;
+}
+
+/**
  * 找出给定章节在其他各层文献中的对应章节，按层次序列排序。
  *
- * 不含源章节所在的书。源段落没有 `(book_name, cs_para)` 时返回空数组。
+ * 不含源章节所在的书。源段落算不出对齐坐标时返回空数组。
  */
 export async function findRelatedChapters(
   db: SqlRunner,
@@ -152,36 +204,36 @@ export async function findRelatedChapters(
   paragraph: number,
 ): Promise<RelatedChapter[]> {
   const self = await getRow(db, book, paragraph);
-  if (!self || self.book_name === null || self.cs_para === null) return [];
+  if (!self) return [];
+  const coord = await chapterCoordinate(db, self);
+  if (!coord) return [];
 
-  // 同坐标下每部书取 paragraph 最小的章节行 —— 同书多行属于同一章节的不同段落。
+  // 按坐标匹配的可能是正文段落，不再要求 level <= 7；同坐标下每部书取
+  // paragraph 最小的一行，再各自沿 parent 向上收敛到章节行。
   // 先在子查询里定位每部书的最小 paragraph 再回表取整行：
   // 直接对各列取 MIN 会拼出不属于同一行的 level / toc。
-  const rows = await db.all<{
-    book: number;
-    paragraph: number;
-    level: number;
-    toc: string | null;
-  }>(
-    `SELECT p.book, p.paragraph, p.level, p.toc
+  const rows = await db.all<TextRow>(
+    `SELECT p.book, p.paragraph, p.level, p.toc, p.parent, p.tags, p.cs_para, p.book_name
        FROM pali_text p
        JOIN (SELECT book, MIN(paragraph) AS paragraph
                FROM pali_text
-              WHERE book_name = ? AND cs_para = ? AND level <= ? AND book <> ?
+              WHERE book_name = ? AND cs_para = ? AND book <> ?
               GROUP BY book) g
          ON g.book = p.book AND g.paragraph = p.paragraph
       ORDER BY p.book`,
-    [self.book_name, self.cs_para, CHAPTER_MAX_LEVEL, book],
+    [coord.book_name, coord.cs_para, book],
   );
 
   const out: RelatedChapter[] = [];
   for (const row of rows) {
-    const resolved = await resolveLayer(db, row.book, row.paragraph);
+    const chapterRow = await climbToChapter(db, row);
+    if (!chapterRow) continue;
+    const resolved = await resolveLayer(db, chapterRow.book, chapterRow.paragraph);
     out.push({
-      book: row.book,
-      paragraph: row.paragraph,
-      level: row.level,
-      toc: row.toc,
+      book: chapterRow.book,
+      paragraph: chapterRow.paragraph,
+      level: chapterRow.level,
+      toc: chapterRow.toc,
       layer: resolved?.layer ?? null,
       layerLabel: resolved ? LAYER_LABEL[resolved.layer] : null,
     });

@@ -30,16 +30,18 @@ const cases = args.length >= 2
 
 for (const [book, paragraph] of cases) {
   const self = db
-    .prepare("SELECT toc, level, book_name, cs_para FROM pali_text WHERE book=? AND paragraph=?")
+    .prepare("SELECT book, paragraph, toc, level, parent, tags, book_name, cs_para FROM pali_text WHERE book=? AND paragraph=?")
     .get(book, paragraph);
   if (!self) {
     console.log(`(${book},${paragraph}) 不存在`);
     continue;
   }
   const own = await mod.resolveLayer(runner, book, paragraph);
+  const coord = await mod.chapterCoordinate(runner, self);
   console.log(
     `\n=== (${book},${paragraph}) level=${self.level} ${JSON.stringify(self.toc)}` +
-      `  坐标=${self.book_name}/${self.cs_para}` +
+      `  自身坐标=${self.book_name}/${self.cs_para}` +
+      `  查询坐标=${coord ? `${coord.book_name}/${coord.cs_para}` : "无"}` +
       `  层次=${own ? mod.LAYER_LABEL[own.layer] : "未知"}` +
       (own ? `（据 ${own.source.book}:${own.source.paragraph} ${JSON.stringify(own.source.toc)}）` : ""),
   );
