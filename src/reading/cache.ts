@@ -4,8 +4,9 @@
  * 按**段落**存，不按区间存：阈值可调，用户从目录 / 上一章 / 书签等不同入口
  * 进入同一片正文，产生的区间互相重叠 —— 段落是唯一稳定的复用单位。
  */
-import { fetchReadParas, FETCH_BATCH_PARAS } from "../api/read-para";
-import { openReadingDb } from "./db";
+import { fetchReadParas } from "../api/read-para";
+import { planBookRanges } from "./batch";
+import { openReadingDb, tipitakaRunner } from "./db";
 
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
 export const CACHE_QUOTA_BYTES = 200 * 1024 * 1024;
@@ -29,20 +30,6 @@ export async function readCachedParas(
       ORDER BY para`,
     [channelId, book, from, to],
   );
-}
-
-/** 把缺失的段落号合并成连续子区间，减少请求数。 */
-export function toRanges(paras: number[]): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (const p of paras) {
-    const last = out[out.length - 1];
-    if (last && p === last[1] + 1 && last[1] - last[0] + 1 < FETCH_BATCH_PARAS) {
-      last[1] = p;
-    } else {
-      out.push([p, p]);
-    }
-  }
-  return out;
 }
 
 /**
@@ -97,7 +84,8 @@ export async function loadParaHtml(
     if (!byPara.has(p)) missing.push(p);
   }
 
-  for (const [a, b] of toRanges(missing)) {
+  // 按巴利文字符数分批（见 batch.ts）：段落大小差两个数量级，按固定段数分会超时
+  for (const [a, b] of await planBookRanges(await tipitakaRunner(), book, missing)) {
     const fetched = await fetchAndStore(channelId, book, a, b);
     for (let p = a; p <= b; p++) byPara.set(p, fetched.get(p) ?? "");
   }

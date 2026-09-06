@@ -4,7 +4,7 @@
  * 断点续传不需要状态机：每批写入前先查该批已缓存的段，已有的跳过。
  * 中断在哪都不用记，重启时自然从缺口继续。
  */
-import { FETCH_BATCH_PARAS } from "../api/read-para";
+import { planBookRanges } from "./batch";
 import { cachedParaCount, cachedParas, storeParas } from "./cache";
 import { openReadingDb, tipitakaRunner } from "./db";
 
@@ -189,7 +189,17 @@ export async function downloadBook(
     if (!range) throw new Error(`book ${book} 无段落数据`);
     const [lo, hi] = range;
 
-    for (let from = lo; from <= hi; from += FETCH_BATCH_PARAS) {
+    // 断点续传：先算出还缺哪些段，只对缺口分批。中断在哪都不用记 ——
+    // 已写入的段自然被跳过（docs/reading-content.md §4.4）。
+    const have = await cachedParas(channelId, book, lo, hi);
+    const missing: number[] = [];
+    for (let p = lo; p <= hi; p++) {
+      if (!have.has(p)) missing.push(p);
+    }
+
+    // 按巴利文字符数分批，不按固定段数（见 batch.ts）
+    const ranges = await planBookRanges(await tipitakaRunner(), book, missing);
+    for (const [from, to] of ranges) {
       if (flag.cancelled) {
         progress = { ...progress, status: "paused", updatedAt: Date.now() };
         await writeState(progress);
@@ -197,19 +207,14 @@ export async function downloadBook(
         return progress;
       }
 
-      const to = Math.min(from + FETCH_BATCH_PARAS - 1, hi);
-      // 断点续传：整批都已缓存就跳过，不发请求
-      const have = await cachedParas(channelId, book, from, to);
-      if (have.size < to - from + 1) {
-        await storeParas(channelId, book, from, to);
-        progress = {
-          ...progress,
-          done: await cachedParaCount(channelId, book),
-          updatedAt: Date.now(),
-        };
-        await writeState(progress);
-        onProgress?.(progress);
-      }
+      await storeParas(channelId, book, from, to);
+      progress = {
+        ...progress,
+        done: await cachedParaCount(channelId, book),
+        updatedAt: Date.now(),
+      };
+      await writeState(progress);
+      onProgress?.(progress);
     }
 
     progress = {

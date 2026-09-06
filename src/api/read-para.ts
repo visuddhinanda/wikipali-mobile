@@ -8,9 +8,6 @@ import { ApiError, request } from "./client";
 import { mockReadParas } from "./mock";
 import { t } from "../i18n";
 
-/** 单次请求的最大段数。服务端是 `foreach range()` 逐段查库，没有上限保护。 */
-export const FETCH_BATCH_PARAS = 200;
-
 export interface ReadParaItem {
   para: number;
   display: string;
@@ -36,6 +33,9 @@ interface Envelope<T> {
  *
  * ⚠️ 服务端会跳过 `display` 为空的段落，返回的条数可能少于请求的段数。
  * 调用方（缓存层）负责把「请求了但没返回」的段记成空，见 §4.2。
+ *
+ * 区间大小由 `src/reading/batch.ts` 按巴利文字符数决定 —— 服务端是
+ * `foreach range()` 逐段查库、没有上限保护，不能随便传大区间。
  */
 export async function fetchReadParas(
   book: number,
