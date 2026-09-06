@@ -1,4 +1,4 @@
-# wikipali-mobile 进度记录（更新至 2026-09-05）
+# wikipali-mobile 进度记录（更新至 2026-09-06）
 
 > 本文件记录 mobile 项目的完整进展与交接信息，供后续会话续接使用。
 
@@ -341,3 +341,101 @@ chapter_len, chapter_strlen, parent, tags, cs_para, book_name`。
    `src/data/tipitaka_heading.json`（5.47MB，目前仍在仓库里）。
 3. 用户会说明「章节数据如何加载」，据此接入对读的正文获取。
 4. 之后才是双列对照 UI（§10.2 未做项第一条）。
+
+
+## 11. 阅读数据链路重做 + 离线下载（2026-09-06 会话）
+
+**设计文档：`docs/reading-content.md`**（接口契约、算法、表结构、实测数据都在里面，
+下次续接先看它，本节只记要点与待办）。
+
+本次提交：`430a069`（链路重做）→ `4873edd`（进度分母修复）→
+`207e2da`（下载 UI）→ `c4e7d91`（字符分批）→ `8d093a2`（文档）。
+
+### 11.1 新链路
+
+```
+用户点书名
+  └─ 本地 SQLite(pali_text) 算阅读单元区间 [from,to]   src/reading/unit.ts
+      └─ 查缓存 para_html，列出缺口段落                src/reading/cache.ts
+          └─ 缺口按字符数分批                          src/reading/batch.ts
+              └─ api/v3/tipitaka-read-para             src/api/read-para.ts
+                  └─ 事务写回缓存，拼 HTML 进 WebView
+```
+
+**已删除的旧路径**（别再找了）：`chapter-content/{book}-{para}?mode=read`、
+`search/tipitaka_chapter_*`、`flattenReadHtml`、`getChapterContent`、
+`getChapterByChannel` 及其 mock；`headings.ts` 里的 `resolveDisplayNode` /
+`nextHeading` / `prevHeading` / `chapterEndParagraph` /
+`CHAPTER_STR_LEN_THRESHOLD`（那是另一套阅读单元切分，已被 `unit.ts` 取代）。
+
+### 11.2 阅读单元算法（细节见 `docs/reading-content.md` §3）
+
+阈值 5000 字符上限 / 1500 下限。**起点固定不动，只有下沉指针在动** ——
+父标题与首个子标题之间的正文才不会漏。三个必须记住的坑：
+
+- **扩展必须调用「不再扩展」的核心切分**。用完整递归会连锁失控，
+  书 42 一路吞到 66444 字符。算法因此拆成 `coreUnit` + `readingUnit` 两层。
+- **硬切要吞掉不足下限的尾巴**，否则每个硬切章节末尾都留一个几十字符的单元。
+- 三种边界都靠字符硬切兜底：分卷标记导致的过小区间（书 33，26 字符）、
+  无子章节的整本书（书 59，28 万字符）、超阈值的前置正文（书 190，3 万字符）。
+
+全库 217 本从头翻到尾：24607 个单元，全部终止、无空洞、无重叠、覆盖到书末。
+`node scripts/check-reading-unit.mjs` 可复跑（Node 24 直接 import TS 源码，
+App 与脚本共用同一份实现）。
+
+### 11.3 存储
+
+| 文件 | 用途 | 读写 |
+|---|---|---|
+| `assets/db/tipitaka.db3` | `pali_text` 章节树 | 只读，随版本整体替换 |
+| `reading.db3` | `para_html` + `download_state` | 读写，首次启动建表 |
+
+**分开是刻意的**：只读库随 App 更新覆盖，用户数据不受影响，不必写迁移。
+
+- `para_html` **按段落存**，不按区间存 —— 区间边界会随阈值和入口浮动，
+  段落是唯一稳定的复用单位。
+- `html = ''` 表示「服务端确认该段为空」，与「没请求过」区分。服务端会跳过空段落，
+  不记下来的话含空段的章节永远命中不了缓存。
+- 离线时 mock 占位数据带 `mock: true` **不写盘**，否则会冒充真经留在库里。
+
+### 11.4 分批：按巴利文字符数，不按段数
+
+30000 字符 / 300 段，谁先到算谁。两个约束缺一不可：字符数管段落大的书
+（书 24 旧方案最坏一批 321K 字符、HTML 近 1MB，必超 12 秒超时），
+段数管偈颂类的书（光按字符会攒出 1700 段一批，而服务端逐段查库，段数才是成本）。
+`node scripts/check-batch.mjs` 可复跑。
+
+### 11.5 下载入口（三处）
+
+- **版本列表每行**（`BookChannelsScreen`）—— 语义最正，选哪个版本下哪个。
+  注意该行原有的进度环是**译文完成度**，不是下载进度。
+- **阅读器顶栏** —— 一键开始/暂停 + 百分比。
+- **阅读器设置弹层 / 书架「已下载」** —— 完整状态与删除。
+
+断点续传与进度不需要状态机，由数据本身推出：分母 = `pali_text` 该书全部行
+（**含章节标题行**，标题行也有正文），分子 = `para_html` 已缓存段数。
+
+### 11.6 环境
+
+- 新增原生依赖 **`expo-sqlite` + `expo-asset`**，已重建 dev APK：
+  `https://expo.dev/artifacts/eas/GIbw5dtdRjwPrOoHGZNneAcu_vgnZioD6KcATkOw-4A.apk`
+  （build `64b25362`，提交 `430a069`）。之后只改 JS 的话不必重建。
+- `metro.config.js` 把 `db3` 加进 `assetExts` —— 默认只有 `db`，
+  不加则 `require('…/tipitaka.db3')` 解析不到。
+- 本容器与宿主机共享网络，waydroid 连 Metro 用 **`http://192.168.240.1:8081`**
+  （waydroid0 网桥；备用 `192.168.43.14`）。启动 Metro 要带 `--lan`。
+
+### 11.7 真机验证情况
+
+已验证：首次进阅读器（46MB 库拷贝）、翻页、换版本、缓存命中秒开、
+整本下载、进度条、暂停/继续、删除。
+
+### 11.8 下一步（下次从这里继续）
+
+1. **`headings.ts` 由 JSON 改读 SQLite**，删除 `src/data/tipitaka_heading.json`
+   （5.47MB，仍在仓库里）。目录抽屉现在是**同步 API**，改 SQLite 要连带改成异步，
+   这是主要工作量。对应 `docs/reading-content.md` §6 第 11 步。
+2. 缓存配额清理（`enforceCacheQuota` 已写好，200MB LRU，**但还没有任何地方调用它**，
+   也没有设置页入口展示占用）。
+3. 双列并排对照（§10.2 未做项第一条），现在正文获取已经就绪。
+4. 阅读进度改用 wikipali API 同步（`src/data/history.ts` 目前是 AsyncStorage 本地存储）。
