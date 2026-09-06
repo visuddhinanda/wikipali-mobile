@@ -2,14 +2,10 @@
  * 本地 mock 数据层：无后端（EXPO_PUBLIC_API_URL 未配置）时回退到这里，
  * 保证「目录树 → 章节列表 → 阅读器」链路离线可走通。
  *
- * 数据形状与 mint api-v13 一致（BookTitle / ChapterContent）。
+ * 数据形状与 mint api-v13 一致（BookTitle / tipitaka-read-para）。
  */
-import type {
-  BookTitle,
-  ChapterContent,
-  TipitakaChapter,
-  TocItem,
-} from "../catalog";
+import type { ReadParaItem } from "./read-para";
+import type { BookTitle, TocItem } from "../catalog";
 
 interface MockSutta extends BookTitle {
   titleZh: string;
@@ -157,73 +153,33 @@ export function mockGetChapterToc(book: number): Promise<TocItem[]> {
   ]);
 }
 
-export function mockGetChapterContent(
+/**
+ * 阅读模式段落的离线占位数据（对应 `tipitaka-read-para`）。
+ *
+ * 逐段返回，形状与真实接口的 `items` 一致；空段由缓存层记为 ''。
+ */
+export function mockReadParas(
   book: number,
-  paragraph: number,
-): Promise<ChapterContent> {
+  from: number,
+  to: number,
+): Promise<ReadParaItem[]> {
   const sutta = SUTTAS.find((s) => s.book === book);
-  if (!sutta) {
-    return Promise.resolve({
-      title: `示例经文 ${book}-${paragraph}`,
-      content: mockBody(
-        "Sabbe saṅkhārā aniccā…",
-        "诸行无常……",
-        "此为示例占位经文。",
-      ),
-      content_type: "html",
-    });
-  }
-  return Promise.resolve({
-    title: sutta.titleZh,
-    sub_title: sutta.title,
-    content: mockBody(sutta.pali, sutta.zh, sutta.note),
-    content_type: "html",
-    lang: "pali-zh",
-  });
-}
-
-export function mockGetChapterByChannel(
-  book: number,
-  paragraph: number,
-  channelId: string,
-): Promise<TipitakaChapter> {
-  const sutta = SUTTAS.find((s) => s.book === book);
-  const title = sutta?.titleZh ?? `示例经文 ${book}-${paragraph}`;
   const pali = sutta?.pali ?? "Sabbe saṅkhārā aniccā…";
   const zh = sutta?.zh ?? "诸行无常……";
   const note = sutta?.note ?? "此为示例占位经文。";
+  const texts = [pali, zh, note];
 
-  return Promise.resolve({
-    id: `tipitaka_chapter_${book}-${paragraph}_${channelId}`,
-    title,
-    content: `${pali}\n${zh}\n${note}`,
-    display: mockDisplay(pali, zh, note),
-    language: "pali",
-  });
+  const items: ReadParaItem[] = [];
+  for (let para = from; para <= to; para++) {
+    items.push({
+      para,
+      display:
+        `<div class='original' data-para='${para}'><div class='para-block'>` +
+        `<div class='sentence origin'><span><span>` +
+        texts[(para - from) % texts.length] +
+        `</span></span></div></div></div>`,
+    });
+  }
+  return Promise.resolve(items);
 }
 
-/** 把 mock 正文组装成与 api/v3 `display` 一致的段落结构。 */
-function mockDisplay(pali: string, zh: string, note: string): string {
-  const para = (n: number, html: string) =>
-    `<div class='original' data-para='${n}'><div class='para-block'>` +
-    `<div class='sentence origin'><span><span>${html}</span></span></div>` +
-    `</div></div>`;
-  return [
-    para(1, pali),
-    para(2, zh),
-    para(3, note),
-  ].join("");
-}
-
-/** 组装正文 HTML（含一个 Tufte sidenote 示例）。 */
-function mockBody(pali: string, zh: string, note: string): string {
-  return `
-    <p class="pali">${pali}</p>
-    <p>${zh}
-      <label for="sn-demo" class="sidenote-number">注</label>
-      <input type="checkbox" id="sn-demo" class="margin-toggle">
-      <span class="sidenote">${note}</span>
-    </p>
-    <p>这一段演示正文排版：巴利原文、中文译文的对照呈现，以及正文右侧（宽屏）或行内（窄屏）的边注。</p>
-  `;
-}

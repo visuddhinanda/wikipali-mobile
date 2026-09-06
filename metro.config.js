@@ -7,8 +7,12 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { mergeConfig } = require("@react-native/metro-config");
 
+const defaultConfig = getDefaultConfig(__dirname);
+
 const config = {
   resolver: {
+    // 离线目录库 assets/db/tipitaka.db3 要作为资源打包（默认 assetExts 只有 .db）
+    assetExts: [...defaultConfig.resolver.assetExts, "db3"],
     resolveRequest: (context, moduleImport, platform) => {
       if (moduleImport === "jose" || moduleImport.startsWith("jose/")) {
         return context.resolveRequest(
@@ -22,4 +26,4 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = mergeConfig(defaultConfig, config);

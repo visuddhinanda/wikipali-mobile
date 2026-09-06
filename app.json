@@ -30,7 +30,9 @@
     "owner": "iapt",
     "plugins": [
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-sqlite",
+      "expo-asset"
     ]
   }
 }

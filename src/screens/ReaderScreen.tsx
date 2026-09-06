@@ -12,14 +12,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { getBookChannels, getChapterByChannel, getChapterContent } from "../api";
+import { getBookChannels } from "../api";
+import { findNode, headingPath } from "../catalog/headings";
 import {
-  chapterEndParagraph,
-  headingPath,
-  nextHeading,
-  prevHeading,
-  resolveDisplayNode,
-} from "../catalog/headings";
+  getNextUnit,
+  getPrevUnit,
+  getReadingUnitAt,
+  getReadingUnitContent,
+  resolveStartParagraph,
+  type ReadingUnit,
+} from "../reading";
 import type { ChapterChannel } from "../catalog";
 import { saveReadingRecord } from "../data/history";
 import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
@@ -52,12 +54,6 @@ interface ReaderDoc {
   body: string;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 function buildReaderHtml(
   doc: ReaderDoc,
@@ -212,8 +208,9 @@ export function ReaderScreen({ route, navigation }: Props) {
     theme: "light",
     fontSize: "md",
   });
-  // 当前要显示的章节起始段；初始为路由传入的 paragraph，导航（上一章/下一章/目录）时更新。
-  const [activeParagraph, setActiveParagraph] = useState(paragraph);
+  // 当前阅读单元（区间 + 停止章节）。由 src/reading 的切分算法算出，
+  // 导航（上一单元/下一单元/目录）时整体替换。见 docs/reading-content.md §3。
+  const [unit, setUnit] = useState<ReadingUnit | null>(null);
   const [channelId, setChannelId] = useState<string | undefined>(
     route.params.channelId,
   );
@@ -222,6 +219,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   );
   const [doc, setDoc] = useState<ReaderDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasPrev, setHasPrev] = useState(false);
+  const [hasNext, setHasNext] = useState(false);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   // 宽屏 list-detail（DESIGN.md §4.6）：expanded 及以上把目录做成常驻左栏，
@@ -243,80 +242,118 @@ export function ReaderScreen({ route, navigation }: Props) {
     loadReaderSettings().then(setSettings);
   }, []);
 
-  // 路由切换（进入新书/新章节）时重置显示段。
+  // 进入新书 / 新章节：定位阅读单元。
+  // paragraph 有值 = 目录点击或上次中断处；无值 = 从本书第一个 level-1 章节开始。
   useEffect(() => {
-    setActiveParagraph(paragraph);
+    let alive = true;
+    setUnit(null);
+    setError(null);
+    (async () => {
+      const start = await resolveStartParagraph(book, paragraph);
+      if (start === null) throw new Error(t("common.loadFailed"));
+      return getReadingUnitAt(book, start);
+    })()
+      .then((u) => {
+        if (alive) setUnit(u);
+      })
+      .catch((err) => {
+        if (alive) {
+          setError(err instanceof Error ? err.message : t("common.loadFailed"));
+        }
+      });
+    return () => {
+      alive = false;
+    };
   }, [book, paragraph]);
 
-  // 当前「显示单元」：由 activeParagraph 派生（输入章节体量过大时下沉到子章节）。
-  const current = useMemo(
-    () => resolveDisplayNode(book, activeParagraph),
-    [book, activeParagraph],
-  );
+  const p = unit?.from ?? paragraph ?? 0;
+  const toc = unit?.chapter?.toc ?? title;
 
-  const p = current?.heading.paragraph ?? activeParagraph;
-  const toc = current?.heading.toc ?? title;
-
-  // 记录阅读历史（本地存储，见 src/data/history.ts；TODO: 后续改 wikipali API）。
+  // 没指定版本时自动选第一个可读频道 —— 新接口必须带 channel。
   useEffect(() => {
+    if (channelId || !unit) return;
+    let alive = true;
+    getBookChannels(book, unit.from)
+      .then((list) => {
+        if (!alive || list.length === 0) return;
+        setChannelId(list[0].channel_id);
+        setChannelName(list[0].name);
+      })
+      .catch(() => {
+        /* 频道列表拿不到时下面的正文加载会报错，这里不重复提示 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [book, channelId, unit]);
+
+  // 记录阅读位置（本地存储，见 src/data/history.ts）。
+  // 存的是阅读单元起点 from，下次进来由算法重新展开成同一个区间。
+  useEffect(() => {
+    if (!unit) return;
     saveReadingRecord({
       book,
-      paragraph: p,
+      paragraph: unit.from,
       title,
       heading: toc,
       channelId,
       channelName,
       updatedAt: Date.now(),
     });
-  }, [book, p, title, toc, channelId, channelName]);
+  }, [book, unit, title, toc, channelId, channelName]);
 
-  // 标题面包屑：从「请求章节」到「当前显示单元」的父层级标题。
-  // 例：93-3 → 93-5，父层级为 93-3(书) / 93-4，正文为 93-5 起的 5–11 段。
-  const path = useMemo(() => headingPath(current), [current]);
+  // 标题面包屑：从书名到当前单元所在章节的父层级标题。
+  const path = useMemo(() => headingPath(findNode(book, p)), [book, p]);
   const breadcrumb = useMemo(() => {
     const ancestors = path.slice(0, -1);
     if (ancestors.length === 0) return title;
     return ancestors.map((h, i) => (i === 0 ? title : h.toc)).join(" › ");
   }, [path, title]);
 
-  const rangeEnd = useMemo(
-    () => (current ? chapterEndParagraph(current) : null),
-    [current],
-  );
-  const rangeLabel = rangeEnd ? `段落 ${p}–${rangeEnd - 1}` : `段落 ${p}–末`;
+  const rangeLabel = unit ? `段落 ${unit.from}–${unit.to}` : "";
 
   const headerTitle = toc;
   const headerSubtitle = [breadcrumb, channelName, rangeLabel]
     .filter(Boolean)
     .join(" · ");
 
-  // 载入正文
+  // 载入正文：查本地缓存 → 只补缺口 → 拼段落 HTML（docs/reading-content.md §4.3）
   useEffect(() => {
+    if (!unit || !channelId) return;
     let alive = true;
     setDoc(null);
     setError(null);
-    const load = channelId
-      ? getChapterByChannel(book, p, channelId).then((d) => ({
-          title: toc,
-          body: d.display ? d.display : escapeHtml(d.content),
-        }))
-      : getChapterContent(book, p).then((d) => ({
-          title: toc,
-          body: d.content,
-        }));
-
-    load
+    getReadingUnitContent(unit, channelId)
       .then((d) => {
-        if (alive) setDoc(d);
+        if (alive) setDoc({ title: toc, body: d.html });
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : t("common.loadFailed"));
+        if (alive) {
+          setError(err instanceof Error ? err.message : t("common.loadFailed"));
+        }
       });
-
     return () => {
       alive = false;
     };
-  }, [book, channelId, channelName, p, toc]);
+  }, [unit, channelId, toc]);
+
+  // 上一 / 下一单元是否存在（异步算，用于禁用导航按钮）
+  useEffect(() => {
+    if (!unit) {
+      setHasPrev(false);
+      setHasNext(false);
+      return;
+    }
+    let alive = true;
+    Promise.all([getPrevUnit(unit), getNextUnit(unit)]).then(([prev, next]) => {
+      if (!alive) return;
+      setHasPrev(!!prev);
+      setHasNext(!!next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [unit]);
 
   // 阅读区净宽以 onLayout 实测为准：列表栏收起、窗口拖动都会改变它，
   // 双列 / 边注栏的开关按这个宽度判断，不按设备档位硬编码（DESIGN.md §4.7）。
@@ -348,20 +385,26 @@ export function ReaderScreen({ route, navigation }: Props) {
     [doc, headerSubtitle, settings.fontSize, isDark, readerWidth, measure, sidenoteMode],
   );
 
+  /** 目录点击：定位到包含该段落的阅读单元（同一本书内）。 */
   const navigateTo = (b: number, para: number) => {
-    if (resolveDisplayNode(b, para)) setActiveParagraph(para);
+    if (b !== book) return;
+    getReadingUnitAt(b, para).then((u) => {
+      if (u) setUnit(u);
+    });
   };
 
   const goNext = () => {
-    if (!current) return;
-    const n = nextHeading(current);
-    if (n) navigateTo(n.book, n.paragraph);
+    if (!unit) return;
+    getNextUnit(unit).then((n) => {
+      if (n) setUnit(n);
+    });
   };
 
   const goPrev = () => {
-    if (!current) return;
-    const prev = prevHeading(current);
-    if (prev) navigateTo(prev.book, prev.paragraph);
+    if (!unit) return;
+    getPrevUnit(unit).then((prev) => {
+      if (prev) setUnit(prev);
+    });
   };
 
   const openVersion = () => {
@@ -392,9 +435,6 @@ export function ReaderScreen({ route, navigation }: Props) {
       seedText: `关于《${title}》「${toc}」这一段落，请讲解大意。`,
     });
   };
-
-  const hasPrev = !!current && !!prevHeading(current);
-  const hasNext = !!current && !!nextHeading(current);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.paper }]} edges={["top", "left", "right"]}>

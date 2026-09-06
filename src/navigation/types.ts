@@ -33,9 +33,13 @@ export type RootStackParamList = {
   };
   Reader: {
     book: number;
-    paragraph: number;
+    /**
+     * 起始段。省略时由阅读器自己定位：读过这本书就从上次中断处继续，
+     * 没读过就从本书第一个 level-1 章节开始（docs/reading-content.md §5.1）。
+     */
+    paragraph?: number;
     title: string;
-    /** 版本/频道 id（来自 BookChannels 选择）；缺省时走旧 chapter-content 接口。 */
+    /** 版本/频道 id（来自 BookChannels 选择）；缺省时自动选第一个可读频道。 */
     channelId?: string;
     /** 版本显示名（如 _System_Pali_VRI_ / 译文），作为副标题。 */
     channelName?: string;
