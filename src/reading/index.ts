@@ -17,6 +17,8 @@ import {
 } from "./unit";
 
 export type { ReadingUnit, ReadingUnitMode } from "./unit";
+export { getCompanionLayers } from "./companion";
+export type { CompanionChapter, CompanionLayers } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";
 export type { DownloadProgress, DownloadStatus } from "./download";
 export {

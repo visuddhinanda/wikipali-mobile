@@ -99,12 +99,13 @@ export function DownloadIconButton({
 
 const styles = StyleSheet.create({
   wrap: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 3,
     minWidth: 34,
   },
   pct: {
     fontSize: 10,
-    marginTop: 1,
   },
 });
