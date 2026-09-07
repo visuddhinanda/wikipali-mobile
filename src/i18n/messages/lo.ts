@@ -14,6 +14,7 @@ const lo: Messages = {
   "nav.debugLayout": "ກວດສອບຮູບແບບ",
 
   "common.cancel": "ຍົກເລີກ",
+  "common.ok": "ຮັບຊາບ",
   "common.loadFailed": "ໂຫຼດບໍ່ສຳເລັດ",
   "ai.unavailableTitle": "ຟັງຊັນ AI ຍັງບໍ່ເປີດ",
   "ai.unavailableBody": "ບໍລິການສົນທະນາຍັງບໍ່ທັນເປີດໃຫ້ບໍລິການ. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",

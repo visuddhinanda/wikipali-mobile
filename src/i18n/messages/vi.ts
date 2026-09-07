@@ -14,6 +14,7 @@ const vi: Messages = {
   "nav.debugLayout": "Gỡ lỗi bố cục",
 
   "common.cancel": "Hủy",
+  "common.ok": "Đã hiểu",
   "common.loadFailed": "Tải thất bại",
   "ai.unavailableTitle": "Tính năng AI chưa mở",
   "ai.unavailableBody": "Dịch vụ trò chuyện chưa hoạt động. Vui lòng quay lại sau.",

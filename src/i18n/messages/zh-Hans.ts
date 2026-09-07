@@ -21,6 +21,7 @@ const zhHans = {
 
   // 通用
   "common.cancel": "取消",
+  "common.ok": "知道了",
   "common.loadFailed": "加载失败",
   "ai.unavailableTitle": "AI 功能暂未开放",
   "ai.unavailableBody": "对话服务还没有上线，敬请期待。",

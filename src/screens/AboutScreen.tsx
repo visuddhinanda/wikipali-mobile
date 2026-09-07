@@ -77,6 +77,8 @@ export function AboutScreen() {
 
   // 版本号取自 app.json 的 expo.version，构建时内联，不会和实际包脱节。
   const version = Constants.expoConfig?.version ?? "—";
+  // 名字取 app.json，避免和桌面图标下的名称各写各的。
+  const appName = Constants.expoConfig?.name ?? "Wikipali";
 
   return (
     <Screen contentStyle={styles.content}>
@@ -84,7 +86,7 @@ export function AboutScreen() {
         <View style={styles.mark}>
           <Ionicons name="book" size={32} color={colors.paperRaised} />
         </View>
-        <Text style={styles.appName}>法音</Text>
+        <Text style={styles.appName}>{appName}</Text>
         <Text style={styles.version}>{t("about.version", { version })}</Text>
       </View>
 

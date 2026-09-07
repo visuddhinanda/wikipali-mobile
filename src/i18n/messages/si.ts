@@ -14,6 +14,7 @@ const si: Messages = {
   "nav.debugLayout": "සැලසුම නිදොස්කරණය",
 
   "common.cancel": "අවලංගු කරන්න",
+  "common.ok": "හරි",
   "common.loadFailed": "පූරණය අසාර්ථකයි",
   "ai.unavailableTitle": "AI පහසුකම තවම නැත",
   "ai.unavailableBody": "සංවාද සේවාව තවම ක්‍රියාත්මක නොවේ. පසුව නැවත බලන්න.",

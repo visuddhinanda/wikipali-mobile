@@ -14,6 +14,7 @@ const en: Messages = {
   "nav.debugLayout": "Layout debug",
 
   "common.cancel": "Cancel",
+  "common.ok": "OK",
   "common.loadFailed": "Failed to load",
   "ai.unavailableTitle": "AI is not available yet",
   "ai.unavailableBody": "The chat service is not online yet. Please check back later.",

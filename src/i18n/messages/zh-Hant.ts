@@ -14,6 +14,7 @@ const zhHant: Messages = {
   "nav.debugLayout": "版面偵錯",
 
   "common.cancel": "取消",
+  "common.ok": "知道了",
   "common.loadFailed": "載入失敗",
   "ai.unavailableTitle": "AI 功能暫未開放",
   "ai.unavailableBody": "對話服務尚未上線，敬請期待。",

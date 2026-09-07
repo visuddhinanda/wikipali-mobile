@@ -14,6 +14,7 @@ const th: Messages = {
   "nav.debugLayout": "ตรวจสอบเลย์เอาต์",
 
   "common.cancel": "ยกเลิก",
+  "common.ok": "รับทราบ",
   "common.loadFailed": "โหลดไม่สำเร็จ",
   "ai.unavailableTitle": "ฟีเจอร์ AI ยังไม่เปิดให้ใช้",
   "ai.unavailableBody": "บริการสนทนายังไม่เปิดให้บริการ กรุณากลับมาใหม่ภายหลัง",

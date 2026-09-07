@@ -14,6 +14,7 @@ const my: Messages = {
   "nav.debugLayout": "အပြင်အဆင် စစ်ဆေးရန်",
 
   "common.cancel": "ပယ်ဖျက်ရန်",
+  "common.ok": "ရပါပြီ",
   "common.loadFailed": "ဖတ်ယူမှု မအောင်မြင်ပါ",
   "ai.unavailableTitle": "AI လုပ်ဆောင်ချက် မဖွင့်ရသေးပါ",
   "ai.unavailableBody": "စကားပြောဝန်ဆောင်မှု မစတင်ရသေးပါ။ နောက်မှ ပြန်စစ်ပါ။",

@@ -30,16 +30,19 @@ const TIMEOUT = 12_000;
 async function callJson<T>(url: string, init: RequestInit): Promise<Envelope<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT);
+  // 超时要覆盖到读完 body —— 只包住 fetch 的话，服务端发完响应头后卡住
+  // 就会永久挂起（同 src/api/client.ts）。
   let res: Response;
+  let text: string;
   try {
     res = await fetch(url, { ...init, signal: controller.signal });
+    text = await res.text();
   } catch (err) {
     throw new ApiError(err instanceof Error ? err.message : t("error.network"));
   } finally {
     clearTimeout(timer);
   }
 
-  const text = await res.text();
   if (!text) {
     // 没有 body 时只能靠状态码判断
     return { ok: res.ok, data: undefined as T };
@@ -66,7 +69,8 @@ export async function signIn(
     body: JSON.stringify({ username, password }),
   });
   if (!env.ok || !env.data) {
-    throw new ApiError(env.message || t("signIn.badCredentials"));
+    // 服务端的原文（如 `invalid token`）对用户没有意义，一律显示统一文案。
+    throw new ApiError(t("signIn.badCredentials"));
   }
   return env.data;
 }

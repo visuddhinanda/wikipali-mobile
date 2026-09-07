@@ -19,6 +19,10 @@ const OK_TTL_MS = 60_000;
 const FAIL_TTL_MS = 10_000;
 
 let cache: { ok: boolean; at: number } | null = null;
+/** 正在探测的请求 —— 连点入口时共用一次探测，不要发一串。 */
+let inflight: Promise<boolean> | null = null;
+/** 弹窗是否已经在屏上 —— 连点三次不该叠三个 Alert。 */
+let alertVisible = false;
 
 async function probe(): Promise<boolean> {
   const controller = new AbortController();
@@ -39,7 +43,12 @@ export async function isAiRuntimeReachable(): Promise<boolean> {
   if (cache && now - cache.at < (cache.ok ? OK_TTL_MS : FAIL_TTL_MS)) {
     return cache.ok;
   }
-  const ok = await probe();
+  if (!inflight) {
+    inflight = probe().finally(() => {
+      inflight = null;
+    });
+  }
+  const ok = await inflight;
   cache = { ok, at: Date.now() };
   return ok;
 }
@@ -53,6 +62,10 @@ export async function ensureAiAvailable(
   t: (key: MessageKey) => string,
 ): Promise<boolean> {
   if (await isAiRuntimeReachable()) return true;
-  Alert.alert(t("ai.unavailableTitle"), t("ai.unavailableBody"));
+  if (alertVisible) return false;
+  alertVisible = true;
+  Alert.alert(t("ai.unavailableTitle"), t("ai.unavailableBody"), [
+    { text: t("common.ok"), onPress: () => { alertVisible = false; } },
+  ], { onDismiss: () => { alertVisible = false; } });
   return false;
 }
