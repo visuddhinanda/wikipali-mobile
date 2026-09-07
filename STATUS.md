@@ -503,7 +503,36 @@ adb logcat -v brief
 | 翻章报 `cannot rollback - no transaction is active` | `withTransactionAsync` 是裸的 `BEGIN`/`COMMIT`，共用一个连接；三层同时预取时第二个 `BEGIN` 嵌套失败 | `withReadingTransaction()` 用 promise 链把写事务串行化（`e49b7d5`） |
 | 点「探索」进到永远失败的对话页 | CopilotKit Runtime 未上线，包里内联的是开发机局域网地址 | `src/ai/availability.ts` 探测 `{RUNTIME_URL}/info`，不可达时三个入口弹窗拦截（`26817aa`） |
 
-### 12.5 已知未决
+### 12.5 第四个 bug：请求超时没覆盖 body
+
+`src/api/client.ts` 的 12 秒 `AbortController` 只包住 `fetch()`，
+`clearTimeout` 在 `finally` 里就执行了 —— 服务端发完响应头后卡住时，
+`await res.text()` 永久挂起。整本下载卡在某一批后，循环再也回不到
+`flag.cancelled` 检查点，`running` 标记不释放，之后点「继续」全是空操作，
+必须杀进程才能恢复。已把 `res.ok` 判断和 `res.text()` 移进 try（`e00ee75`）。
+
+### 12.6 全功能真机测试结果（2026-09-07）
+
+测试机：Redmi 2304FPN6DC（Android 16，1080x2400），release 包，经宿主 adb server 驱动。
+
+**通过**：冷启动、五个 Tab、三藏树四级导航、书架三个分页与空态、
+版本列表（43 个版本）、阅读正文渲染、上一章/下一章、目录抽屉跳转、
+版本切换（Claude ↔ deepseek）、层切换（原文/义注/复注）、字号四档、
+深色/亮色主题、整本下载 1507/1507 完成、暂停/继续、飞行模式下离线阅读与翻章、
+语言切换（简中 ↔ English）、API 服务器列表、关于页、登录页错误处理、
+AI 三个入口的不可用拦截。
+
+**未实现（占位，非 bug）**：分类页搜索框、工具页三项（字典/佛教日历/编码转换）、
+设置页「显示设置」「下载管理」。
+
+**待人工确认**：阅读页「就此段落提问」FAB 对注入点击无响应（同一守卫在
+「探索」Tab 和「我的提问历史」已验证生效），怀疑是 WebView 吞掉了注入事件。
+
+**记录待定的问题**：见本次会话报告 —— 段号与有序列表序号重叠、长标题横向裁切、
+登录失败提示直接显示服务端原文 `invalid token`、关于页仍写「法音」而应用名已是
+Wikipali、离线时只剩「原文」一层、连点 AI 入口会叠多个弹窗。
+
+### 12.7 已知未决
 
 - `.env` 的 `EXPO_PUBLIC_RUNTIME_URL` 仍是开发机地址，Runtime 上线后要改成正式地址再出包。
 - release 用 debug keystore 签名（见 §12.1）。
