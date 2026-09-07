@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -339,20 +340,11 @@ function SettingsSheet({
         </Text>
 
         <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{t("reader.fontSize")}</Text>
-        <View style={styles.fontRow}>
-          {FONT_OPTIONS.map((f) => {
-            const activeOpt = settings.fontSize === f.id;
-            return (
-              <Pressable
-                key={f.id}
-                style={[styles.fontPill, { backgroundColor: activeOpt ? c.vermilion : c.paperSunken }]}
-                onPress={() => onChange({ ...settings, fontSize: f.id as ReaderSettings["fontSize"] })}
-              >
-                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink, fontSize: f.px }}>{t(f.labelKey)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <FontScale
+          value={settings.fontSize}
+          c={c}
+          onChange={(fontSize) => onChange({ ...settings, fontSize })}
+        />
 
         <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{t("reader.theme")}</Text>
         <View style={styles.fontRow}>
@@ -376,6 +368,102 @@ function SettingsSheet({
         </View>
       </View>
     </Modal>
+  );
+}
+
+/**
+ * 字号选择：四节点进度条。左右两端用「小 / 大」标注，档位本身不写字
+ * —— 四个档的名字（标准/特大之类）在这么窄的条上只会互相挤。
+ *
+ * 整条都可点，也可以按住拖动，落点取最近的节点。
+ */
+function FontScale({
+  value,
+  c,
+  onChange,
+}: {
+  value: ReaderSettings["fontSize"];
+  c: ReaderChrome;
+  onChange: (v: ReaderSettings["fontSize"]) => void;
+}) {
+  const last = FONT_OPTIONS.length - 1;
+  const index = Math.max(0, FONT_OPTIONS.findIndex((f) => f.id === value));
+
+  // PanResponder 只创建一次，靠 ref 读最新的宽度与选中值，避免闭包读到旧状态。
+  const widthRef = useRef(0);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const pick = useCallback(
+    (x: number) => {
+      const w = widthRef.current;
+      if (w <= 0) return;
+      const i = Math.round(Math.min(1, Math.max(0, x / w)) * last);
+      const next = FONT_OPTIONS[i];
+      if (next && next.id !== valueRef.current) {
+        onChangeRef.current(next.id as ReaderSettings["fontSize"]);
+      }
+    },
+    [last],
+  );
+
+  // 拖动只能用绝对坐标：move 事件里的 locationX 在 Android 上不可靠
+  // （实测一路右拖反而跳到最左档）。按下时用 pageX - locationX 得到轨道
+  // 自身的屏幕左边界，之后统一拿 gestureState.moveX 减掉它。
+  const originRef = useRef(0);
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        originRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX;
+        pick(e.nativeEvent.locationX);
+      },
+      onPanResponderMove: (_e, g) => pick(g.moveX - originRef.current),
+    }),
+  ).current;
+
+  return (
+    <View style={styles.scaleRow}>
+      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 12 }]}>
+        小
+      </Text>
+
+      <View style={styles.scaleTrackHit} {...pan.panHandlers}>
+        <View
+          style={styles.scaleTrackInner}
+          onLayout={(e) => {
+            widthRef.current = e.nativeEvent.layout.width;
+          }}
+        >
+          <View style={[styles.scaleLine, { backgroundColor: c.border }]} />
+          <View
+            style={[
+              styles.scaleLineFill,
+              { backgroundColor: c.vermilion, width: `${(index / last) * 100}%` },
+            ]}
+          />
+          {FONT_OPTIONS.map((f, i) => (
+            <View
+              key={f.id}
+              style={[
+                styles.scaleDot,
+                {
+                  left: `${(i / last) * 100}%`,
+                  backgroundColor: i <= index ? c.vermilion : c.paperSunken,
+                  borderColor: i <= index ? c.vermilion : c.border,
+                },
+                i === index && styles.scaleDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+
+      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 19 }]}>大</Text>
+    </View>
   );
 }
 
@@ -453,6 +541,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     marginBottom: 8,
+  },
+  scaleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  scaleCap: {
+    width: 24,
+    textAlign: "center",
+  },
+  // 触摸区比线粗得多，免得要"戳准"那根 3px 的线
+  scaleTrackHit: {
+    flex: 1,
+    height: 44,
+    justifyContent: "center",
+  },
+  scaleTrackInner: {
+    height: 18,
+    marginHorizontal: 9,
+    justifyContent: "center",
+  },
+  scaleLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 3,
+    borderRadius: 2,
+  },
+  // 单独写一份：RN 的样式合并会忽略 undefined，靠覆盖 scaleLine 的 right 清不掉
+  scaleLineFill: {
+    position: "absolute",
+    left: 0,
+    height: 3,
+    borderRadius: 2,
+  },
+  scaleDot: {
+    position: "absolute",
+    top: 3,
+    width: 12,
+    height: 12,
+    marginLeft: -6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  scaleDotActive: {
+    top: 0,
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    borderRadius: 9,
   },
   fontRow: {
     flexDirection: "row",
