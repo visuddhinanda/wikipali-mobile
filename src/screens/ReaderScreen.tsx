@@ -12,8 +12,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { BOOK_TITLES } from "../catalog";
-import { getCompanionLayers } from "../reading";
+import { bookEntryAt, bookLayerAt } from "../catalog";
+import type { CommentaryLayer } from "../catalog/commentary";
+import { getChapterLayers } from "../reading";
 import { ReaderLayerPane } from "./ReaderLayerPane";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
@@ -29,7 +30,7 @@ import type { RootStackParamList } from "../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Reader">;
 
-type Layer = "mula" | "atthakatha" | "tika";
+type Layer = CommentaryLayer;
 
 interface PageMeta {
   layer: Layer;
@@ -39,8 +40,9 @@ interface PageMeta {
   toc: string | null;
 }
 
-function bookTitleOf(book: number): string {
-  return BOOK_TITLES.find((b) => b.book === book)?.title ?? String(book);
+/** 作品名（level=1 的 toc），不是丛书名 —— 一个 book 文件可能含多部作品。 */
+function bookTitleOf(book: number, paragraph?: number): string {
+  return bookEntryAt(book, paragraph)?.toc ?? String(book);
 }
 
 /**
@@ -71,14 +73,18 @@ export function ReaderScreen({ route, navigation }: Props) {
     saveReaderSettings(next);
   }, []);
 
+  // 入口这一层不一定是根本：从「义注」书进来时，标签栏该停在义注，而不是
+  // 顶一个空的「原文」（bug：从义注/复注进来标签停在原文位置且只有原文）。
   const [pages, setPages] = useState<PageMeta[]>(() => [
-    { layer: "mula", book, paragraph, title, toc: title },
+    { layer: bookLayerAt(book, paragraph) ?? "mula", book, paragraph, title, toc: title },
   ]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(() => new Set([0]));
   const pagerRef = useRef<PagerView>(null);
-  // 原文当前锚点，用来判断「章节锚点上报」是真换章了、还是同一章内 unit 细化。
-  const mulaAnchorRef = useRef<{ book: number; paragraph: number } | null>(null);
+  // 驱动重算的是「用户所在的那一层」，不再固定是第 0 页。
+  const selfIndexRef = useRef(0);
+  // 该层当前锚点，用来判断「章节锚点上报」是真换章了、还是同一章内 unit 细化。
+  const selfAnchorRef = useRef<{ book: number; paragraph: number } | null>(null);
   // 当前偏好的版本名（如「deepseek」）——义注/复注第一次加载时，用它在自己
   // 书的版本列表里找同名版本，而不是无脑取第一个（不然会跳去系统默认的
   // 逐字翻译版本，见 bug：根本用 deepseek，切到义注/复注却变成 _System_Wbw_VRI_）。
@@ -121,8 +127,8 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const handleChapterAnchor = useCallback(
     (index: number, b: number, para: number, toc: string | null) => {
-      if (index !== 0) {
-        // 义注/复注层自己翻章：只刷新标签标题，不影响原文与另一层。
+      if (index !== selfIndexRef.current) {
+        // 别的层自己翻章：只刷新标签标题，不影响当前层与另一层。
         setPages((prev) => {
           const cur = prev[index];
           if (!cur || (cur.book === b && cur.paragraph === para && cur.toc === toc)) return prev;
@@ -133,57 +139,55 @@ export function ReaderScreen({ route, navigation }: Props) {
         return;
       }
 
-      const prevAnchor = mulaAnchorRef.current;
+      const prevAnchor = selfAnchorRef.current;
       const changed = !prevAnchor || prevAnchor.book !== b || prevAnchor.paragraph !== para;
-      mulaAnchorRef.current = { book: b, paragraph: para };
+      selfAnchorRef.current = { book: b, paragraph: para };
 
       if (!changed) {
         setPages((prev) => {
-          if (!prev[0] || prev[0].toc === toc) return prev;
+          const cur = prev[selfIndexRef.current];
+          if (!cur || cur.toc === toc) return prev;
           const next = [...prev];
-          next[0] = { ...next[0], toc };
+          next[selfIndexRef.current] = { ...cur, toc };
           return next;
         });
         return;
       }
 
-      // 原文真的换章了：先把义注/复注摘掉、跳回原文页，再重新算对应章节。
-      setPages((prev) => [{ ...(prev[0] ?? { layer: "mula", book: b, paragraph: para, title, toc }), book: b, paragraph: para, toc }]);
+      // 当前层真的换章了：先收成单层、跳回它，再重新算各层对应章节。
+      const selfLayer = bookLayerAt(b, para) ?? "mula";
+      setPages([{ layer: selfLayer, book: b, paragraph: para, title: bookTitleOf(b, para), toc }]);
+      selfIndexRef.current = 0;
       setVisited(new Set([0]));
       setActiveIndex(0);
       setDualAnchor(0);
       pagerRef.current?.setPageWithoutAnimation(0);
 
-      getCompanionLayers(b, para).then((layers) => {
-        // 期间用户又翻了别的原文章节，这次查询已经过期，丢弃。
-        if (mulaAnchorRef.current?.book !== b || mulaAnchorRef.current?.paragraph !== para) return;
-        setPages((prev) => {
-          const mula = prev[0] ?? { layer: "mula" as const, book: b, paragraph: para, title, toc };
-          const next: PageMeta[] = [mula];
-          if (layers.atthakatha) {
-            next.push({
-              layer: "atthakatha",
-              book: layers.atthakatha.book,
-              paragraph: layers.atthakatha.paragraph,
-              title: bookTitleOf(layers.atthakatha.book),
-              toc: layers.atthakatha.toc,
-            });
-            // 没有义注就不找复注 —— 不允许原文直接跳复注。
-            if (layers.tika) {
-              next.push({
-                layer: "tika",
-                book: layers.tika.book,
-                paragraph: layers.tika.paragraph,
-                title: bookTitleOf(layers.tika.book),
-                toc: layers.tika.toc,
-              });
-            }
-          }
-          return next;
-        });
+      getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
+        // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
+        if (selfAnchorRef.current?.book !== b || selfAnchorRef.current?.paragraph !== para) return;
+        if (chapters.length === 0) return;
+        setPages(
+          chapters.map((ch, i) =>
+            i === selfIndex
+              ? { layer: ch.layer, book: b, paragraph: para, title: bookTitleOf(b, para), toc }
+              : {
+                  layer: ch.layer,
+                  book: ch.book,
+                  paragraph: ch.paragraph,
+                  title: bookTitleOf(ch.book, ch.paragraph),
+                  toc: ch.toc,
+                },
+          ),
+        );
+        selfIndexRef.current = selfIndex;
+        setVisited(new Set([selfIndex]));
+        setActiveIndex(selfIndex);
+        setDualAnchor(Math.max(0, Math.min(selfIndex, chapters.length - 2)));
+        pagerRef.current?.setPageWithoutAnimation(selfIndex);
       });
     },
-    [title],
+    [],
   );
 
   const onPageSelected = (e: PagerViewOnPageSelectedEvent) => {
@@ -226,8 +230,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         paragraph={p.paragraph}
         title={p.title}
         initialToc={p.toc}
-        initialChannelId={i === 0 ? channelId : undefined}
-        initialChannelName={i === 0 ? channelName : undefined}
+        initialChannelId={i === selfIndexRef.current ? channelId : undefined}
+        initialChannelName={i === selfIndexRef.current ? channelName : undefined}
         preferredChannelName={preferredChannelNameRef.current}
         onChannelChange={handleChannelChange}
         settings={settings}
