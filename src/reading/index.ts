@@ -18,6 +18,12 @@ import {
 
 export type { ReadingUnit, ReadingUnitMode } from "./unit";
 export { getCompanionLayers, getChapterLayers } from "./companion";
+export {
+  channelNames,
+  localChannelsFor,
+  rememberChannelName,
+  type LocalChannel,
+} from "./cache";
 export type { ChapterLayers, LayerChapter } from "./companion";
 export type { CompanionChapter, CompanionLayers } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";

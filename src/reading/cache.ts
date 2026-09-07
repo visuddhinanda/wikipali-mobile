@@ -218,3 +218,73 @@ export async function enforceCacheQuota(
   if (freed > 0) await db.execAsync("VACUUM");
   return freed;
 }
+
+/** 记住版本 uid 对应的显示名（离线选版本、离线显示名字都要用）。 */
+export async function rememberChannelName(
+  channelUid: string,
+  name: string,
+): Promise<void> {
+  if (!channelUid || !name) return;
+  const db = await openReadingDb();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO channels (uid, name) VALUES (?, ?)",
+    [channelUid, name],
+  );
+}
+
+export interface LocalChannel {
+  channelId: string;
+  name: string | null;
+  /** 该版本在本书已缓存的段数。 */
+  cached: number;
+  /** 是否是用户显式下载的（而不是阅读时被动缓存的）。 */
+  downloaded: boolean;
+}
+
+/**
+ * 本书在本地已有内容的版本，按「下载过的优先、缓存段数多的优先」排。
+ *
+ * 用途：滑到义注/复注层时先看本地有什么，别一律等接口再挑 —— 那样既会
+ * 挑到本地没数据的版本（于是转圈联网），也让已下载的书白白等一次网络。
+ */
+export async function localChannelsFor(book: number): Promise<LocalChannel[]> {
+  const db = await openReadingDb();
+  const rows = await db.getAllAsync<{
+    channel: string;
+    name: string | null;
+    cached: number;
+    downloaded: number;
+  }>(
+    `SELECT c.channel,
+            n.name                          AS name,
+            c.cached                        AS cached,
+            CASE WHEN d.channel IS NULL THEN 0 ELSE 1 END AS downloaded
+       FROM (SELECT channel, COUNT(*) AS cached
+               FROM para_html WHERE book = ? GROUP BY channel) c
+       LEFT JOIN channels n ON n.uid = c.channel
+       LEFT JOIN download_state d
+              ON d.channel = c.channel AND d.book = ? AND d.done > 0
+      ORDER BY downloaded DESC, cached DESC`,
+    [book, book],
+  );
+  return rows.map((r) => ({
+    channelId: r.channel,
+    name: r.name,
+    cached: r.cached,
+    downloaded: r.downloaded === 1,
+  }));
+}
+
+/** 批量查版本显示名（uid → name）；没见过的 uid 不会出现在结果里。 */
+export async function channelNames(
+  uids: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(uids.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const db = await openReadingDb();
+  const rows = await db.getAllAsync<{ uid: string; name: string }>(
+    `SELECT uid, name FROM channels WHERE uid IN (${unique.map(() => "?").join(",")})`,
+    unique,
+  );
+  return new Map(rows.map((r) => [r.uid, r.name]));
+}

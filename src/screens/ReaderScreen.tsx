@@ -88,10 +88,18 @@ export function ReaderScreen({ route, navigation }: Props) {
   // 当前偏好的版本名（如「deepseek」）——义注/复注第一次加载时，用它在自己
   // 书的版本列表里找同名版本，而不是无脑取第一个（不然会跳去系统默认的
   // 逐字翻译版本，见 bug：根本用 deepseek，切到义注/复注却变成 _System_Wbw_VRI_）。
-  const preferredChannelNameRef = useRef<string | undefined>(channelName);
-  const handleChannelChange = useCallback((name: string | undefined) => {
-    if (name) preferredChannelNameRef.current = name;
-  }, []);
+  // 认版本认 uid：显示名可能在服务端被改（「claude」→「Claude」），
+  // 按名字匹配会认不出同一个版本，退化成 _System_Pali_VRI_。
+  const preferredChannelRef = useRef<{ uid?: string; name?: string }>({
+    uid: channelId,
+    name: channelName,
+  });
+  const handleChannelChange = useCallback(
+    (uid: string | undefined, name: string | undefined) => {
+      if (uid) preferredChannelRef.current = { uid, name };
+    },
+    [],
+  );
 
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -232,7 +240,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         initialToc={p.toc}
         initialChannelId={i === selfIndexRef.current ? channelId : undefined}
         initialChannelName={i === selfIndexRef.current ? channelName : undefined}
-        preferredChannelName={preferredChannelNameRef.current}
+        preferredChannelUid={preferredChannelRef.current.uid}
+        preferredChannelName={preferredChannelRef.current.name}
         onChannelChange={handleChannelChange}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}

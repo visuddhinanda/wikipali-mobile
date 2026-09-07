@@ -180,6 +180,15 @@ CREATE TABLE IF NOT EXISTS para_html (
   PRIMARY KEY (channel, book, para)
 );
 
+-- 版本表：uid → 显示名。para_html / download_state 里存的 channel 就是这个
+-- uid，**认版本一律认 uid**（显示名可能在服务端被改，按名字匹配会认错人）。
+-- 名字只用于显示，见过一次就记下来，离线时也能挑版本、显示名字；名字更新
+-- 可能滞后，但数据是对的。
+CREATE TABLE IF NOT EXISTS channels (
+  uid  TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
 -- 用户显式下载过的书，区别于阅读时被动产生的缓存（清理时不误删）。
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,

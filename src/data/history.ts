@@ -19,9 +19,15 @@ export interface ReadingRecord {
   title: string;
   /** 当前章节标题（用于副标题展示）。 */
   heading?: string;
-  /** 阅读时使用的版本/频道 id。 */
+  /**
+   * 阅读时使用的版本 uid —— **只存 uid**。
+   *
+   * 显示名要查 `reading.db3` 的 `channels` 表（`channelNames()`）：名字在
+   * 服务端可能被改（「claude」→「Claude」），存快照会显示过期的名字，
+   * 而 uid 永远认得出同一个版本。
+   */
   channelId?: string;
-  /** 版本显示名。 */
+  /** @deprecated 旧数据里的版本名快照，只读不写；显示一律查 `channels` 表。 */
   channelName?: string;
   /** 最近阅读时间（epoch ms）。 */
   updatedAt: number;

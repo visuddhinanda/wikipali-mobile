@@ -26,6 +26,8 @@ import { getBookChannels } from "../api";
 import {
   getNextUnit,
   getPrevUnit,
+  localChannelsFor,
+  rememberChannelName,
   getReadingUnitAt,
   getReadingUnitContent,
   resolveStartParagraph,
@@ -72,12 +74,14 @@ export interface ReaderLayerPaneProps {
   initialChannelId?: string;
   initialChannelName?: string;
   /** 自动选版本时优先匹配的版本名（如「deepseek」）——同名版本存在就用它，而不是无脑取第一个。 */
+  /** 上一层用的版本 uid —— 认版本认它，显示名可能被改。 */
+  preferredChannelUid?: string;
   preferredChannelName?: string;
   settings: ReaderSettings;
   /** 每次这一层的阅读单元变化都会调用（含首次进入），供外层算/重算义注复注章节。 */
   onChapterAnchor: (book: number, paragraph: number, toc: string | null) => void;
   /** 版本变化（自动选定或手动切换）都会调用，供外层记住「当前偏好的版本名」，义注/复注第一次加载时接着用。 */
-  onChannelChange?: (channelName: string | undefined) => void;
+  onChannelChange?: (channelUid: string | undefined, channelName: string | undefined) => void;
   navigation: ReaderNavigation;
 }
 
@@ -260,6 +264,7 @@ export function ReaderLayerPane({
   initialToc,
   initialChannelId,
   initialChannelName,
+  preferredChannelUid,
   preferredChannelName,
   settings,
   onChapterAnchor,
@@ -323,26 +328,53 @@ export function ReaderLayerPane({
   }, [unit, book]);
 
   // 没指定版本时自动选版本 —— 新接口必须带 channel。
+  //
+  // 顺序：本地已有内容的版本（下载过的优先）→ 接口列表里的同名版本 →
+  // `_System_Pali_VRI_`。先看本地有两个好处：下载过的书不必等一次网络就能
+  // 直接命中缓存（否则滑到义注层要先转圈），也不会挑到一个本地没数据的
+  // 版本 —— 那正是「刚下载完的原文滑过去却变成 _System_Pali_VRI_」的原因。
   useEffect(() => {
     if (channelId || !unit) return;
     let alive = true;
-    getBookChannels(book, unit.from)
-      .then((list) => {
-        if (!alive) return;
-        // 优先接着用当前偏好的版本（比如原文用的「deepseek」）；这本书没有
-        // 同名版本就降级到「_System_Pali_VRI_」（巴利原文，各书基本都有）；
-        // 连这个都没有才是真没数据 —— 不再无脑取列表第一个凑合。
-        const preferred = preferredChannelName
-          ? list.find((c) => c.name === preferredChannelName)
-          : undefined;
-        const fallback = list.find((c) => c.name === FALLBACK_CHANNEL_NAME);
-        const picked = preferred ?? fallback;
-        if (!picked) {
-          setError(t("reader.noVersions"));
-          return;
-        }
-        setChannelId(picked.channel_id);
-        setChannelName(picked.name);
+    (async () => {
+      const local = await localChannelsFor(book);
+      if (!alive) return false;
+      const localPick =
+        (preferredChannelUid
+          ? local.find((c) => c.channelId === preferredChannelUid)
+          : undefined) ??
+        local.find((c) => c.downloaded) ??
+        local[0];
+      if (localPick) {
+        setChannelId(localPick.channelId);
+        setChannelName(localPick.name ?? undefined);
+        return true;
+      }
+      return false;
+    })()
+      .then((done) => {
+        if (done || !alive) return;
+        return getBookChannels(book, unit.from).then((list) => {
+          if (!alive) return;
+          // 记下 id→名字，下次可以离线选版本。
+          for (const c of list) void rememberChannelName(c.channel_id, c.name);
+          // 先按 uid 认，认不到再退回按名字（老记录可能只有名字）。
+          const preferred =
+            (preferredChannelUid
+              ? list.find((c) => c.channel_id === preferredChannelUid)
+              : undefined) ??
+            (preferredChannelName
+              ? list.find((c) => c.name === preferredChannelName)
+              : undefined);
+          const fallback = list.find((c) => c.name === FALLBACK_CHANNEL_NAME);
+          const picked = preferred ?? fallback;
+          if (!picked) {
+            setError(t("reader.noVersions"));
+            return;
+          }
+          setChannelId(picked.channel_id);
+          setChannelName(picked.name);
+        });
       })
       .catch(() => {
         /* 频道列表拿不到时下面的正文加载会报错，这里不重复提示 */
@@ -350,26 +382,31 @@ export function ReaderLayerPane({
     return () => {
       alive = false;
     };
-  }, [book, channelId, unit, preferredChannelName, t]);
+  }, [book, channelId, unit, preferredChannelUid, preferredChannelName, t]);
+
+  // 当前版本的名字也记一份 —— 从目录/书架带进来的版本同样要能离线复用。
+  useEffect(() => {
+    if (channelId && channelName) void rememberChannelName(channelId, channelName);
+  }, [channelId, channelName]);
 
   // 版本一变（自动选定或手动切换）就告诉外层，供其他层第一次加载时参考。
   useEffect(() => {
-    onChannelChange?.(channelName);
-  }, [channelName, onChannelChange]);
+    onChannelChange?.(channelId, channelName);
+  }, [channelId, channelName, onChannelChange]);
 
   // 记录阅读位置（本地存储，见 src/data/history.ts）——每一层各自的书各算一条。
   useEffect(() => {
     if (!unit) return;
+    // 只存版本 uid，不存名字：名字查 channels 表（见 history.ts 注释）。
     saveReadingRecord({
       book,
       paragraph: unit.from,
       title,
       heading: toc,
       channelId,
-      channelName,
       updatedAt: Date.now(),
     });
-  }, [book, unit, title, toc, channelId, channelName]);
+  }, [book, unit, title, toc, channelId]);
 
   const rangeLabel = unit ? `段落 ${unit.from}–${unit.to}` : "";
   const headerSubtitle = [channelName, rangeLabel].filter(Boolean).join(" · ");

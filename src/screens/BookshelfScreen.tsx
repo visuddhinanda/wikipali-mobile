@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { DownloadControl } from "../components/DownloadControl";
 import { bookEntryAt, bookLayerAt } from "../catalog";
-import { listDownloads, type DownloadProgress } from "../reading";
+import { channelNames, listDownloads, type DownloadProgress } from "../reading";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -64,6 +64,8 @@ export function BookshelfScreen() {
   const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
   const [downloads, setDownloads] = useState<DownloadProgress[] | null>(null);
+  // 版本名不存在记录里 —— uid → name 现查，服务端改了名这里立刻跟上。
+  const [names, setNames] = useState<Map<string, string>>(new Map());
 
   const refreshDownloads = useCallback(() => {
     listDownloads().then(setDownloads);
@@ -74,10 +76,18 @@ export function BookshelfScreen() {
     useCallback(() => {
       let alive = true;
       loadReadingHistory().then((r) => {
-        if (alive) setRecords(r);
+        if (!alive) return;
+        setRecords(r);
+        channelNames(r.map((x) => x.channelId ?? "")).then((m) => {
+          if (alive) setNames(m);
+        });
       });
       listDownloads().then((d) => {
-        if (alive) setDownloads(d);
+        if (!alive) return;
+        setDownloads(d);
+        channelNames(d.map((x) => x.channel)).then((m) => {
+          if (alive) setNames((prev) => new Map([...prev, ...m]));
+        });
       });
       return () => {
         alive = false;
@@ -94,6 +104,10 @@ export function BookshelfScreen() {
    */
   const workTitle = (book: number, paragraph?: number, fallback?: string): string =>
     bookEntryAt(book, paragraph)?.toc ?? fallback ?? String(book);
+
+  /** 版本显示名：现查 channels 表；查不到才退回旧记录里的名字快照。 */
+  const channelLabel = (uid?: string, legacy?: string): string | undefined =>
+    (uid ? names.get(uid) : undefined) ?? legacy;
 
   /** 层次 tag（根本 / 义注 / 复注 / 再复注），放在副标题开头。 */
   const layerTag = (book: number, paragraph?: number): string | null => {
@@ -135,7 +149,7 @@ export function BookshelfScreen() {
             const sub = [
               layerTag(r.book, r.paragraph),
               r.heading && r.heading !== title ? r.heading : null,
-              r.channelName,
+              channelLabel(r.channelId, r.channelName),
               `${r.book}-${r.paragraph}`,
             ]
               .filter(Boolean)
@@ -150,7 +164,7 @@ export function BookshelfScreen() {
                     paragraph: r.paragraph,
                     title,
                     channelId: r.channelId,
-                    channelName: r.channelName,
+                    channelName: channelLabel(r.channelId, r.channelName),
                   })
                 }
               >
@@ -190,11 +204,11 @@ export function BookshelfScreen() {
                   <Text style={styles.rowTitle} numberOfLines={1}>
                     {workTitle(d.book)}
                   </Text>
-                  {layerTag(d.book) ? (
-                    <Text style={styles.rowSub} numberOfLines={1}>
-                      {layerTag(d.book)}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.rowSub} numberOfLines={1}>
+                    {[layerTag(d.book), channelLabel(d.channel)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
                 </View>
                 <Ionicons
                   name="chevron-forward"
