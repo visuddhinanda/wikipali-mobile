@@ -21,6 +21,7 @@ import { AiChatScreen } from "../screens/AiChatScreen";
 import { ToolsScreen } from "../screens/ToolsScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { NewChatScreen } from "../screens/NewChatScreen";
+import { ensureAiAvailable } from "../ai/availability";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { LanguageSettingsScreen } from "../screens/LanguageSettingsScreen";
@@ -313,6 +314,19 @@ export function RootNavigator() {
             name={name}
             component={TAB_STACKS[name]}
             options={{ title: t(TAB_ICONS[name].label) }}
+            // 「探索」整个 Tab 依赖 CopilotKit Runtime，服务没上线就先别放人进去。
+            listeners={
+              name === "AiChat"
+                ? ({ navigation: nav }) => ({
+                    tabPress: (e) => {
+                      e.preventDefault();
+                      void ensureAiAvailable(t).then((ok) => {
+                        if (ok) nav.navigate("AiChat");
+                      });
+                    },
+                  })
+                : undefined
+            }
           />
         ))}
       </Tab.Navigator>

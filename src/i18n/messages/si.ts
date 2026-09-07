@@ -15,6 +15,8 @@ const si: Messages = {
 
   "common.cancel": "අවලංගු කරන්න",
   "common.loadFailed": "පූරණය අසාර්ථකයි",
+  "ai.unavailableTitle": "AI පහසුකම තවම නැත",
+  "ai.unavailableBody": "සංවාද සේවාව තවම ක්‍රියාත්මක නොවේ. පසුව නැවත බලන්න.",
   "common.justNow": "දැන් මොහොතකට පෙර",
   "common.minutesAgo": "මිනිත්තු {n}කට පෙර",
   "common.hoursAgo": "පැය {n}කට පෙර",

@@ -15,6 +15,8 @@ const lo: Messages = {
 
   "common.cancel": "ຍົກເລີກ",
   "common.loadFailed": "ໂຫຼດບໍ່ສຳເລັດ",
+  "ai.unavailableTitle": "ຟັງຊັນ AI ຍັງບໍ່ເປີດ",
+  "ai.unavailableBody": "ບໍລິການສົນທະນາຍັງບໍ່ທັນເປີດໃຫ້ບໍລິການ. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
   "common.justNow": "ຫາກໍ່ຜ່ານມາ",
   "common.minutesAgo": "{n} ນາທີກ່ອນ",
   "common.hoursAgo": "{n} ຊົ່ວໂມງກ່ອນ",

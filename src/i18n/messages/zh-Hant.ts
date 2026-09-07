@@ -15,6 +15,8 @@ const zhHant: Messages = {
 
   "common.cancel": "取消",
   "common.loadFailed": "載入失敗",
+  "ai.unavailableTitle": "AI 功能暫未開放",
+  "ai.unavailableBody": "對話服務尚未上線，敬請期待。",
   "common.justNow": "剛剛",
   "common.minutesAgo": "{n}分鐘前",
   "common.hoursAgo": "{n}小時前",

@@ -15,6 +15,8 @@ const th: Messages = {
 
   "common.cancel": "ยกเลิก",
   "common.loadFailed": "โหลดไม่สำเร็จ",
+  "ai.unavailableTitle": "ฟีเจอร์ AI ยังไม่เปิดให้ใช้",
+  "ai.unavailableBody": "บริการสนทนายังไม่เปิดให้บริการ กรุณากลับมาใหม่ภายหลัง",
   "common.justNow": "เมื่อสักครู่",
   "common.minutesAgo": "{n} นาทีที่แล้ว",
   "common.hoursAgo": "{n} ชั่วโมงที่แล้ว",

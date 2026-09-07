@@ -15,6 +15,8 @@ const vi: Messages = {
 
   "common.cancel": "Hủy",
   "common.loadFailed": "Tải thất bại",
+  "ai.unavailableTitle": "Tính năng AI chưa mở",
+  "ai.unavailableBody": "Dịch vụ trò chuyện chưa hoạt động. Vui lòng quay lại sau.",
   "common.justNow": "Vừa xong",
   "common.minutesAgo": "{n} phút trước",
   "common.hoursAgo": "{n} giờ trước",

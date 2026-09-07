@@ -48,6 +48,7 @@ import { readerColors, type ReaderChrome } from "../theme/reader";
 import { useT } from "../i18n/I18nContext";
 import { fontSizePx, type ReaderSettings } from "../settings/reader";
 import type { RootStackParamList } from "../navigation/types";
+import { ensureAiAvailable } from "../ai/availability";
 
 type ReaderNavigation = NativeStackNavigationProp<RootStackParamList, "Reader">;
 
@@ -457,7 +458,8 @@ export function ReaderLayerPane({
     setVersionVisible(false);
   };
 
-  const askAboutParagraph = () => {
+  const askAboutParagraph = async () => {
+    if (!(await ensureAiAvailable(t))) return;
     navigation.navigate("NewChat", {
       passageRef: { book, paragraph: p, title: toc },
       seedText: `关于《${title}》「${toc}」这一段落，请讲解大意。`,
@@ -545,7 +547,10 @@ export function ReaderLayerPane({
         </View>
       </View>
 
-      <Pressable style={[styles.askFab, { backgroundColor: c.vermilion }]} onPress={askAboutParagraph}>
+      <Pressable
+        style={[styles.askFab, { backgroundColor: c.vermilion }]}
+        onPress={() => void askAboutParagraph()}
+      >
         <Ionicons name="chatbubble-ellipses-outline" size={17} color="#fdfaf1" />
         <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
       </Pressable>

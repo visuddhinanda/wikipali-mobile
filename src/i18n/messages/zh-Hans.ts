@@ -22,6 +22,8 @@ const zhHans = {
   // 通用
   "common.cancel": "取消",
   "common.loadFailed": "加载失败",
+  "ai.unavailableTitle": "AI 功能暂未开放",
+  "ai.unavailableBody": "对话服务还没有上线，敬请期待。",
   "common.justNow": "刚刚",
   "common.minutesAgo": "{n}分钟前",
   "common.hoursAgo": "{n}小时前",

@@ -15,6 +15,8 @@ const en: Messages = {
 
   "common.cancel": "Cancel",
   "common.loadFailed": "Failed to load",
+  "ai.unavailableTitle": "AI is not available yet",
+  "ai.unavailableBody": "The chat service is not online yet. Please check back later.",
   "common.justNow": "Just now",
   "common.minutesAgo": "{n} min ago",
   "common.hoursAgo": "{n} h ago",

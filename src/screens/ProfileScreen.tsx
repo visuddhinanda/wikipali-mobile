@@ -16,6 +16,7 @@ import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useAuth } from "../auth/AuthContext";
 import { useT } from "../i18n/I18nContext";
+import { ensureAiAvailable } from "../ai/availability";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -76,7 +77,11 @@ export function ProfileScreen() {
 
       <Pressable
         style={styles.row}
-        onPress={() => navigation.navigate("NewChat")}
+        onPress={() => {
+          void ensureAiAvailable(t).then((ok) => {
+            if (ok) navigation.navigate("NewChat");
+          });
+        }}
       >
         <Ionicons name="chatbubble-outline" size={20} color={colors.inkSoft} />
         <Text style={styles.rowLabel}>{t("profile.history")}</Text>
