@@ -16,15 +16,20 @@ export interface ReaderFontOption {
   px: number;
 }
 
+/**
+ * WebView 里的 CSS px 与 RN 的 dp 一一对应（viewport 是 width=device-width,
+ * initial-scale=1），所以这里的数字可以直接和界面字号比：阅读页导航按钮
+ * （上一章/下一章/版本）是 12，「就此段落提问」是 13 —— 「标准」对齐到 13。
+ */
 export const FONT_OPTIONS: ReaderFontOption[] = [
-  { id: "sm", labelKey: "reader.size.sm", px: 15 },
-  { id: "md", labelKey: "reader.size.md", px: 18 },
-  { id: "lg", labelKey: "reader.size.lg", px: 21 },
-  { id: "xl", labelKey: "reader.size.xl", px: 24 },
+  { id: "sm", labelKey: "reader.size.sm", px: 11 },
+  { id: "md", labelKey: "reader.size.md", px: 13 },
+  { id: "lg", labelKey: "reader.size.lg", px: 16 },
+  { id: "xl", labelKey: "reader.size.xl", px: 19 },
 ];
 
 export function fontSizePx(id: ReaderFontSize): number {
-  return FONT_OPTIONS.find((f) => f.id === id)?.px ?? 18;
+  return FONT_OPTIONS.find((f) => f.id === id)?.px ?? 13;
 }
 
 export interface ReaderSettings {

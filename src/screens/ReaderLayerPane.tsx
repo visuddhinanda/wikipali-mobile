@@ -111,6 +111,7 @@ function buildReaderHtml(
   body {
     background: var(--paper);
     color: var(--ink);
+    overflow-wrap: break-word;
     font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
     font-size: var(--base);
     line-height: 1.95;
@@ -124,22 +125,41 @@ function buildReaderHtml(
   [data-sidenote="margin"] .paper {
     margin-right: calc(var(--sidenote-w) + 24px);
   }
-  .doc-title { font-size: 1.45em; font-weight: 700; margin: 8px 0 4px; }
+  /* 巴利长词（Rājāmaccakathāvaṇṇanā 之类）没有断词点，不允许断行就会被裁掉。 */
+  .doc-title {
+    font-size: 1.45em;
+    font-weight: 700;
+    margin: 8px 0 4px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
   .doc-subtitle { color: var(--ink-soft); font-size: 0.82em; margin-bottom: 24px; }
 
   .original, .translation { margin: 0 0 0.55em; }
   .original::after, .translation::after { content: ""; display: block; clear: both; }
+  /*
+   * 段号用绝对定位挂在左槽里，不能用 float —— 段落正文若以有序列表
+   * （「150.」这类）开头，浮动的段号会和列表序号叠在一起。
+   */
+  [data-para] {
+    position: relative;
+    padding-left: 2.3em;
+  }
   [data-para]::before {
     content: attr(data-para);
-    float: left;
-    min-width: 1.8em;
-    margin-right: 0.5em;
-    margin-top: 0.22em;
+    position: absolute;
+    left: 0;
+    top: 0.22em;
+    /* 宽度按 ::before 自己的 0.6em 计，要给到 3.2em 才够放四位数并保持不折行 */
+    width: 3.2em;
+    white-space: nowrap;
     text-align: right;
     color: var(--ink-faint);
     font-size: 0.6em;
     font-family: ui-monospace, Menlo, Consolas, monospace;
   }
+  /* 列表自己的序号也要留在左槽之内，别再往外顶。 */
+  [data-para] ol, [data-para] ul { margin: 0; padding-left: 1.4em; }
   .sentence { display: inline; }
   .sentence + .sentence::before { content: " "; }
   strong { font-weight: 700; }
