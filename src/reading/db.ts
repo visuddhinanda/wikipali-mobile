@@ -110,6 +110,31 @@ export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
   return readingPromise;
 }
 
+/**
+ * 串行化 `reading.db3` 上的写事务。
+ *
+ * `withTransactionAsync` 只是裸的 `BEGIN`/`COMMIT`，同一个连接上并发调用会
+ * 嵌套 —— 三层对读同时预取时第二个 `BEGIN` 失败，catch 里的 `ROLLBACK` 又
+ * 撞上「cannot rollback - no transaction is active」。这里排成队列，一次只
+ * 跑一个事务。
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+
+export function withReadingTransaction<T>(
+  task: (db: SQLite.SQLiteDatabase) => Promise<T>,
+): Promise<T> {
+  const run = writeQueue.then(async () => {
+    const db = await openReadingDb();
+    let result!: T;
+    await db.withTransactionAsync(async () => {
+      result = await task(db);
+    });
+    return result;
+  });
+  writeQueue = run.catch(() => undefined); // 一次失败不该卡死后面的写入
+  return run;
+}
+
 /** `pali_text` 的 SqlRunner，供 `unit.ts` / `commentary.ts` 使用。 */
 export async function tipitakaRunner(): Promise<SqlRunner> {
   return toRunner(await openTipitakaDb());

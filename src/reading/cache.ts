@@ -6,7 +6,7 @@
  */
 import { fetchReadParas } from "../api/read-para";
 import { planBookRanges } from "./batch";
-import { openReadingDb, tipitakaRunner } from "./db";
+import { openReadingDb, tipitakaRunner, withReadingTransaction } from "./db";
 
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
 export const CACHE_QUOTA_BYTES = 200 * 1024 * 1024;
@@ -51,8 +51,7 @@ async function fetchAndStore(
   if (mock) return byPara;
 
   const now = Date.now();
-  const db = await openReadingDb();
-  await db.withTransactionAsync(async () => {
+  await withReadingTransaction(async (db) => {
     for (let p = from; p <= to; p++) {
       await db.runAsync(
         `INSERT OR REPLACE INTO para_html (channel, book, para, html, fetched_at)
