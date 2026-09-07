@@ -166,7 +166,13 @@ export async function downloadBook(
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<DownloadProgress> {
   const key = runKey(channelId, book);
-  if (running.has(key)) return getDownloadProgress(channelId, book);
+  if (running.has(key)) {
+    // 已有循环在跑，重复调用直接回当前进度 —— 但要回调一次，
+    // 否则调用方（书架的「继续」按钮）点了完全没反馈。
+    const current = await getDownloadProgress(channelId, book);
+    onProgress?.(current);
+    return current;
+  }
 
   const flag = { cancelled: false };
   running.set(key, flag);
