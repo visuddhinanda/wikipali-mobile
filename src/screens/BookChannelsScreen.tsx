@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,11 +8,13 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { ProgressRing } from "../components/ProgressRing";
 import { DownloadIconButton } from "../components/DownloadIconButton";
 import { getBookChannels } from "../api";
+import { loadReadingHistory } from "../data/history";
 import type { ChapterChannel } from "../catalog";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -94,10 +96,29 @@ interface ChannelSection {
 
 export function BookChannelsScreen({ route, navigation }: Props) {
   const { book, paragraph, title } = route.params;
+  // 上次读到哪一段：从版本列表进阅读器时接着上次读，而不是每次都从头开始。
+  // 只在这里查一次（进列表时），点版本时直接用。
+  const [lastParagraph, setLastParagraph] = useState<number | null>(null);
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const { t, locale } = useI18n();
+
+  // 每次回到这个页面都重读 —— 只在挂载时读的话，从阅读器返回后拿到的还是
+  // 进去之前的位置，「接着上次读」永远慢一拍。
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      loadReadingHistory().then((records) => {
+        if (!alive) return;
+        const hit = records.find((r) => r.book === book);
+        setLastParagraph(hit?.paragraph ?? null);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [book]),
+  );
 
   useEffect(() => {
     let alive = true;
@@ -222,7 +243,8 @@ export function BookChannelsScreen({ route, navigation }: Props) {
               onPress={() =>
                 navigation.navigate("Reader", {
                   book,
-                  paragraph,
+                  // 有阅读记录就接着上次读；没有才用目录点进来的锚点。
+                  paragraph: lastParagraph ?? paragraph,
                   title,
                   channelId: item.channel_id,
                   channelName: item.name,
