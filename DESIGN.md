@@ -97,6 +97,12 @@
 **当前已实现**（`AiChatScreen` / `NewChatScreen`）：
 - 探索首页：去掉「公开问题」标题，标语 + 置顶输入框 + 信息流卡片（占位数据）。
 - 新对话页：`KeyboardAvoidingView` 键盘避让；工具调用气泡与「思考中…」指示用 `ActivityIndicator`；引用链接（`/library/tipitaka/`）渲染为灰色 tag（灰字 `#6b7280` + 淡灰底 `#e5e7eb`）。
+- **Runtime 未上线时的降级**（2026-09-07）：CopilotKit Runtime 还没部署，
+  发行包里内联的是开发机地址。`src/ai/availability.ts` 在进入 AI 前探测
+  `{EXPO_PUBLIC_RUNTIME_URL}/info`（3 秒超时，通了缓存 60 秒 / 不通缓存 10 秒），
+  不可达则弹窗「AI 功能暂未开放」并阻止跳转。拦截点三处：底部「探索」Tab
+  （`tabPress` 里 `preventDefault`）、阅读页「就此段落提问」FAB、
+  「我 → 我的提问历史」。服务上线后无需改代码即自动放行。
 
 ### 1.4 工具（可扩展列表/宫格）
 1. **字典**：搜索框 + 最近查词历史；词条页复用 Term tooltip/drawer 逻辑

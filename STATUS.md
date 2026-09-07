@@ -439,3 +439,71 @@ App 与脚本共用同一份实现）。
    也没有设置页入口展示占用）。
 3. 双列并排对照（§10.2 未做项第一条），现在正文获取已经就绪。
 4. 阅读进度改用 wikipali API 同步（`src/data/history.ts` 目前是 AsyncStorage 本地存储）。
+
+---
+
+## 12. 本地 release 构建 + 真机联调（2026-09-07 会话）
+
+### 12.1 本地出 release 包（不再走 EAS）
+
+容器里 JDK 17 + Android SDK 已齐，直接：
+
+```bash
+cd android && ./gradlew assembleRelease
+# 产物：android/app/build/outputs/apk/release/app-release.apk（157MB，全 ABI）
+```
+
+首次全量约 16 分钟，改 JS 后增量约 30 秒~8 分钟。
+
+⚠️ release 目前用的仍是模板默认的 **debug keystore**（`android/app/debug.keystore`），
+只能自测/内测，上架前必须换成自己的 keystore 并改 `signingConfigs.release`。
+
+⚠️ 157MB 是因为打包了所有 ABI。需要瘦身可加
+`-PreactNativeArchitectures=arm64-v8a` 或开 splits（约 60~70MB）。
+
+### 12.2 `android/` 是生成目录，改 app.json 后必须重跑 prebuild
+
+`android/` 在 `.gitignore` 里，图标、`app_name`、`versionName` 全部由
+`npx expo prebuild -p android` 从 `app.json` 生成。上个会话只换了 `assets/`
+里的图标就直接打包，结果装出来仍是默认名 `mobile` + Expo 默认图标。
+
+**改了 `app.json`（名称/版本/图标/插件）→ 先 `npx expo prebuild -p android` 再 assembleRelease。**
+
+当前：`name: Wikipali`、`version: 0.1.0`、`versionCode 1`。
+
+### 12.3 真机调试：容器没有 USB 透传，走宿主机 adb server
+
+本容器 `/dev/bus/usb` 不存在，`lsusb` 无输出 —— 插线也看不到设备。
+无线调试同样不通（手机热点开了客户端隔离，ARP 都不通）。可行路径：
+
+```bash
+# 宿主机（连着数据线的那台）
+adb kill-server && adb -a -P 5037 nodaemon server
+
+# 容器内
+export ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
+adb devices -l          # 能看到设备
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+adb logcat -v brief
+```
+
+小米/红米还需在开发者选项里额外打开 **「USB 调试（安全设置）」**，
+否则 `adb shell input tap/swipe` 报
+`SecurityException: Injecting input events requires ... INJECT_EVENTS`。
+
+坐标换算：`adb shell wm size` 拿 override 尺寸（本机 1080x2400）；
+`adb shell uiautomator dump` 拿到的 bounds 就是这套坐标，直接喂给 `input tap`。
+注意底部 Tab 栏要点 y≈2300（更低会被手势导航条吃掉）。
+
+### 12.4 本次修掉的三个 release 专属 bug
+
+| 现象 | 根因 | 修复 |
+|---|---|---|
+| 阅读页 `no such table: pali_text` | 首次把 46MB 库从 APK 拷到 `SQLite/` 时拷贝失败留下空文件，`ensureTipitakaFile()` 只判断「文件存在」就返回，SQLite 把空文件当合法空库打开 | 拷完比对源/目标字节数；打开后查 `sqlite_master`，缺表就删掉重拷一次（`bc48172`） |
+| 翻章报 `cannot rollback - no transaction is active` | `withTransactionAsync` 是裸的 `BEGIN`/`COMMIT`，共用一个连接；三层同时预取时第二个 `BEGIN` 嵌套失败 | `withReadingTransaction()` 用 promise 链把写事务串行化（`e49b7d5`） |
+| 点「探索」进到永远失败的对话页 | CopilotKit Runtime 未上线，包里内联的是开发机局域网地址 | `src/ai/availability.ts` 探测 `{RUNTIME_URL}/info`，不可达时三个入口弹窗拦截（`26817aa`） |
+
+### 12.5 已知未决
+
+- `.env` 的 `EXPO_PUBLIC_RUNTIME_URL` 仍是开发机地址，Runtime 上线后要改成正式地址再出包。
+- release 用 debug keystore 签名（见 §12.1）。
