@@ -4,6 +4,7 @@
  * 线上数据源（mint `/api/v2/pali-book-category/{file}`）结构一致，
  * 后续可切换为远程加载。
  */
+import { layerFromTagList, type CommentaryLayer } from "./commentary";
 import defaultTree from "./default.json";
 import bookTitles from "./book-titles.json";
 import type { BookTitle, CategoryNode } from "./types";
@@ -51,4 +52,36 @@ export function bookKind(tags: string[] = []): BookKind {
   if (tags.some((t) => t.includes("ṭīkā") || t.includes("dīpanī"))) return "tika";
   if (tags.some((t) => t.includes("aṭṭhakathā"))) return "atthakatha";
   return "root";
+}
+
+/**
+ * 覆盖某个段落的 level=1 条目。
+ *
+ * `book` 是一个文件，里面可能装着**多部**作品（281 条 level=1 对 217 个 book，
+ * 31 个 book 有不止一条），所以「书名」要按段落落在哪一部里取，不能拿
+ * 文件里的第一条充数 —— 那给出的是丛书名。不传 `paragraph` 时退回第一条。
+ */
+export function bookEntryAt(
+  book: number,
+  paragraph?: number,
+): BookTitle | undefined {
+  const inBook = BOOK_TITLES.filter((b) => b.book === book).sort(
+    (a, b) => a.paragraph - b.paragraph,
+  );
+  if (inBook.length === 0) return undefined;
+  if (paragraph == null) return inBook[0];
+  let found = inBook[0];
+  for (const entry of inBook) {
+    if (entry.paragraph <= paragraph) found = entry;
+    else break;
+  }
+  return found;
+}
+
+/** 某段落所属作品的注释层次（根本/义注/复注/…）；判不出来返回 `null`。 */
+export function bookLayerAt(
+  book: number,
+  paragraph?: number,
+): CommentaryLayer | null {
+  return layerFromTagList(bookEntryAt(book, paragraph)?.tags ?? []);
 }

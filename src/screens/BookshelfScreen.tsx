@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { DownloadControl } from "../components/DownloadControl";
-import { BOOK_TITLES } from "../catalog";
+import { bookEntryAt, bookLayerAt } from "../catalog";
 import { listDownloads, type DownloadProgress } from "../reading";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { colors, radius, spacing, type, serifFont } from "../theme";
@@ -88,11 +88,20 @@ export function BookshelfScreen() {
   const readingList = records ?? [];
   const downloadList = downloads ?? [];
 
-  /** 书名：优先用阅读记录里的，其次查内嵌书目，最后退回 book id。 */
-  const bookTitle = (book: number): string =>
-    records?.find((r) => r.book === book)?.title ??
-    BOOK_TITLES.find((b) => b.book === book)?.title ??
-    String(book);
+  /**
+   * 列表标题用 level=1 的作品名（`toc`），不是丛书名 —— 一个 book 文件
+   * 可能装着多部作品，丛书名对读者没有定位作用。
+   */
+  const workTitle = (book: number, paragraph?: number, fallback?: string): string =>
+    bookEntryAt(book, paragraph)?.toc ?? fallback ?? String(book);
+
+  /** 层次 tag（根本 / 义注 / 复注 / 再复注），放在副标题开头。 */
+  const layerTag = (book: number, paragraph?: number): string | null => {
+    const layer = bookLayerAt(book, paragraph);
+    if (!layer) return null;
+    // 「原文」在对读标签栏里叫原文，在书架这里按书的性质叫「根本」。
+    return t(layer === "mula" ? "layer.root" : (`layer.${layer}` as MessageKey));
+  };
 
   return (
     <Screen contentStyle={styles.content}>
@@ -122,8 +131,10 @@ export function BookshelfScreen() {
       {active === "reading" && readingList.length > 0 ? (
         <View>
           {readingList.map((r) => {
+            const title = workTitle(r.book, r.paragraph, r.title);
             const sub = [
-              r.heading && r.heading !== r.title ? r.heading : null,
+              layerTag(r.book, r.paragraph),
+              r.heading && r.heading !== title ? r.heading : null,
               r.channelName,
               `${r.book}-${r.paragraph}`,
             ]
@@ -137,7 +148,7 @@ export function BookshelfScreen() {
                   navigation.navigate("Reader", {
                     book: r.book,
                     paragraph: r.paragraph,
-                    title: r.title,
+                    title,
                     channelId: r.channelId,
                     channelName: r.channelName,
                   })
@@ -145,7 +156,7 @@ export function BookshelfScreen() {
               >
                 <View style={styles.rowBody}>
                   <Text style={styles.rowTitle} numberOfLines={1}>
-                    {r.title}
+                    {title}
                   </Text>
                   <Text style={styles.rowSub} numberOfLines={1}>
                     {sub}
@@ -170,14 +181,21 @@ export function BookshelfScreen() {
                 onPress={() =>
                   navigation.navigate("Reader", {
                     book: d.book,
-                    title: bookTitle(d.book),
+                    title: workTitle(d.book),
                     channelId: d.channel,
                   })
                 }
               >
-                <Text style={styles.rowTitle} numberOfLines={1}>
-                  {bookTitle(d.book)}
-                </Text>
+                <View style={styles.rowBody}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    {workTitle(d.book)}
+                  </Text>
+                  {layerTag(d.book) ? (
+                    <Text style={styles.rowSub} numberOfLines={1}>
+                      {layerTag(d.book)}
+                    </Text>
+                  ) : null}
+                </View>
                 <Ionicons
                   name="chevron-forward"
                   size={18}

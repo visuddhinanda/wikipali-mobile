@@ -21,7 +21,7 @@ export const COMMENTARY_LAYERS = [
 export type CommentaryLayer = (typeof COMMENTARY_LAYERS)[number];
 
 /** 层次标签 → 层次。一行可能同时命中多个，取序列中最靠后的（最具体的）。 */
-const TAG_TO_LAYER: Record<string, CommentaryLayer> = {
+export const TAG_TO_LAYER: Record<string, CommentaryLayer> = {
   "mūla": "mula",
   "pāḷi": "mula",
   "aṭṭhakathā": "atthakatha",
@@ -29,6 +29,27 @@ const TAG_TO_LAYER: Record<string, CommentaryLayer> = {
   "mūlaṭīkā": "mulatika",
   "anuṭīkā": "anutika",
 };
+
+/**
+ * 一组标签里最具体的层次（序列最靠后的那个）；没有层次标签返回 `null`。
+ *
+ * 书目 JSON（`book-titles.json`）与 `pali_text.tags` 用的是同一套标签，
+ * 所以离线书目也能直接判层，不必查库。
+ */
+export function layerFromTagList(tags: string[] = []): CommentaryLayer | null {
+  let best: CommentaryLayer | null = null;
+  let bestRank = -1;
+  for (const tag of tags) {
+    const layer = TAG_TO_LAYER[tag.trim()];
+    if (!layer) continue;
+    const rank = COMMENTARY_LAYERS.indexOf(layer);
+    if (rank > bestRank) {
+      best = layer;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
 
 /** UI 显示用的文案 key（`scripts/check-commentary.mjs` 仍用下面的中文常量）。 */
 export const LAYER_MESSAGE_KEY: Record<CommentaryLayer, string> = {
