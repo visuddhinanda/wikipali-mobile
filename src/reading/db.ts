@@ -37,19 +37,38 @@ let readingPromise: Promise<SQLite.SQLiteDatabase> | null = null;
  * 只在目标文件不存在时拷贝。App 更新带来的新数据库由 `meta.generated_at`
  * 比对后覆盖，见 `refreshTipitakaDbIfStale()`。
  */
-async function ensureTipitakaFile(): Promise<void> {
+async function ensureTipitakaFile(force = false): Promise<void> {
   const dir = new Directory(Paths.document, DB_DIR);
   if (!dir.exists) dir.create({ intermediates: true });
 
   const target = new File(dir, TIPITAKA_DB);
-  if (target.exists) return;
+  if (target.exists && !force) return;
+  if (target.exists) target.delete();
 
   const asset = Asset.fromModule(require("../../assets/db/tipitaka.db3"));
   await asset.downloadAsync();
   if (!asset.localUri) {
-    throw new Error("离线目录数据库不可用");
+    throw new Error("离线目录数据库不可用：资源未解包（localUri 为空）");
   }
-  new File(asset.localUri).copy(target);
+  const source = new File(asset.localUri);
+  source.copy(target);
+
+  // release 构建里资源来自 APK 的 res/raw，拷贝失败时只会留下 0 字节文件，
+  // SQLite 把它当成空库打开，报的是「no such table」而不是拷贝错误 ——
+  // 这里当场比一次大小，把真正的原因暴露出来。
+  if (target.size !== source.size) {
+    throw new Error(
+      `离线目录数据库拷贝不完整：${target.size}/${source.size} 字节（${asset.localUri}）`,
+    );
+  }
+}
+
+/** 打开的库里到底有没有正文表 —— 空文件也能被 SQLite 正常打开。 */
+async function hasPaliText(db: SQLite.SQLiteDatabase): Promise<boolean> {
+  const row = await db.getFirstAsync<{ n: number }>(
+    "SELECT count(*) n FROM sqlite_master WHERE type = 'table' AND name = 'pali_text'",
+  );
+  return (row?.n ?? 0) > 0;
 }
 
 /** 只读的三藏目录库（`pali_text`）。 */
@@ -57,7 +76,17 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
   if (!tipitakaPromise) {
     tipitakaPromise = (async () => {
       await ensureTipitakaFile();
-      return SQLite.openDatabaseAsync(TIPITAKA_DB);
+      let db = await SQLite.openDatabaseAsync(TIPITAKA_DB);
+      if (!(await hasPaliText(db))) {
+        // 文件在但表不在 = 上次拷贝留下了半截/空文件，重拷一次自愈。
+        await db.closeAsync();
+        await ensureTipitakaFile(true);
+        db = await SQLite.openDatabaseAsync(TIPITAKA_DB);
+        if (!(await hasPaliText(db))) {
+          throw new Error("离线目录数据库损坏：重拷后仍缺 pali_text 表");
+        }
+      }
+      return db;
     })().catch((err) => {
       tipitakaPromise = null; // 失败不缓存，下次重试
       throw err;
