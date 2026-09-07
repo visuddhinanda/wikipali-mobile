@@ -28,9 +28,14 @@ bad()  { fail=$((fail+1)); failed_names+=("$1"); log "  ✗ $1 —— $2"; }
 dump() { adb shell uiautomator dump /sdcard/e2e.xml >/dev/null 2>&1
          adb shell cat /sdcard/e2e.xml 2>/dev/null | tr '<' '\n<'; }
 texts() { dump | grep -oE 'text="[^"]{1,60}"' | sed -E 's/^text="//; s/"$//'; }
-# 某个 text 的中心坐标（第一个匹配）
+# 只保留像条目标题的行（去掉空行、Tab 名、分段标题）
+titles_only() { texts | grep -vxE '书架|在读|已下载|收藏|分类|探索|工具|我|' \
+                       | grep -E '[A-Za-z]'; }
+# 某个 text 的中心坐标（第一个匹配）。text 里可能带括号（如「(DN) …」），
+# 所以先按字面量筛出那一行，再用正则取 bounds——直接把 text 拼进正则会当成分组。
 center() {
-  dump | grep -oE "text=\"$1\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" \
+  dump | grep -F "text=\"$1\"" \
+    | grep -oE "text=\"[^\"]*\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" \
     | head -1 \
     | grep -oE '\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]' \
     | sed -E 's/\]\[/ /; s/[][]//g' \
@@ -48,10 +53,10 @@ alert_ok() {
   return 1
 }
 
-# 点击并等界面变化；注入点击约三成会被吞，所以最多点 3 次
+# 点击并等界面变化；注入点击约三成会被吞，所以最多点 5 次
 tap_until() { # tap_until X Y 期望出现的文本
   local x=$1 y=$2 want=$3
-  for _ in 1 2 3; do
+  for _ in 1 2 3 4 5; do
     adb shell input tap "$x" "$y"; sleep 4
     if texts | grep -qF "$want"; then return 0; fi
   done
@@ -61,6 +66,17 @@ tap_text() { # tap_text 目标文本 期望出现的文本
   local xy; xy=$(center "$1")
   [ -z "$xy" ] && return 1
   tap_until ${xy% *} ${xy#* } "$2"
+}
+# 分组标题下面那行（当前值）才是可点的行：取标题 bounds 下方 ~110px
+tap_row_under() { # tap_row_under 分组标题 期望出现的文本
+  local xy y
+  xy=$(dump | grep -F "text=\"$1\"" \
+       | grep -oE "text=\"[^\"]*\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" | head -1 \
+       | grep -oE '\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]' | sed -E 's/\]\[/ /; s/[][]//g' \
+       | awk -F'[ ,]' '{print int(($2+$4)/2)}')
+  [ -z "$xy" ] && return 1
+  y=$((xy + 110))
+  tap_until 540 "$y" "$2"
 }
 restart() {
   adb shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1
@@ -72,9 +88,11 @@ restart() {
 # 所以每一节都从冷启动重来，慢一点但确定。
 reset_to_home() { restart; }
 back() { adb shell input keyevent KEYCODE_BACK; sleep 3; }
-# 底部 Tab：y=2300（更低会被手势导航条吃掉）
-tab() { case $1 in discover) x=108;; shelf) x=324;; explore) x=540;; tools) x=756;; me) x=972;; esac
-        tap_until $x 2300 "$2"; }
+# 底部 Tab：点在文字上（y=2368）；y=2300 落在图标上方的空档，经常不响应。
+# 「探索」是中间凸起的圆形按钮，文字在按钮外面，得点圆心（y=2250）。
+tab() { local y=2368
+        case $1 in discover) x=108;; shelf) x=324;; explore) x=540; y=2250;; tools) x=756;; me) x=972;; esac
+        tap_until $x $y "$2"; }
 
 log "== 输出目录 $OUT"
 adb devices -l | sed -n 2p
@@ -137,9 +155,11 @@ if tap_text "deepseek" "义注"; then
   sleep 8
   ok "5.2 从义注版本进入"
   t=$(texts | head -5 | tr '\n' ' ')
-  echo "$t" | grep -q "原文" \
-    && bad "5.3 义注入口不显示空的原文标签" "实际：$t" \
-    || ok "5.3 义注入口不显示空的原文标签"
+  # 停在义注层：章节标题是 …vaṇṇanā，标签栏含「义注」。
+  # 注意「原文」标签本身不是 bug——该章在根本里有对应章节时它就该出现（a9db851）。
+  echo "$t" | grep -q "vaṇṇanā" && echo "$t" | grep -q "义注" \
+    && ok "5.3 义注入口停在义注层" \
+    || bad "5.3 义注入口停在义注层" "实际：$t"
   shot 5-reader-atthakatha
 else
   bad "5.2 从义注版本进入" "没进阅读器"
@@ -148,6 +168,8 @@ fi
 ########################################
 log ""; log "6. 阅读进度恢复（入口 A/B 通用）"
 for i in 1 2 3; do adb shell input tap 516 371; sleep 5; done
+# 长按浮层（「就此段落提问」）会盖住头部，读不到段落号，先点空白关掉
+texts | grep -q "就此段落提问" && { adb shell input tap 540 900; sleep 2; }
 before=$(texts | grep -oE '段落 [0-9]+' | head -1)
 back                     # 从阅读器回到版本列表（只退一层，仍在 App 内）
 if tap_text "deepseek" "义注"; then
@@ -170,7 +192,7 @@ echo "$titles" | grep -qE "义注|复注|根本" \
   && ok "7.1 在读副标题带层次 tag" || bad "7.1 在读层次 tag" "实际：$titles"
 echo "$titles" | grep -qE "\(DN\)" \
   && ok "7.2 在读标题是作品名" || bad "7.2 在读标题" "实际：$titles"
-first=$(texts | sed -n 5p)
+first=$(titles_only | head -1)
 if [ -n "$first" ] && tap_text "$first" "版本"; then
   sleep 8; ok "7.3 从在读条目进入阅读器"; shot 7-reader-from-shelf
   texts | head -5 | grep -q "义注" && ok "7.4 进入后停在记录的层" || log "  · 7.4 该条目不是义注层，跳过"
@@ -184,7 +206,7 @@ reset_to_home
 tab shelf "已下载" >/dev/null
 tap_text "已下载" "段" && ok "8.1 已下载列表" || bad "8.1 已下载列表" "没有下载条目或没切过去"
 shot 8-shelf-downloads
-dtitle=$(texts | sed -n 5p)
+dtitle=$(titles_only | head -1)
 if [ -n "$dtitle" ] && tap_text "$dtitle" "版本"; then
   sleep 8; ok "8.2 从已下载条目进入阅读器"
   ch=$(texts | grep -oE '_System_Pali_VRI_' | head -1)
@@ -200,9 +222,10 @@ log ""; log "9. 设置 / 我"
 reset_to_home
 tab me "尚未登录" >/dev/null
 tap_text "设置" "API 服务器" && ok "9.1 设置页" || bad "9.1 设置页" "没进去"
-tap_text "语言偏好" "跟随系统" && ok "9.2 语言页" || bad "9.2 语言页" "没进去"
+# 「语言偏好」「API 服务器」是分组标题，不可点；可点的是它下面显示当前值的那行
+tap_row_under "语言偏好" "跟随系统" && ok "9.2 语言页" || bad "9.2 语言页" "没进去"
 back
-tap_text "API 服务器" "wikipali" && ok "9.3 API 服务器页" || bad "9.3 API 服务器页" "没进去"
+tap_row_under "API 服务器" "api/v2" && ok "9.3 API 服务器页" || bad "9.3 API 服务器页" "没进去"
 back
 tap_text "关于 / 反馈" "版本" && ok "9.4 关于页" || bad "9.4 关于页" "没进去"
 texts | grep -q "Wikipali" && ok "9.5 关于页应用名与桌面一致" || bad "9.5 关于页应用名" "不是 Wikipali"
