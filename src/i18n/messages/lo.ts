@@ -27,8 +27,17 @@ const lo: Messages = {
 
   "discover.searchPlaceholder": "ຄົ້ນຫາພຣະໄຕປິດົກ ແລະ ຄຳສັບ…",
   "discover.tipitaka": "ພຣະໄຕປິດົກ ບາລີ",
-  "discover.featured": "ແນະນຳ · ອັບເດດຫຼ້າສຸດ",
   "discover.authors": "ຜູ້ແຕ່ງ (ຕາມພາສາ)",
+  "discover.channels": "ຊຸດຄຳແປ",
+  "channelList.title": "ດາວໂຫລດເປັນຊຸດ",
+  "channelList.hint": "ເລືອກຊຸດຄຳແປເພື່ອດາວໂຫລດປຶ້ມທັງໝົດໃນຊຸດນັ້ນ.",
+  "channelList.empty": "ຍັງບໍ່ມີຊຸດຄຳແປໃນພາສານີ້",
+  "channel.books": "ປຶ້ມໃນຊຸດ",
+  "channel.paraCount": "ແປແລ້ວ {n} ຫຍໍ້ໜ້າ",
+  "channel.bookCount": "{n} ຫົວ",
+  "channel.downloadAll": "ດາວໂຫລດທັງໝົດ",
+  "channel.downloading": "ກຳລັງດາວໂຫລດ {done}/{total}",
+  "channel.translated": "ແປແລ້ວ {n}%",
   "categoryBrowse.count": " · {n} ລາຍການ",
 
   "chapterList.empty": "ຍັງບໍ່ມີປຶ້ມໃນໝວດນີ້",

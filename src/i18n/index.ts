@@ -20,14 +20,7 @@ import vi from "./messages/vi";
 import lo from "./messages/lo";
 
 export type Locale =
-  | "zh-Hans"
-  | "zh-Hant"
-  | "en"
-  | "my"
-  | "th"
-  | "si"
-  | "vi"
-  | "lo";
+  "zh-Hans" | "zh-Hant" | "en" | "my" | "th" | "si" | "vi" | "lo";
 
 /** 语言选择；`system` 表示跟随系统。 */
 export type LocalePreference = Locale | "system";
@@ -189,3 +182,13 @@ export function t(
 }
 
 export type { MessageKey, Messages };
+
+/**
+ * 界面语言 → 内容语族。
+ *
+ * 内容（译本）的语言维度只到语族：简体/繁体中文都是 `zh`，服务端按 `zh`
+ * 一并返回 `zh-Hans` / `zh-Hant` / `zh` 的频道。
+ */
+export function langFamily(locale: Locale): string {
+  return locale.split("-")[0];
+}

@@ -27,8 +27,17 @@ const si: Messages = {
 
   "discover.searchPlaceholder": "සූත්‍ර හා පද සොයන්න…",
   "discover.tipitaka": "පාලි ත්‍රිපිටකය",
-  "discover.featured": "නිර්දේශිත · මෑත යාවත්කාලීන",
   "discover.authors": "කතුවරු (භාෂාව අනුව)",
+  "discover.channels": "පරිවර්තන එකතු",
+  "channelList.title": "සමූහ බාගැනීම",
+  "channelList.hint": "පරිවර්තන එකතුවක් තෝරා එහි සියලු පොත් බාගන්න.",
+  "channelList.empty": "මෙම භාෂාවෙන් එකතු නොමැත",
+  "channel.books": "ඇතුළත් පොත්",
+  "channel.paraCount": "පරිවර්තිත ඡේද {n}",
+  "channel.bookCount": "පොත් {n}",
+  "channel.downloadAll": "සියල්ල බාගන්න",
+  "channel.downloading": "බාගනිමින් {done}/{total}",
+  "channel.translated": "{n}% පරිවර්තනයයි",
   "categoryBrowse.count": " · අයිතම {n}",
 
   "chapterList.empty": "මෙම වර්ගයේ පොත් නොමැත",

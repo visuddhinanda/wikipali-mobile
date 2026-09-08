@@ -31,6 +31,8 @@ import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
 import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 import { ScanScreen } from "../screens/ScanScreen";
+import { ChannelListScreen } from "../screens/ChannelListScreen";
+import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
 import { navigationRef } from "../linking/handler";
 import { useDeepLinks } from "../linking/useDeepLinks";
 import { useT } from "../i18n/I18nContext";
@@ -69,7 +71,11 @@ const TAB_ICONS: Record<
     label: "nav.aiChat",
   },
   Tools: { active: "apps", inactive: "apps-outline", label: "nav.tools" },
-  Profile: { active: "person", inactive: "person-outline", label: "nav.profile" },
+  Profile: {
+    active: "person",
+    inactive: "person-outline",
+    label: "nav.profile",
+  },
 };
 
 function TabBarIcon({
@@ -85,7 +91,13 @@ function TabBarIcon({
     <Ionicons
       name={name}
       size={raised ? 26 : 23}
-      color={raised ? colors.paperRaised : focused ? colors.vermilion : colors.inkFaint}
+      color={
+        raised
+          ? colors.paperRaised
+          : focused
+            ? colors.vermilion
+            : colors.inkFaint
+      }
     />
   );
 
@@ -122,6 +134,25 @@ const stackScreenOptions = () => ({
   contentStyle: { backgroundColor: colors.paper },
 });
 
+/** 「书架」标题栏右侧的批量下载入口。 */
+function BatchDownloadButton() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={() => navigation.navigate("ChannelList")}
+      style={({ pressed }) => [
+        styles.headerButton,
+        pressed && { opacity: 0.5 },
+      ]}
+    >
+      <Ionicons name="add" size={24} color={colors.ink} />
+    </Pressable>
+  );
+}
+
 /** 「分类」标题栏右侧的扫码入口。 */
 function ScanButton() {
   const navigation =
@@ -131,7 +162,10 @@ function ScanButton() {
       accessibilityRole="button"
       hitSlop={8}
       onPress={() => navigation.navigate("Scan")}
-      style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.5 }]}
+      style={({ pressed }) => [
+        styles.headerButton,
+        pressed && { opacity: 0.5 },
+      ]}
     >
       <Ionicons name="scan-outline" size={22} color={colors.ink} />
     </Pressable>
@@ -167,6 +201,16 @@ function readingChainScreens(t: T) {
         name="Reader"
         component={ReaderScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ChannelList"
+        component={ChannelListScreen}
+        options={{ title: t("channelList.title") }}
+      />
+      <Stack.Screen
+        name="ChannelDetail"
+        component={ChannelDetailScreen}
+        options={({ route }) => ({ title: route.params.name })}
       />
       <Stack.Screen
         name="NewChat"
@@ -206,7 +250,10 @@ function BookshelfStack() {
       <Stack.Screen
         name="Bookshelf"
         component={BookshelfScreen}
-        options={{ title: t("nav.bookshelf") }}
+        options={{
+          title: t("nav.bookshelf"),
+          headerRight: () => <BatchDownloadButton />,
+        }}
       />
       {readingChainScreens(t)}
     </Stack.Navigator>
@@ -248,6 +295,16 @@ function ProfileStack() {
         name="Profile"
         component={ProfileScreen}
         options={{ title: t("nav.profile") }}
+      />
+      <Stack.Screen
+        name="ChannelList"
+        component={ChannelListScreen}
+        options={{ title: t("channelList.title") }}
+      />
+      <Stack.Screen
+        name="ChannelDetail"
+        component={ChannelDetailScreen}
+        options={({ route }) => ({ title: route.params.name })}
       />
       <Stack.Screen
         name="NewChat"

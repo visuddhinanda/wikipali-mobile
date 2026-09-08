@@ -35,8 +35,17 @@ const zhHans = {
   // 分类页
   "discover.searchPlaceholder": "搜索经文、词条…",
   "discover.tipitaka": "巴利三藏",
-  "discover.featured": "推荐 · 最近更新",
   "discover.authors": "作者（语文）",
+  "discover.channels": "译本合集",
+  "channelList.title": "批量下载",
+  "channelList.hint": "选择一个译本，把它包含的书整批下载到本地。",
+  "channelList.empty": "暂无该语言的译本",
+  "channel.books": "包含的书",
+  "channel.paraCount": "{n} 段译文",
+  "channel.bookCount": "{n} 本书",
+  "channel.downloadAll": "全部下载",
+  "channel.downloading": "正在下载 {done}/{total}",
+  "channel.translated": "已译 {n}%",
   "categoryBrowse.count": " · {n} 项",
 
   // 章节 / 版本

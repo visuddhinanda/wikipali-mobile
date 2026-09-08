@@ -61,6 +61,15 @@ export type RootStackParamList = {
   About: undefined;
   /** 登录页（从「我」进入）。 */
   SignIn: undefined;
+  /** 译本频道列表（书架 → 批量下载）。 */
+  ChannelList: undefined;
+  /** 译本频道详情：信息 + 该频道下的书列表。 */
+  ChannelDetail: {
+    uid: string;
+    name: string;
+    /** `download` 时每本书带下载控件并可整批下载；缺省为浏览。 */
+    mode?: "download";
+  };
   /** 扫码（从「分类」标题栏进入）。 */
   Scan: undefined;
   /** 布局调试页（仅 __DEV__ 从「我」进入）。 */

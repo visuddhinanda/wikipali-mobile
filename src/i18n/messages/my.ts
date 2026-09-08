@@ -27,8 +27,17 @@ const my: Messages = {
 
   "discover.searchPlaceholder": "ပါဠိစာပေနှင့် ဝေါဟာရများ ရှာရန်…",
   "discover.tipitaka": "ပါဠိ ပိဋကတ်",
-  "discover.featured": "အကြံပြုချက် · မကြာသေးမီ အသစ်များ",
   "discover.authors": "စာရေးသူ (ဘာသာစကားအလိုက်)",
+  "discover.channels": "ဘာသာပြန်စုစည်းမှုများ",
+  "channelList.title": "အစုလိုက် ဒေါင်းလုဒ်",
+  "channelList.hint": "ဘာသာပြန်တစ်ခုကို ရွေးပြီး ၎င်း၏စာအုပ်များအားလုံးကို ဒေါင်းလုဒ်လုပ်ပါ။",
+  "channelList.empty": "ဤဘာသာစကားအတွက် စုစည်းမှုမရှိသေးပါ",
+  "channel.books": "ပါဝင်သောစာအုပ်များ",
+  "channel.paraCount": "ဘာသာပြန် {n} ပိုဒ်",
+  "channel.bookCount": "စာအုပ် {n} အုပ်",
+  "channel.downloadAll": "အားလုံး ဒေါင်းလုဒ်",
+  "channel.downloading": "ဒေါင်းလုဒ်လုပ်နေသည် {done}/{total}",
+  "channel.translated": "{n}% ဘာသာပြန်ပြီး",
   "categoryBrowse.count": " · {n} ခု",
 
   "chapterList.empty": "ဤအမျိုးအစားတွင် စာအုပ်မရှိသေးပါ",

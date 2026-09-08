@@ -27,8 +27,17 @@ const vi: Messages = {
 
   "discover.searchPlaceholder": "Tìm kinh văn, thuật ngữ…",
   "discover.tipitaka": "Tam Tạng Pāli",
-  "discover.featured": "Đề cử · Cập nhật gần đây",
   "discover.authors": "Tác giả (theo ngôn ngữ)",
+  "discover.channels": "Bộ bản dịch",
+  "channelList.title": "Tải hàng loạt",
+  "channelList.hint": "Chọn một bộ bản dịch để tải toàn bộ sách trong đó.",
+  "channelList.empty": "Chưa có bộ bản dịch cho ngôn ngữ này",
+  "channel.books": "Sách trong bộ",
+  "channel.paraCount": "{n} đoạn đã dịch",
+  "channel.bookCount": "{n} cuốn",
+  "channel.downloadAll": "Tải tất cả",
+  "channel.downloading": "Đang tải {done}/{total}",
+  "channel.translated": "Đã dịch {n}%",
   "categoryBrowse.count": " · {n} mục",
 
   "chapterList.empty": "Chưa có sách trong mục này",

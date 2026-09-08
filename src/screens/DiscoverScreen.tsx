@@ -1,5 +1,11 @@
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -7,7 +13,10 @@ import { Screen } from "../components/Screen";
 import { useLayout } from "../hooks/useLayout";
 import { getTree } from "../catalog";
 import { label } from "../catalog/labels";
+import { ChannelRow } from "../components/ChannelRow";
+import { fetchTranslationChannels, type ChannelSummary } from "../api/channels";
 import { useI18n } from "../i18n/I18nContext";
+import { langFamily } from "../i18n";
 import { colors, radius, spacing, type, cardShadow, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -15,12 +24,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const LANGUAGES = ["Pali", "中文", "缅文", "泰文", "僧伽罗"];
 
-/** 推荐条目（P0 演示：直接落到 mock 阅读器）。 */
-const FEATURED = [
-  { title: "转法轮经", subtitle: "SN 56.11 · 四圣谛", book: 5, paragraph: 5 },
-  { title: "无我相经", subtitle: "SN 22.59 · 五蕴无我", book: 6, paragraph: 6 },
-  { title: "慈经", subtitle: "Khp 9 · Mettā Sutta", book: 7, paragraph: 7 },
-];
+/** 「译本合集」只露前几个，全量在「书架 → 批量下载」里。 */
+const CHANNEL_PREVIEW = 4;
 
 export function DiscoverScreen() {
   const navigation = useNavigation<Nav>();
@@ -29,6 +34,18 @@ export function DiscoverScreen() {
   const { cardWidth } = useLayout();
   const { t, locale } = useI18n();
   const basketWidth = cardWidth(spacing.md);
+  const [channels, setChannels] = useState<ChannelSummary[] | null>(null);
+
+  // 译本合集：按界面语言的语族取（简繁中文同为 zh，由服务端一并归拢）。
+  useEffect(() => {
+    let alive = true;
+    fetchTranslationChannels(langFamily(locale))
+      .then((rows) => alive && setChannels(rows.slice(0, CHANNEL_PREVIEW)))
+      .catch(() => alive && setChannels([]));
+    return () => {
+      alive = false;
+    };
+  }, [locale]);
 
   return (
     <Screen contentStyle={styles.content}>
@@ -66,27 +83,22 @@ export function DiscoverScreen() {
         ))}
       </View>
 
-      {/* 推荐 / 最近更新 */}
-      <Text style={styles.sectionTitle}>{t("discover.featured")}</Text>
-      {FEATURED.map((f) => (
-        <Pressable
-          key={f.book}
-          style={styles.featured}
-          onPress={() =>
-            navigation.navigate("Reader", {
-              book: f.book,
-              paragraph: f.paragraph,
-              title: f.title,
-            })
-          }
-        >
-          <View style={styles.featuredBody}>
-            <Text style={styles.featuredTitle}>{f.title}</Text>
-            <Text style={styles.featuredSubtitle}>{f.subtitle}</Text>
-          </View>
-          <Ionicons name="arrow-forward" size={18} color={colors.vermilion} />
-        </Pressable>
-      ))}
+      {/* 译本合集（wikipali 上的译本频道，取前几个） */}
+      <Text style={styles.sectionTitle}>{t("discover.channels")}</Text>
+      {channels === null ? (
+        <ActivityIndicator color={colors.vermilion} style={styles.loading} />
+      ) : (
+        channels.map((c) => (
+          <ChannelRow
+            key={c.id}
+            channel={c}
+            onPress={() =>
+              navigation.navigate("ChannelDetail", { uid: c.id, name: c.name })
+            }
+          />
+        ))
+      )}
+      <View style={styles.sectionGap} />
 
       {/* 作者（语文）筛选 */}
       <Text style={styles.sectionTitle}>{t("discover.authors")}</Text>
@@ -152,28 +164,11 @@ const styles = StyleSheet.create({
     right: spacing.md,
     top: spacing.md,
   },
-  featured: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.paperRaised,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
+  loading: {
+    marginVertical: spacing.lg,
   },
-  featuredBody: {
-    flex: 1,
-  },
-  featuredTitle: {
-    ...type.body,
-    fontWeight: "600",
-    fontFamily: serifFont,
-  },
-  featuredSubtitle: {
-    ...type.caption,
-    marginTop: 2,
+  sectionGap: {
+    height: spacing.lg,
   },
   chips: {
     flexDirection: "row",

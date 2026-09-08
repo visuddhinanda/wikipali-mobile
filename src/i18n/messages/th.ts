@@ -27,8 +27,17 @@ const th: Messages = {
 
   "discover.searchPlaceholder": "ค้นหาพระไตรปิฎกและคำศัพท์…",
   "discover.tipitaka": "พระไตรปิฎกบาลี",
-  "discover.featured": "แนะนำ · อัปเดตล่าสุด",
   "discover.authors": "ผู้แต่ง (ภาษา)",
+  "discover.channels": "ชุดคำแปล",
+  "channelList.title": "ดาวน์โหลดเป็นชุด",
+  "channelList.hint": "เลือกชุดคำแปลเพื่อดาวน์โหลดหนังสือทั้งหมดในชุดนั้น",
+  "channelList.empty": "ยังไม่มีชุดคำแปลในภาษานี้",
+  "channel.books": "หนังสือในชุด",
+  "channel.paraCount": "แปลแล้ว {n} ย่อหน้า",
+  "channel.bookCount": "{n} เล่ม",
+  "channel.downloadAll": "ดาวน์โหลดทั้งหมด",
+  "channel.downloading": "กำลังดาวน์โหลด {done}/{total}",
+  "channel.translated": "แปลแล้ว {n}%",
   "categoryBrowse.count": " · {n} รายการ",
 
   "chapterList.empty": "ยังไม่มีหนังสือในหมวดนี้",

@@ -27,8 +27,17 @@ const zhHant: Messages = {
 
   "discover.searchPlaceholder": "搜尋經文、詞條…",
   "discover.tipitaka": "巴利三藏",
-  "discover.featured": "推薦 · 最近更新",
   "discover.authors": "作者（語文）",
+  "discover.channels": "譯本合集",
+  "channelList.title": "批次下載",
+  "channelList.hint": "選擇一個譯本，把它包含的書整批下載到本機。",
+  "channelList.empty": "暫無該語言的譯本",
+  "channel.books": "包含的書",
+  "channel.paraCount": "{n} 段譯文",
+  "channel.bookCount": "{n} 本書",
+  "channel.downloadAll": "全部下載",
+  "channel.downloading": "正在下載 {done}/{total}",
+  "channel.translated": "已譯 {n}%",
   "categoryBrowse.count": " · {n} 項",
 
   "chapterList.empty": "該目錄暫無書籍",

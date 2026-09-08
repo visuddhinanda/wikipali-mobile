@@ -45,9 +45,21 @@ interface Props {
   };
   /** 删除下载后的回调（书架列表据此刷新）。 */
   onDeleted?: () => void;
+  /**
+   * 强制轮询进度。下载由外部发起时（频道页的「全部下载」串行跑到这一本）
+   * 本组件的 `progress` 一直是挂载时的快照，`isDownloading` 也是挂载那刻的
+   * 假值，自身的轮询条件永远不成立 —— 这行会一直显示「未下载」。
+   */
+  watch?: boolean;
 }
 
-export function DownloadControl({ book, channelId, colors, onDeleted }: Props) {
+export function DownloadControl({
+  book,
+  channelId,
+  colors,
+  onDeleted,
+  watch = false,
+}: Props) {
   const t = useT();
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,10 +85,10 @@ export function DownloadControl({ book, channelId, colors, onDeleted }: Props) {
 
   // 下载在别处发起时（例如从阅读器点的、返回书架后仍在跑），轮询刷新进度。
   useEffect(() => {
-    if (!channelId || !isDownloading(channelId, book)) return;
+    if (!channelId || (!watch && !isDownloading(channelId, book))) return;
     const timer = setInterval(refresh, 1000);
     return () => clearInterval(timer);
-  }, [book, channelId, refresh, progress?.status]);
+  }, [book, channelId, refresh, watch, progress?.status]);
 
   if (!channelId) {
     return (
@@ -134,22 +146,35 @@ export function DownloadControl({ book, channelId, colors, onDeleted }: Props) {
         <Text style={[styles.status, { color: colors.ink }]}>
           {t(STATUS_LABEL[p?.status ?? "pending"])}
         </Text>
-        <Text style={[styles.detail, { color: colors.inkSoft }]} numberOfLines={1}>
+        <Text
+          style={[styles.detail, { color: colors.inkSoft }]}
+          numberOfLines={1}
+        >
           {p?.status === "error" && p.error
             ? p.error
-            : t("download.paraCount", { done: p?.done ?? 0, total: p?.total ?? 0 })}
+            : t("download.paraCount", {
+                done: p?.done ?? 0,
+                total: p?.total ?? 0,
+              })}
         </Text>
       </View>
 
       {running ? (
-        <ActionBtn icon="pause" label={t("download.pause")} color={colors.accent} onPress={pause} />
+        <ActionBtn
+          icon="pause"
+          label={t("download.pause")}
+          color={colors.accent}
+          onPress={pause}
+        />
       ) : (
         <View style={styles.actions}>
           {/* 已下完就没有「继续」可言 */}
           {p?.status !== "done" ? (
             <ActionBtn
               icon="cloud-download-outline"
-              label={p && p.done > 0 ? t("download.resume") : t("download.start")}
+              label={
+                p && p.done > 0 ? t("download.resume") : t("download.start")
+              }
               color={colors.accent}
               disabled={busy}
               onPress={start}

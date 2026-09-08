@@ -27,8 +27,17 @@ const en: Messages = {
 
   "discover.searchPlaceholder": "Search texts and terms…",
   "discover.tipitaka": "Pāli Tipiṭaka",
-  "discover.featured": "Featured · Recently updated",
   "discover.authors": "Authors (by language)",
+  "discover.channels": "Translation collections",
+  "channelList.title": "Batch download",
+  "channelList.hint": "Pick a translation collection to download all of its books.",
+  "channelList.empty": "No collections in this language yet",
+  "channel.books": "Books included",
+  "channel.paraCount": "{n} segments translated",
+  "channel.bookCount": "{n} books",
+  "channel.downloadAll": "Download all",
+  "channel.downloading": "Downloading {done}/{total}",
+  "channel.translated": "{n}% translated",
   "categoryBrowse.count": " · {n} items",
 
   "chapterList.empty": "No books in this category",
