@@ -564,3 +564,32 @@ Wikipali、离线时只剩「原文」一层、连点 AI 入口会叠多个弹�
 重进恢复到 225–246，全部通过。
 
 功能测试清单见 **`docs/testing.md`**（12 组、约 70 项，含注入点击的已知盲区）。
+
+---
+
+## 14. 扫码 / 深链（2026-09-08）
+
+「分类」标题栏右侧加了扫码入口，扫 WikiPali 网页二维码直达阅读器；其他 App
+打开或分享这类链接给 WikiPali 走同一条路（`b324bfb`）。链接语义只在
+`src/linking/wikipali-url.ts`，加新链接形态只改那一个文件。
+
+### 14.1 一个坑：Tab 与 Stack 首屏同名，嵌套 navigate 会被吃掉
+
+`navigate("Discover", { screen: "Reader", params })` 在真机上日志走到了、
+界面纹丝不动 —— Tab 路由与 `BrowseStack` 首屏都叫 `Discover`。改成两步：
+先 `navigate("Discover")` 切 Tab，再 `setTimeout(0)` 里 `navigate("Reader")`。
+
+### 14.2 代办（下次处理）
+
+- **网页端加二维码**：`mint/api-v13` 的阅读页
+  （`resources/views/library/book/read.blade.php`，控制器
+  `app/Http/Controllers/Library/BookController.php@read`）与首页
+  （`pages.home` / `PageIndexController`）上放当前页链接的二维码，手机端才有
+  码可扫。**卡在依赖选型**：该仓库 composer 与 npm 都没有二维码库，而其
+  CLAUDE.md 要求加依赖须先批准。候选：composer `endroid/qr-code`（服务端出
+  SVG，无需 npm build）/ CDN 引 `qrcode.js`（不动依赖清单，但依赖外部 CDN）
+  / npm 装 `qrcode` 走现有 vite 链路（改完要 `npm run build`）。
+- **Android App Links 校验**：`app.json` 里开了 `autoVerify`，需在
+  `next.wikipali.org` 等域名放 `/.well-known/assetlinks.json`（包名
+  `com.iapt.mobile` + 正式签名 SHA-256 指纹），点链接才会直接进 App；
+  在此之前「分享给 WikiPali」这条路不受影响。

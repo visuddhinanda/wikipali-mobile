@@ -123,15 +123,21 @@ export function BookDownloadCard({
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      {/* 底色进度条：下到哪填到哪；下完就整块铺满。 */}
+      {/* 底色进度条：下到哪填到哪；下完就整块铺满。
+          用 flex 分两段而不是给绝对定位的块写百分比宽 —— Yoga 把百分比算在
+          父节点的**内容盒**上，100% 会短掉卡片左右各一份 padding，下完了
+          右边仍留一条没填上的白边。 */}
       {ratio > 0 ? (
-        <View
-          style={[
-            styles.fill,
-            { width: `${ratio * 100}%` },
-            p?.status === "done" && styles.fillDone,
-          ]}
-        />
+        <View style={styles.fillLayer} pointerEvents="none">
+          <View
+            style={[
+              styles.fill,
+              { flex: ratio },
+              p?.status === "done" && styles.fillDone,
+            ]}
+          />
+          <View style={{ flex: 1 - ratio }} />
+        </View>
       ) : null}
 
       <View style={styles.body}>
@@ -221,11 +227,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     overflow: "hidden",
   },
-  fill: {
+  fillLayer: {
     position: "absolute",
     left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
+    flexDirection: "row",
+  },
+  fill: {
     backgroundColor: colors.paperSunken,
   },
   fillDone: {
