@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getBookChannels } from "../api";
@@ -79,9 +80,16 @@ export interface ReaderLayerPaneProps {
   preferredChannelName?: string;
   settings: ReaderSettings;
   /** 每次这一层的阅读单元变化都会调用（含首次进入），供外层算/重算义注复注章节。 */
-  onChapterAnchor: (book: number, paragraph: number, toc: string | null) => void;
+  onChapterAnchor: (
+    book: number,
+    paragraph: number,
+    toc: string | null,
+  ) => void;
   /** 版本变化（自动选定或手动切换）都会调用，供外层记住「当前偏好的版本名」，义注/复注第一次加载时接着用。 */
-  onChannelChange?: (channelUid: string | undefined, channelName: string | undefined) => void;
+  onChannelChange?: (
+    channelUid: string | undefined,
+    channelName: string | undefined,
+  ) => void;
   navigation: ReaderNavigation;
 }
 
@@ -241,7 +249,12 @@ function NavBtn({
     </Text>
   ) : null;
   return (
-    <Pressable style={styles.navBtn} disabled={disabled} onPress={onPress} hitSlop={4}>
+    <Pressable
+      style={styles.navBtn}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={4}
+    >
       {iconPosition === "right" ? (
         <>
           {labelEl}
@@ -274,8 +287,12 @@ export function ReaderLayerPane({
   const t = useT();
 
   const [unit, setUnit] = useState<ReadingUnit | null>(null);
-  const [channelId, setChannelId] = useState<string | undefined>(initialChannelId);
-  const [channelName, setChannelName] = useState<string | undefined>(initialChannelName);
+  const [channelId, setChannelId] = useState<string | undefined>(
+    initialChannelId,
+  );
+  const [channelName, setChannelName] = useState<string | undefined>(
+    initialChannelName,
+  );
   const [doc, setDoc] = useState<ReaderDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasPrev, setHasPrev] = useState(false);
@@ -386,7 +403,8 @@ export function ReaderLayerPane({
 
   // 当前版本的名字也记一份 —— 从目录/书架带进来的版本同样要能离线复用。
   useEffect(() => {
-    if (channelId && channelName) void rememberChannelName(channelId, channelName);
+    if (channelId && channelName)
+      void rememberChannelName(channelId, channelName);
   }, [channelId, channelName]);
 
   // 版本一变（自动选定或手动切换）就告诉外层，供其他层第一次加载时参考。
@@ -456,7 +474,9 @@ export function ReaderLayerPane({
     if (!readerWidth) return MAX_CONTENT_WIDTH.medium ?? 720;
     const cap = MAX_CONTENT_WIDTH[widthClassOf(readerWidth)] ?? readerWidth;
     const usable =
-      sidenoteMode === "margin" ? readerWidth - SIDENOTE_WIDTH - 24 : readerWidth;
+      sidenoteMode === "margin"
+        ? readerWidth - SIDENOTE_WIDTH - 24
+        : readerWidth;
     return Math.max(280, Math.min(cap, usable));
   }, [readerWidth, sidenoteMode]);
 
@@ -474,7 +494,15 @@ export function ReaderLayerPane({
             },
           )
         : "",
-    [doc, headerSubtitle, settings.fontSize, isDark, readerWidth, measure, sidenoteMode],
+    [
+      doc,
+      headerSubtitle,
+      settings.fontSize,
+      isDark,
+      readerWidth,
+      measure,
+      sidenoteMode,
+    ],
   );
 
   const navigateTo = (b: number, para: number) => {
@@ -505,7 +533,9 @@ export function ReaderLayerPane({
     getBookChannels(book, p)
       .then(setChannels)
       .catch((e) =>
-        setChannelsError(e instanceof Error ? e.message : t("common.loadFailed")),
+        setChannelsError(
+          e instanceof Error ? e.message : t("common.loadFailed"),
+        ),
       );
   };
 
@@ -519,14 +549,68 @@ export function ReaderLayerPane({
     if (!(await ensureAiAvailable(t))) return;
     navigation.navigate("NewChat", {
       passageRef: { book, paragraph: p, title: toc },
+      systemPrompt: passageSystemPrompt(book, p, channelId),
       seedText: `关于《${title}》「${toc}」这一段落，请讲解大意。`,
     });
+  };
+
+  /**
+   * 选中正文后的上下文菜单（复制 / 查词 / 提问）。
+   *
+   * `menuItems` 非空时 react-native-webview 会用它**整个重建** ActionMode 菜单，
+   * 系统自带的复制/全选/网页搜索都不再出现 —— 所以「复制」也得自己实现。
+   */
+  const menuItems = useMemo(
+    () => [
+      { label: t("reader.menu.copy"), key: "copy" },
+      { label: t("reader.menu.lookup"), key: "lookup" },
+      { label: t("reader.menu.ask"), key: "ask" },
+    ],
+    [t],
+  );
+
+  const onMenuSelection = async (e: {
+    nativeEvent: { key: string; selectedText: string };
+  }) => {
+    const { key, selectedText } = e.nativeEvent;
+    const text = (selectedText ?? "").trim();
+    if (!text) return;
+
+    if (key === "copy") {
+      await Clipboard.setStringAsync(text);
+      return;
+    }
+
+    // 查词 / 提问都落到「探索」对话，带上章节坐标当系统提示词。
+    if (!(await ensureAiAvailable(t))) return;
+    const common = {
+      passageRef: { book, paragraph: p, title: toc },
+      systemPrompt: passageSystemPrompt(book, p, channelId),
+    } as const;
+    if (key === "lookup") {
+      // 查词是个完整的问题，直接替用户发出去。
+      navigation.navigate("NewChat", {
+        ...common,
+        seedText: t("chat.lookupSeed", { text }),
+      });
+    } else {
+      // 提问只预填开头，问题本身让用户自己写完再发。
+      navigation.navigate("NewChat", {
+        ...common,
+        draftText: t("chat.askDraft", { text }),
+      });
+    }
   };
 
   return (
     <View style={[styles.pane, { backgroundColor: c.paper }]}>
       {/* 导航条：目录 / 上一章 / 下一章 / 版本切换 / 离线下载（这一层自己的书） */}
-      <View style={[styles.navBar, { backgroundColor: c.paperRaised, borderBottomColor: c.hairline }]}>
+      <View
+        style={[
+          styles.navBar,
+          { backgroundColor: c.paperRaised, borderBottomColor: c.hairline },
+        ]}
+      >
         <NavBtn
           icon="list-outline"
           c={c}
@@ -554,12 +638,26 @@ export function ReaderLayerPane({
           c={c}
           onPress={goNext}
         />
-        <NavBtn icon="layers-outline" label={t("reader.version")} c={c} onPress={openVersion} />
+        <NavBtn
+          icon="layers-outline"
+          label={t("reader.version")}
+          c={c}
+          onPress={openVersion}
+        />
         <View style={styles.navBtn}>
           {channelId ? (
-            <DownloadIconButton book={book} channelId={channelId} color={c.ink} size={18} />
+            <DownloadIconButton
+              book={book}
+              channelId={channelId}
+              color={c.ink}
+              size={18}
+            />
           ) : (
-            <Ionicons name="cloud-download-outline" size={18} color={c.inkFaint} />
+            <Ionicons
+              name="cloud-download-outline"
+              size={18}
+              color={c.inkFaint}
+            />
           )}
         </View>
       </View>
@@ -569,7 +667,11 @@ export function ReaderLayerPane({
           <View
             style={[
               styles.listPane,
-              { width: LIST_PANE_WIDTH, backgroundColor: c.paperRaised, borderRightColor: c.hairline },
+              {
+                width: LIST_PANE_WIDTH,
+                backgroundColor: c.paperRaised,
+                borderRightColor: c.hairline,
+              },
             ]}
           >
             <ChapterTree
@@ -583,11 +685,18 @@ export function ReaderLayerPane({
             />
           </View>
         ) : null}
-        <View style={styles.body} onLayout={(e) => setReaderWidth(Math.round(e.nativeEvent.layout.width))}>
+        <View
+          style={styles.body}
+          onLayout={(e) =>
+            setReaderWidth(Math.round(e.nativeEvent.layout.width))
+          }
+        >
           {error ? (
             <View style={styles.center}>
               <Ionicons name="cloud-offline" size={40} color={c.inkFaint} />
-              <Text style={[styles.centerText, { color: c.inkSoft }]}>{error}</Text>
+              <Text style={[styles.centerText, { color: c.inkSoft }]}>
+                {error}
+              </Text>
             </View>
           ) : !doc ? (
             <View style={styles.center}>
@@ -599,6 +708,8 @@ export function ReaderLayerPane({
               originWhitelist={["*"]}
               style={[styles.web, { backgroundColor: c.paper }]}
               setSupportMultipleWindows={false}
+              menuItems={menuItems}
+              onCustomMenuSelection={(e) => void onMenuSelection(e)}
             />
           )}
         </View>
@@ -608,7 +719,11 @@ export function ReaderLayerPane({
         style={[styles.askFab, { backgroundColor: c.vermilion }]}
         onPress={() => void askAboutParagraph()}
       >
-        <Ionicons name="chatbubble-ellipses-outline" size={17} color="#fdfaf1" />
+        <Ionicons
+          name="chatbubble-ellipses-outline"
+          size={17}
+          color="#fdfaf1"
+        />
         <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
       </Pressable>
 
@@ -656,20 +771,39 @@ function VersionSheet({
 }) {
   const t = useT();
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: c.paperRaised, borderTopColor: c.border }]}>
-        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]}
+        onPress={onClose}
+      />
+      <View
+        style={[
+          styles.sheet,
+          { backgroundColor: c.paperRaised, borderTopColor: c.border },
+        ]}
+      >
+        <Text
+          style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}
+        >
           {t("reader.switchVersion")}
         </Text>
         {channelsError ? (
-          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{channelsError}</Text>
+          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+            {channelsError}
+          </Text>
         ) : !channels ? (
           <View style={styles.versionLoading}>
             <ActivityIndicator color={c.vermilion} />
           </View>
         ) : channels.length === 0 ? (
-          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{t("reader.noVersions")}</Text>
+          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+            {t("reader.noVersions")}
+          </Text>
         ) : (
           <ScrollView style={styles.versionList}>
             {channels.map((ch) => {
@@ -679,17 +813,28 @@ function VersionSheet({
                   key={ch.uid}
                   style={[
                     styles.versionRow,
-                    { backgroundColor: active ? c.paperSunken : "transparent", borderBottomColor: c.hairline },
+                    {
+                      backgroundColor: active ? c.paperSunken : "transparent",
+                      borderBottomColor: c.hairline,
+                    },
                   ]}
                   onPress={() => onPick(ch)}
                 >
                   <Text
                     numberOfLines={1}
-                    style={[styles.versionName, { color: active ? c.vermilion : c.ink, fontWeight: active ? "700" : "400" }]}
+                    style={[
+                      styles.versionName,
+                      {
+                        color: active ? c.vermilion : c.ink,
+                        fontWeight: active ? "700" : "400",
+                      },
+                    ]}
                   >
                     {ch.name}
                   </Text>
-                  {active ? <Ionicons name="checkmark" size={18} color={c.vermilion} /> : null}
+                  {active ? (
+                    <Ionicons name="checkmark" size={18} color={c.vermilion} />
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -698,6 +843,18 @@ function VersionSheet({
       </View>
     </Modal>
   );
+}
+
+/**
+ * 「查词 / 提问 / 就此段落提问」共用的系统提示词：告诉模型用户正看着哪一段、
+ * 哪个版本，让它先去查原文与译文，而不是凭空作答。
+ */
+function passageSystemPrompt(
+  book: number,
+  para: number,
+  channelUid?: string,
+): string {
+  return `用户正在阅读巴利文献章节 ${book}-${para} channel:${channelUid ?? ""} 段落号${para} 。请根据原文，译文，和 该处相关资料回答用户的问题。`;
 }
 
 const styles = StyleSheet.create({

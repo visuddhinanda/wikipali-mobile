@@ -50,6 +50,13 @@ export type RootStackParamList = {
         passageRef?: { book: number; paragraph: number; title: string };
         /** 预置的追问文本（进入对话后自动提交一次）。 */
         seedText?: string;
+        /** 预填到输入框、等用户自己补完再发的草稿（与 seedText 二选一）。 */
+        draftText?: string;
+        /**
+         * 本次对话的系统提示词。阅读器带着章节坐标进来时用它交代上下文，
+         * 让模型知道用户正看着哪一段、哪个版本。
+         */
+        systemPrompt?: string;
       }
     | undefined;
   Settings: undefined;

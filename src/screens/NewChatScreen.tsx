@@ -116,12 +116,20 @@ function ToolCallBubble(props: any) {
   );
 }
 
-function ChatUI({ seedText }: { seedText?: string }) {
+function ChatUI({
+  seedText,
+  draftText,
+  systemPrompt,
+}: {
+  seedText?: string;
+  draftText?: string;
+  systemPrompt?: string;
+}) {
   const navigation = useNavigation<Nav>();
   const t = useT();
   const { agent, messages, isRunning, submitMessage } = useCopilotChatContext();
   const renderToolCall = useRenderToolCall();
-  const [input, setInput] = React.useState("");
+  const [input, setInput] = React.useState(draftText ?? "");
   const listRef = useRef<FlatList>(null);
   const headerHeight = useHeaderHeight();
 
@@ -132,11 +140,19 @@ function ChatUI({ seedText }: { seedText?: string }) {
   submitMessageRef.current = submitMessage;
   const seededRef = useRef(false);
   useEffect(() => {
-    if (seedText && !seededRef.current) {
-      seededRef.current = true;
-      submitMessageRef.current(seedText);
+    if (seededRef.current) return;
+    seededRef.current = true;
+    // 系统提示词要排在第一条用户消息**之前**，不然模型是在没有上下文的
+    // 情况下先读到问题的（阅读器过来的「查词/提问」全靠它交代章节坐标）。
+    if (systemPrompt) {
+      agent?.addMessage?.({
+        id: `sys-${Date.now()}`,
+        role: "system",
+        content: systemPrompt,
+      });
     }
-  }, [seedText]);
+    if (seedText) submitMessageRef.current(seedText);
+  }, [seedText, systemPrompt, agent]);
 
   // 「思考中」指示：AI 在跑、但当前既没在流式输出正文、也没在跑工具（查资料）时显示。
   const lastMsg: any =
@@ -239,7 +255,9 @@ function ChatUI({ seedText }: { seedText?: string }) {
         data={messages ?? []}
         keyExtractor={(m: any) => m.id}
         renderItem={renderItem}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() =>
+          listRef.current?.scrollToEnd({ animated: true })
+        }
         contentContainerStyle={styles.listContent}
         style={styles.list}
         ListFooterComponent={
@@ -278,10 +296,14 @@ function ChatUI({ seedText }: { seedText?: string }) {
 export function NewChatScreen({
   route,
 }: NativeStackScreenProps<RootStackParamList, "NewChat">) {
-  const seedText = route.params?.seedText;
+  const { seedText, draftText, systemPrompt } = route.params ?? {};
   return (
     <CopilotChat agentId="pali_agent">
-      <ChatUI seedText={seedText} />
+      <ChatUI
+        seedText={seedText}
+        draftText={draftText}
+        systemPrompt={systemPrompt}
+      />
     </CopilotChat>
   );
 }
