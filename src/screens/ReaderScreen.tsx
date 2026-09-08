@@ -9,7 +9,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import PagerView, { type PagerViewOnPageSelectedEvent } from "react-native-pager-view";
+import PagerView, {
+  type PagerViewOnPageSelectedEvent,
+} from "react-native-pager-view";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { bookEntryAt, bookLayerAt } from "../catalog";
@@ -64,7 +67,10 @@ export function ReaderScreen({ route, navigation }: Props) {
   const t = useT();
   const { book, paragraph, title, channelId, channelName } = route.params;
 
-  const [settings, setSettings] = useState<ReaderSettings>({ theme: "light", fontSize: "md" });
+  const [settings, setSettings] = useState<ReaderSettings>({
+    theme: "light",
+    fontSize: "md",
+  });
   useEffect(() => {
     loadReaderSettings().then(setSettings);
   }, []);
@@ -76,15 +82,26 @@ export function ReaderScreen({ route, navigation }: Props) {
   // 入口这一层不一定是根本：从「义注」书进来时，标签栏该停在义注，而不是
   // 顶一个空的「原文」（bug：从义注/复注进来标签停在原文位置且只有原文）。
   const [pages, setPages] = useState<PageMeta[]>(() => [
-    { layer: bookLayerAt(book, paragraph) ?? "mula", book, paragraph, title, toc: title },
+    {
+      layer: bookLayerAt(book, paragraph) ?? "mula",
+      book,
+      paragraph,
+      title,
+      toc: title,
+    },
   ]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(() => new Set([0]));
   const pagerRef = useRef<PagerView>(null);
   // 驱动重算的是「用户所在的那一层」，不再固定是第 0 页。
   const selfIndexRef = useRef(0);
+  // 手势回调里读页数：Pan 只随 activeIndex 重建，闭包里的 pages 会过期。
+  const pagesLenRef = useRef(1);
+  pagesLenRef.current = pages.length;
   // 该层当前锚点，用来判断「章节锚点上报」是真换章了、还是同一章内 unit 细化。
-  const selfAnchorRef = useRef<{ book: number; paragraph: number } | null>(null);
+  const selfAnchorRef = useRef<{ book: number; paragraph: number } | null>(
+    null,
+  );
   // 当前偏好的版本名（如「deepseek」）——义注/复注第一次加载时，用它在自己
   // 书的版本列表里找同名版本，而不是无脑取第一个（不然会跳去系统默认的
   // 逐字翻译版本，见 bug：根本用 deepseek，切到义注/复注却变成 _System_Wbw_VRI_）。
@@ -113,7 +130,9 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [dualAnchor, setDualAnchor] = useState(0);
   const clampedAnchor = Math.max(0, Math.min(dualAnchor, pages.length - 2));
   const pairIndices =
-    dual && pages.length > 1 ? [clampedAnchor, clampedAnchor + 1] : [activeIndex];
+    dual && pages.length > 1
+      ? [clampedAnchor, clampedAnchor + 1]
+      : [activeIndex];
 
   // 双列露出的两层要立即挂载（不是滑过去才加载），不然右边一直转圈。
   useEffect(() => {
@@ -139,7 +158,11 @@ export function ReaderScreen({ route, navigation }: Props) {
         // 别的层自己翻章：只刷新标签标题，不影响当前层与另一层。
         setPages((prev) => {
           const cur = prev[index];
-          if (!cur || (cur.book === b && cur.paragraph === para && cur.toc === toc)) return prev;
+          if (
+            !cur ||
+            (cur.book === b && cur.paragraph === para && cur.toc === toc)
+          )
+            return prev;
           const next = [...prev];
           next[index] = { ...cur, book: b, paragraph: para, toc };
           return next;
@@ -148,7 +171,8 @@ export function ReaderScreen({ route, navigation }: Props) {
       }
 
       const prevAnchor = selfAnchorRef.current;
-      const changed = !prevAnchor || prevAnchor.book !== b || prevAnchor.paragraph !== para;
+      const changed =
+        !prevAnchor || prevAnchor.book !== b || prevAnchor.paragraph !== para;
       selfAnchorRef.current = { book: b, paragraph: para };
 
       if (!changed) {
@@ -164,7 +188,15 @@ export function ReaderScreen({ route, navigation }: Props) {
 
       // 当前层真的换章了：先收成单层、跳回它，再重新算各层对应章节。
       const selfLayer = bookLayerAt(b, para) ?? "mula";
-      setPages([{ layer: selfLayer, book: b, paragraph: para, title: bookTitleOf(b, para), toc }]);
+      setPages([
+        {
+          layer: selfLayer,
+          book: b,
+          paragraph: para,
+          title: bookTitleOf(b, para),
+          toc,
+        },
+      ]);
       selfIndexRef.current = 0;
       setVisited(new Set([0]));
       setActiveIndex(0);
@@ -173,12 +205,22 @@ export function ReaderScreen({ route, navigation }: Props) {
 
       getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
         // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
-        if (selfAnchorRef.current?.book !== b || selfAnchorRef.current?.paragraph !== para) return;
+        if (
+          selfAnchorRef.current?.book !== b ||
+          selfAnchorRef.current?.paragraph !== para
+        )
+          return;
         if (chapters.length === 0) return;
         setPages(
           chapters.map((ch, i) =>
             i === selfIndex
-              ? { layer: ch.layer, book: b, paragraph: para, title: bookTitleOf(b, para), toc }
+              ? {
+                  layer: ch.layer,
+                  book: b,
+                  paragraph: para,
+                  title: bookTitleOf(b, para),
+                  toc,
+                }
               : {
                   layer: ch.layer,
                   book: ch.book,
@@ -220,6 +262,34 @@ export function ReaderScreen({ route, navigation }: Props) {
     pagerRef.current?.setPage(index);
   };
 
+  /**
+   * 左右滑动换层 —— **上下滑动优先**。
+   *
+   * 原来直接用 PagerView 自带的横滑：ViewPager2 只看横向位移够不够 touch slop，
+   * 不比较纵向，于是竖着划正文时手指带一点横向抖动就被判成翻页，正文停住不动，
+   * 手指继续上滑也没用（那一串事件已经被翻页手势吃掉了）。
+   *
+   * 现在把翻页关掉，自己用 Pan 判：纵向先走出 `failOffsetY` 就直接判负，
+   * 事件原样留给正文滚动；横向走够 `activeOffsetX` 才接管，松手时还要求
+   * 横向位移明显压过纵向（1.5 倍）才真的换层。
+   */
+  const swipeLayer = React.useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-24, 24])
+        .failOffsetY([-12, 12])
+        .onEnd((e) => {
+          const { translationX: dx, translationY: dy } = e;
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          // 只能去相邻的那一层（原文不能直接跳复注）。
+          const next = activeIndex + (dx < 0 ? 1 : -1);
+          if (next < 0 || next >= pagesLenRef.current) return;
+          pagerRef.current?.setPage(next);
+        })
+        .runOnJS(true),
+    [activeIndex],
+  );
+
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
 
@@ -239,7 +309,9 @@ export function ReaderScreen({ route, navigation }: Props) {
         title={p.title}
         initialToc={p.toc}
         initialChannelId={i === selfIndexRef.current ? channelId : undefined}
-        initialChannelName={i === selfIndexRef.current ? channelName : undefined}
+        initialChannelName={
+          i === selfIndexRef.current ? channelName : undefined
+        }
         preferredChannelUid={preferredChannelRef.current.uid}
         preferredChannelName={preferredChannelRef.current.name}
         onChannelChange={handleChannelChange}
@@ -251,13 +323,24 @@ export function ReaderScreen({ route, navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: c.paper }]} edges={["top", "left", "right"]}>
-      <View style={[styles.header, { backgroundColor: c.paperRaised, borderBottomColor: c.hairline }]}>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: c.paper }]}
+      edges={["top", "left", "right"]}
+    >
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: c.paperRaised, borderBottomColor: c.hairline },
+        ]}
+      >
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
           <Ionicons name="chevron-back" size={24} color={c.ink} />
         </Pressable>
         <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: c.ink }]} numberOfLines={1}>
+          <Text
+            style={[styles.headerTitle, { color: c.ink }]}
+            numberOfLines={1}
+          >
             {headerTitle}
           </Text>
           {/* 原文 / 义注 / 复注：告诉用户当前在哪一层，点了换到相邻层（不能跳着换）。 */}
@@ -270,13 +353,22 @@ export function ReaderScreen({ route, navigation }: Props) {
                   key={`${p.layer}-${p.book}`}
                   disabled={!reachable}
                   onPress={() => selectTab(i)}
-                  style={[styles.layerTab, isActive && { borderBottomColor: c.vermilion }]}
+                  style={[
+                    styles.layerTab,
+                    isActive && { borderBottomColor: c.vermilion },
+                  ]}
                   hitSlop={4}
                 >
                   <Text
                     style={[
                       styles.layerTabText,
-                      { color: isActive ? c.vermilion : reachable ? c.inkSoft : c.inkFaint },
+                      {
+                        color: isActive
+                          ? c.vermilion
+                          : reachable
+                            ? c.inkSoft
+                            : c.inkFaint,
+                      },
                       isActive && styles.layerTabTextActive,
                     ]}
                   >
@@ -302,20 +394,40 @@ export function ReaderScreen({ route, navigation }: Props) {
             {pairIndices.map((i, slot) => (
               <View
                 key={`${pages[i].layer}-${pages[i].book}`}
-                style={[styles.dualPane, slot === 1 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.hairline }]}
+                style={[
+                  styles.dualPane,
+                  slot === 1 && {
+                    borderLeftWidth: StyleSheet.hairlineWidth,
+                    borderLeftColor: c.hairline,
+                  },
+                ]}
               >
                 {renderPane(i)}
               </View>
             ))}
           </View>
         ) : (
-          <PagerView ref={pagerRef} style={styles.pager} initialPage={activeIndex} onPageSelected={onPageSelected}>
-            {pages.map((p, i) => (
-              <View key={`${p.layer}-${p.book}`} style={styles.pagerPage} collapsable={false}>
-                {renderPane(i)}
-              </View>
-            ))}
-          </PagerView>
+          <GestureDetector gesture={swipeLayer}>
+            {/* 翻页交给上面这个 Pan：PagerView 自带的横滑是「谁先动谁赢」，
+                竖着划正文时手指稍微带一点横向位移就被判成翻页，正文当场卡住。 */}
+            <PagerView
+              ref={pagerRef}
+              style={styles.pager}
+              initialPage={activeIndex}
+              scrollEnabled={false}
+              onPageSelected={onPageSelected}
+            >
+              {pages.map((p, i) => (
+                <View
+                  key={`${p.layer}-${p.book}`}
+                  style={styles.pagerPage}
+                  collapsable={false}
+                >
+                  {renderPane(i)}
+                </View>
+              ))}
+            </PagerView>
+          </GestureDetector>
         )}
       </View>
 
@@ -345,21 +457,40 @@ function SettingsSheet({
 }) {
   const t = useT();
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: c.paperRaised, borderTopColor: c.border }]}>
-        <Text style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]}
+        onPress={onClose}
+      />
+      <View
+        style={[
+          styles.sheet,
+          { backgroundColor: c.paperRaised, borderTopColor: c.border },
+        ]}
+      >
+        <Text
+          style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}
+        >
           {t("reader.settings")}
         </Text>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{t("reader.fontSize")}</Text>
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.fontSize")}
+        </Text>
         <FontScale
           value={settings.fontSize}
           c={c}
           onChange={(fontSize) => onChange({ ...settings, fontSize })}
         />
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>{t("reader.theme")}</Text>
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.theme")}
+        </Text>
         <View style={styles.fontRow}>
           {(
             [
@@ -371,10 +502,15 @@ function SettingsSheet({
             return (
               <Pressable
                 key={opt.id}
-                style={[styles.fontPill, { backgroundColor: activeOpt ? c.vermilion : c.paperSunken }]}
+                style={[
+                  styles.fontPill,
+                  { backgroundColor: activeOpt ? c.vermilion : c.paperSunken },
+                ]}
                 onPress={() => onChange({ ...settings, theme: opt.id })}
               >
-                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>{t(opt.labelKey)}</Text>
+                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>
+                  {t(opt.labelKey)}
+                </Text>
               </Pressable>
             );
           })}
@@ -400,7 +536,10 @@ function FontScale({
   onChange: (v: ReaderSettings["fontSize"]) => void;
 }) {
   const last = FONT_OPTIONS.length - 1;
-  const index = Math.max(0, FONT_OPTIONS.findIndex((f) => f.id === value));
+  const index = Math.max(
+    0,
+    FONT_OPTIONS.findIndex((f) => f.id === value),
+  );
 
   // PanResponder 只创建一次，靠 ref 读最新的宽度与选中值，避免闭包读到旧状态。
   const widthRef = useRef(0);
@@ -455,7 +594,10 @@ function FontScale({
           <View
             style={[
               styles.scaleLineFill,
-              { backgroundColor: c.vermilion, width: `${(index / last) * 100}%` },
+              {
+                backgroundColor: c.vermilion,
+                width: `${(index / last) * 100}%`,
+              },
             ]}
           />
           {FONT_OPTIONS.map((f, i) => (
@@ -475,7 +617,9 @@ function FontScale({
         </View>
       </View>
 
-      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 19 }]}>大</Text>
+      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 19 }]}>
+        大
+      </Text>
     </View>
   );
 }
