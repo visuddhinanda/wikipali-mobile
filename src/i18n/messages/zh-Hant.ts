@@ -174,6 +174,14 @@ const zhHant: Messages = {
   "download.deleteConfirm": "刪除後將無法離線閱讀本書，需重新下載。",
   "download.paraCount": "{done} / {total} 段",
   "download.pickVersionFirst": "請先選擇版本，再下載。",
+
+  "scan.title": "掃碼",
+  "scan.hint": "掃描 WikiPali 網頁 QR Code，直達對應經文",
+  "scan.permissionTitle": "需要相機權限",
+  "scan.permissionBody": "掃碼需要使用相機，請在系統設定裡允許。",
+  "scan.grant": "允許",
+  "scan.unknownTitle": "無法識別",
+  "scan.unknownBody": "這不是可以開啟的 WikiPali 連結。",
 };
 
 export default zhHant;

@@ -7,7 +7,13 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:next.wikipali.org",
+        "applinks:www.wikipali.org",
+        "applinks:next.wikipali.cc",
+        "applinks:www.wikipali.cc"
+      ]
     },
     "android": {
       "package": "com.iapt.mobile",
@@ -17,7 +23,39 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "next.wikipali.org",
+              "pathPrefix": "/library"
+            },
+            {
+              "scheme": "https",
+              "host": "www.wikipali.org",
+              "pathPrefix": "/library"
+            },
+            {
+              "scheme": "https",
+              "host": "next.wikipali.cc",
+              "pathPrefix": "/library"
+            },
+            {
+              "scheme": "https",
+              "host": "www.wikipali.cc",
+              "pathPrefix": "/library"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +79,15 @@
           "imageWidth": 240,
           "resizeMode": "contain"
         }
-      ]
-    ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允许 WikiPali 使用相机扫描二维码，打开对应经文。"
+        }
+      ],
+      "expo-share-intent"
+    ],
+    "scheme": "wikipali"
   }
 }

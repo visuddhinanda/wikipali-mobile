@@ -177,6 +177,14 @@ const lo: Messages = {
   "download.deleteConfirm": "ຫຼັງຈາກລຶບແລ້ວຈະອ່ານປຶ້ມນີ້ແບບອອບໄລນ໌ບໍ່ໄດ້ ຕ້ອງດາວໂຫຼດໃໝ່.",
   "download.paraCount": "{done} / {total} ວັກ",
   "download.pickVersionFirst": "ກະລຸນາເລືອກສະບັບກ່ອນດາວໂຫຼດ.",
+
+  "scan.title": "ສະແກນ",
+  "scan.hint": "ສະແກນ QR ຂອງໜ້າ WikiPali ເພື່ອເປີດຂໍ້ຄວາມ",
+  "scan.permissionTitle": "ຕ້ອງການສິດກ້ອງຖ່າຍຮູບ",
+  "scan.permissionBody": "ການສະແກນຕ້ອງໃຊ້ກ້ອງ ກະລຸນາອະນຸຍາດໃນການຕັ້ງຄ່າ",
+  "scan.grant": "ອະນຸຍາດ",
+  "scan.unknownTitle": "ບໍ່ຮູ້ຈັກ",
+  "scan.unknownBody": "ນີ້ບໍ່ແມ່ນລິ້ງ WikiPali ທີ່ເປີດໄດ້.",
 };
 
 export default lo;

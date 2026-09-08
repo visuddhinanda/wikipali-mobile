@@ -177,6 +177,14 @@ const vi: Messages = {
   "download.deleteConfirm": "Sau khi xóa sẽ không đọc ngoại tuyến được cuốn này, cần tải lại.",
   "download.paraCount": "{done} / {total} đoạn",
   "download.pickVersionFirst": "Hãy chọn phiên bản trước khi tải.",
+
+  "scan.title": "Quét mã",
+  "scan.hint": "Quét mã QR trang WikiPali để mở đoạn kinh",
+  "scan.permissionTitle": "Cần quyền camera",
+  "scan.permissionBody": "Quét mã cần dùng camera. Vui lòng cho phép trong cài đặt.",
+  "scan.grant": "Cho phép",
+  "scan.unknownTitle": "Không nhận ra",
+  "scan.unknownBody": "Đây không phải liên kết WikiPali mà ứng dụng mở được.",
 };
 
 export default vi;

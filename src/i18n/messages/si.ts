@@ -177,6 +177,14 @@ const si: Messages = {
   "download.deleteConfirm": "මකා දැමූ පසු මෙම පොත නොබැඳිව කියවිය නොහැක; නැවත බාගත යුතුය.",
   "download.paraCount": "ඡේද {done} / {total}",
   "download.pickVersionFirst": "බාගැනීමට පෙර සංස්කරණයක් තෝරන්න.",
+
+  "scan.title": "පරිලෝකනය",
+  "scan.hint": "ඡේදය විවෘත කිරීමට WikiPali පිටුවේ QR කේතය පරිලෝකනය කරන්න",
+  "scan.permissionTitle": "කැමරා අවසරය අවශ්‍යයි",
+  "scan.permissionBody": "පරිලෝකනයට කැමරාව අවශ්‍යයි. සැකසුම් තුළ අවසර දෙන්න.",
+  "scan.grant": "අවසර දෙන්න",
+  "scan.unknownTitle": "හඳුනාගත නොහැක",
+  "scan.unknownBody": "මෙය විවෘත කළ හැකි WikiPali සබැඳියක් නොවේ.",
 };
 
 export default si;

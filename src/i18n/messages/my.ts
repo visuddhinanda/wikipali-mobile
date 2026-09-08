@@ -177,6 +177,14 @@ const my: Messages = {
   "download.deleteConfirm": "ဖျက်ပြီးလျှင် ဤစာအုပ်ကို အော့ဖ်လိုင်းဖြင့် ဖတ်၍မရတော့ဘဲ ပြန်လည်ဒေါင်းလုဒ်ရန် လိုအပ်ပါမည်။",
   "download.paraCount": "စာပိုဒ် {done} / {total}",
   "download.pickVersionFirst": "ဒေါင်းလုဒ်မဆွဲမီ ဗားရှင်းကို ရွေးပါ။",
+
+  "scan.title": "ကုဒ်ဖတ်ရန်",
+  "scan.hint": "WikiPali စာမျက်နှာ QR ကုဒ်ကို ဖတ်ပြီး ကျမ်းပိုဒ်သို့ တိုက်ရိုက်သွားပါ",
+  "scan.permissionTitle": "ကင်မရာ ခွင့်ပြုချက် လိုအပ်သည်",
+  "scan.permissionBody": "ကုဒ်ဖတ်ရန် ကင်မရာ လိုအပ်သည်။ ဆက်တင်တွင် ခွင့်ပြုပါ။",
+  "scan.grant": "ခွင့်ပြုသည်",
+  "scan.unknownTitle": "မသိရှိနိုင်ပါ",
+  "scan.unknownBody": "ဤသည် ဖွင့်နိုင်သော WikiPali လင့်ခ် မဟုတ်ပါ။",
 };
 
 export default my;

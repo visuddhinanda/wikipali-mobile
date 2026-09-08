@@ -191,6 +191,14 @@ const zhHans = {
   "download.deleteConfirm": "删除后将无法离线阅读本书，需重新下载。",
   "download.paraCount": "{done} / {total} 段",
   "download.pickVersionFirst": "请先选择版本，再下载。",
+
+  "scan.title": "扫码",
+  "scan.hint": "扫描 WikiPali 网页二维码，直达对应经文",
+  "scan.permissionTitle": "需要相机权限",
+  "scan.permissionBody": "扫码需要使用相机，请在系统设置里允许。",
+  "scan.grant": "允许",
+  "scan.unknownTitle": "无法识别",
+  "scan.unknownBody": "这不是可以打开的 WikiPali 链接。",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

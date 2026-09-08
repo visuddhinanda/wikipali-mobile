@@ -1,11 +1,13 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DefaultTheme,
   NavigationContainer,
+  useNavigation,
   type Theme,
 } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { colors } from "../theme";
@@ -28,6 +30,9 @@ import { LanguageSettingsScreen } from "../screens/LanguageSettingsScreen";
 import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
 import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
+import { ScanScreen } from "../screens/ScanScreen";
+import { navigationRef } from "../linking/handler";
+import { useDeepLinks } from "../linking/useDeepLinks";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 
@@ -117,6 +122,22 @@ const stackScreenOptions = () => ({
   contentStyle: { backgroundColor: colors.paper },
 });
 
+/** 「分类」标题栏右侧的扫码入口。 */
+function ScanButton() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={() => navigation.navigate("Scan")}
+      style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.5 }]}
+    >
+      <Ionicons name="scan-outline" size={22} color={colors.ink} />
+    </Pressable>
+  );
+}
+
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 /** 阅读链路：分类树 → 章节 → 版本 → 阅读器。多个 Tab 复用。 */
@@ -163,7 +184,15 @@ function BrowseStack() {
       <Stack.Screen
         name="Discover"
         component={DiscoverScreen}
-        options={{ title: t("nav.discover") }}
+        options={{
+          title: t("nav.discover"),
+          headerRight: () => <ScanButton />,
+        }}
+      />
+      <Stack.Screen
+        name="Scan"
+        component={ScanScreen}
+        options={{ title: t("scan.title") }}
       />
       {readingChainScreens(t)}
     </Stack.Navigator>
@@ -274,10 +303,17 @@ export function RootNavigator() {
   // compact 底部 Tab bar / medium·expanded 左侧 rail(80) / large 常驻侧边栏(280)。
   const { navKind, navWidth, isShort } = useLayout();
   const t = useT();
+  // 导航容器就绪后才能处理冷启动带进来的链接。
+  const [navReady, setNavReady] = React.useState(false);
+  useDeepLinks(navReady);
   const vertical = navKind !== "tabs";
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navTheme}
+      onReady={() => setNavReady(true)}
+    >
       <Tab.Navigator
         screenOptions={({ route }) => ({
           // 头部由各 Tab 内部的 Stack 负责，避免双层标题栏
@@ -337,6 +373,9 @@ export function RootNavigator() {
 const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.paperRaised,
+  },
+  headerButton: {
+    paddingHorizontal: 4,
   },
   headerTitle: {
     color: colors.ink,

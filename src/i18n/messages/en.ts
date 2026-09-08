@@ -177,6 +177,14 @@ const en: Messages = {
   "download.deleteConfirm": "You will no longer be able to read this book offline and will need to download it again.",
   "download.paraCount": "{done} / {total} paragraphs",
   "download.pickVersionFirst": "Choose a version before downloading.",
+
+  "scan.title": "Scan",
+  "scan.hint": "Scan a WikiPali page QR code to open the passage",
+  "scan.permissionTitle": "Camera permission needed",
+  "scan.permissionBody": "Scanning needs the camera. Please allow it in settings.",
+  "scan.grant": "Allow",
+  "scan.unknownTitle": "Not recognised",
+  "scan.unknownBody": "This is not a WikiPali link the app can open.",
 };
 
 export default en;

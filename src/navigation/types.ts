@@ -61,6 +61,8 @@ export type RootStackParamList = {
   About: undefined;
   /** 登录页（从「我」进入）。 */
   SignIn: undefined;
+  /** 扫码（从「分类」标题栏进入）。 */
+  Scan: undefined;
   /** 布局调试页（仅 __DEV__ 从「我」进入）。 */
   DebugLayout: undefined;
 };

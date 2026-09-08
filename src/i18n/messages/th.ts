@@ -177,6 +177,14 @@ const th: Messages = {
   "download.deleteConfirm": "หลังจากลบแล้วจะอ่านหนังสือเล่มนี้แบบออฟไลน์ไม่ได้ ต้องดาวน์โหลดใหม่",
   "download.paraCount": "{done} / {total} ย่อหน้า",
   "download.pickVersionFirst": "กรุณาเลือกฉบับก่อนดาวน์โหลด",
+
+  "scan.title": "สแกน",
+  "scan.hint": "สแกน QR โค้ดของหน้า WikiPali เพื่อเปิดข้อความ",
+  "scan.permissionTitle": "ต้องการสิทธิ์กล้อง",
+  "scan.permissionBody": "การสแกนต้องใช้กล้อง โปรดอนุญาตในการตั้งค่า",
+  "scan.grant": "อนุญาต",
+  "scan.unknownTitle": "ไม่รู้จัก",
+  "scan.unknownBody": "นี่ไม่ใช่ลิงก์ WikiPali ที่เปิดได้",
 };
 
 export default th;
