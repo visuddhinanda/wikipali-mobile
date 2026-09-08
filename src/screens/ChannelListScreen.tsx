@@ -7,6 +7,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { ChannelRow } from "../components/ChannelRow";
 import { fetchTranslationChannels, type ChannelSummary } from "../api/channels";
+import { listDownloads } from "../reading";
 import { colors, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useI18n } from "../i18n/I18nContext";
@@ -21,8 +22,17 @@ export function ChannelListScreen({ navigation }: Props) {
 
   useEffect(() => {
     let alive = true;
-    fetchTranslationChannels(langFamily(locale))
-      .then((r) => alive && setRows(r))
+    // 下过东西的频道排最前面 —— 用户回到这个页面多半是接着下没下完的。
+    Promise.all([fetchTranslationChannels(langFamily(locale)), listDownloads()])
+      .then(([r, downloads]) => {
+        if (!alive) return;
+        const has = new Set(
+          downloads.filter((d) => d.done > 0).map((d) => d.channel),
+        );
+        setRows(
+          [...r].sort((a, b) => Number(has.has(b.id)) - Number(has.has(a.id))),
+        );
+      })
       .catch((err) =>
         alive
           ? setError(

@@ -46,6 +46,10 @@ const zhHans = {
   "channel.downloadAll": "全部下载",
   "channel.downloading": "正在下载 {done}/{total}",
   "channel.translated": "已译 {n}%",
+  "channel.filter": "筛选",
+  "channel.filter.all": "全部",
+  "channel.emptyFiltered": "没有符合筛选条件的书",
+  "bookshelf.downloadedBooks": "{n} 本已下载",
   "categoryBrowse.count": " · {n} 项",
 
   // 章节 / 版本
@@ -75,7 +79,8 @@ const zhHans = {
   "bookshelf.tab.downloaded": "已下载",
   "bookshelf.tab.starred": "收藏",
   "bookshelf.empty.reading.title": "还没有阅读记录",
-  "bookshelf.empty.reading.sub": "从「分类」进入经文开始阅读，进度会自动出现在这里。",
+  "bookshelf.empty.reading.sub":
+    "从「分类」进入经文开始阅读，进度会自动出现在这里。",
   "bookshelf.empty.downloaded.title": "暂无下载",
   "bookshelf.empty.downloaded.sub": "下载的经文会出现在这里，可离线阅读。",
   "bookshelf.empty.starred.title": "暂无收藏",

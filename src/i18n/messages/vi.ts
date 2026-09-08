@@ -17,7 +17,8 @@ const vi: Messages = {
   "common.ok": "Đã hiểu",
   "common.loadFailed": "Tải thất bại",
   "ai.unavailableTitle": "Tính năng AI chưa mở",
-  "ai.unavailableBody": "Dịch vụ trò chuyện chưa hoạt động. Vui lòng quay lại sau.",
+  "ai.unavailableBody":
+    "Dịch vụ trò chuyện chưa hoạt động. Vui lòng quay lại sau.",
   "common.justNow": "Vừa xong",
   "common.minutesAgo": "{n} phút trước",
   "common.hoursAgo": "{n} giờ trước",
@@ -38,6 +39,10 @@ const vi: Messages = {
   "channel.downloadAll": "Tải tất cả",
   "channel.downloading": "Đang tải {done}/{total}",
   "channel.translated": "Đã dịch {n}%",
+  "channel.filter": "Bộ lọc",
+  "channel.filter.all": "Tất cả",
+  "channel.emptyFiltered": "Không có sách nào khớp bộ lọc này",
+  "bookshelf.downloadedBooks": "Đã tải {n} cuốn",
   "categoryBrowse.count": " · {n} mục",
 
   "chapterList.empty": "Chưa có sách trong mục này",
@@ -157,7 +162,6 @@ const vi: Messages = {
   "settings.downloads": "Quản lý tải xuống",
   "settings.about": "Giới thiệu / Phản hồi",
 
-
   "about.version": "Phiên bản {version}",
   "about.section.about": "Giới thiệu",
   "about.website": "Trang web WikiPali",
@@ -170,7 +174,8 @@ const vi: Messages = {
   "error.network": "Yêu cầu mạng thất bại",
   "error.badJson": "Phản hồi không phải JSON hợp lệ",
   "error.backend": "Máy chủ trả về lỗi",
-  "error.noOnlineContent": "Bản này chưa có nội dung trực tuyến cho chương hiện tại",
+  "error.noOnlineContent":
+    "Bản này chưa có nội dung trực tuyến cho chương hiện tại",
 
   // Tải về ngoại tuyến
   "download.section": "Tải về ngoại tuyến",
@@ -183,14 +188,16 @@ const vi: Messages = {
   "download.resume": "Tiếp tục",
   "download.pause": "Tạm dừng",
   "download.delete": "Xóa",
-  "download.deleteConfirm": "Sau khi xóa sẽ không đọc ngoại tuyến được cuốn này, cần tải lại.",
+  "download.deleteConfirm":
+    "Sau khi xóa sẽ không đọc ngoại tuyến được cuốn này, cần tải lại.",
   "download.paraCount": "{done} / {total} đoạn",
   "download.pickVersionFirst": "Hãy chọn phiên bản trước khi tải.",
 
   "scan.title": "Quét mã",
   "scan.hint": "Quét mã QR trang WikiPali để mở đoạn kinh",
   "scan.permissionTitle": "Cần quyền camera",
-  "scan.permissionBody": "Quét mã cần dùng camera. Vui lòng cho phép trong cài đặt.",
+  "scan.permissionBody":
+    "Quét mã cần dùng camera. Vui lòng cho phép trong cài đặt.",
   "scan.grant": "Cho phép",
   "scan.unknownTitle": "Không nhận ra",
   "scan.unknownBody": "Đây không phải liên kết WikiPali mà ứng dụng mở được.",

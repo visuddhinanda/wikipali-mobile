@@ -1,12 +1,22 @@
 /**
  * 译本频道详情：工作室信息 + 该频道下的书列表。
  *
- * 从分类页进来是「浏览」（点书直接读），从书架「批量下载」进来是 download
- * 模式：每本书带下载控件，顶部还有「全部下载」（逐本串行，别把服务端打爆）。
+ * 书列表是**服务端列表与本地下载记录的并集** —— 频道内容随时间会变，
+ * 已经下过、如今服务端不再列出的书仍要能看到（和删除），否则那份缓存就
+ * 成了删不掉的孤儿。已下载的排在最前面。
+ *
+ * 标题栏右上角的漏斗按钮按下载状态过滤（全部 / 已下载 / 下载中 / 未下载）。
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -16,7 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { Avatar } from "../components/ChannelRow";
-import { DownloadControl } from "../components/DownloadControl";
+import { BookDownloadCard } from "../components/BookDownloadCard";
 import {
   fetchChannel,
   fetchChannelBooks,
@@ -25,8 +35,14 @@ import {
   type ChannelInfo,
 } from "../api/channels";
 import { bookEntryAt, bookLayerAt } from "../catalog";
-import { downloadBook, isDownloading, pauseDownload } from "../reading";
-import { rememberChannelName } from "../reading";
+import {
+  downloadBook,
+  isDownloading,
+  listDownloads,
+  pauseDownload,
+  rememberChannelName,
+  type DownloadProgress,
+} from "../reading";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useT } from "../i18n/I18nContext";
@@ -34,12 +50,36 @@ import type { MessageKey } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ChannelDetail">;
 
+/** 过滤项；`all` 之外三档对应下载状态。 */
+const FILTERS = ["all", "done", "downloading", "pending"] as const;
+type Filter = (typeof FILTERS)[number];
+
+const FILTER_LABEL: Record<Filter, MessageKey> = {
+  all: "channel.filter.all",
+  done: "download.done",
+  downloading: "download.downloading",
+  pending: "download.notDownloaded",
+};
+
+/** 下载状态归到哪一档（暂停 / 失败都还没下完，算「未下载」）。 */
+function bucket(p?: DownloadProgress): Exclude<Filter, "all"> {
+  if (p?.status === "done") return "done";
+  if (p?.status === "downloading") return "downloading";
+  return "pending";
+}
+
 export function ChannelDetailScreen({ route, navigation }: Props) {
   const { uid, name, mode } = route.params;
   const t = useT();
   const [info, setInfo] = useState<ChannelInfo | null>(null);
   const [books, setBooks] = useState<ChannelBook[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 本地下载记录（并集的另一半，也用来把已下载的排到前面）。
+  const [local, setLocal] = useState<Map<number, DownloadProgress>>(new Map());
+  // 各书的实时状态（卡片回报），只用于过滤。
+  const [status, setStatus] = useState<Map<number, Filter>>(new Map());
+  const [filter, setFilter] = useState<Filter>("all");
+  const [menu, setMenu] = useState(false);
   // 「全部下载」的进度（第几本 / 共几本）；null 表示没在批量下载。
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(
     null,
@@ -50,6 +90,13 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     let alive = true;
     // 频道名先记进本地 channels 表：书架列表靠它把 uid 显示成人话。
     void rememberChannelName(uid, name);
+
+    listDownloads().then((rows) => {
+      if (!alive) return;
+      setLocal(
+        new Map(rows.filter((r) => r.channel === uid).map((r) => [r.book, r])),
+      );
+    });
     fetchChannel(uid)
       .then((c) => alive && setInfo(c))
       .catch(() => undefined);
@@ -57,9 +104,12 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       .then((rows) => alive && setBooks(dedupe(rows)))
       .catch((err) =>
         alive
-          ? setError(
+          ? // 离线时服务端列表拿不到，但本地下载过的书仍要能看到 —— 下面
+            // mergeLocal 会把它们补进来，这里只把列表置空而不报错。
+            (setBooks([]),
+            setError(
               err instanceof Error ? err.message : t("common.loadFailed"),
-            )
+            ))
           : undefined,
       );
     return () => {
@@ -76,11 +126,69 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     [navigation],
   );
 
+  // 标题栏右上角的过滤器。
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => setMenu(true)}
+          style={styles.headerBtn}
+        >
+          <Ionicons
+            name={filter === "all" ? "funnel-outline" : "funnel"}
+            size={20}
+            color={filter === "all" ? colors.ink : colors.vermilion}
+          />
+        </Pressable>
+      ),
+    });
+  }, [navigation, filter]);
+
+  /** 服务端列表 ∪ 本地下载记录，已下载的排前面。 */
+  const merged = useMemo<ChannelBook[] | null>(() => {
+    if (books === null) return null;
+    const rows = [...books];
+    const known = new Set(rows.map((r) => r.book));
+    for (const [book, p] of local) {
+      if (!known.has(book) && p.done > 0) {
+        rows.push({
+          book,
+          para: bookEntryAt(book)?.paragraph ?? 0,
+          progress: 0,
+        });
+      }
+    }
+    const downloaded = (b: ChannelBook) =>
+      (status.get(b.book) ?? bucket(local.get(b.book))) === "done" ? 0 : 1;
+    return rows.sort(
+      (a, b) => downloaded(a) - downloaded(b) || a.book - b.book,
+    );
+  }, [books, local, status]);
+
+  const visible = useMemo(
+    () =>
+      merged?.filter(
+        (b) =>
+          filter === "all" ||
+          (status.get(b.book) ?? bucket(local.get(b.book))) === filter,
+      ) ?? null,
+    [merged, filter, status, local],
+  );
+
+  const onProgress = useCallback((p: DownloadProgress) => {
+    const next = bucket(p);
+    setStatus((prev) =>
+      prev.get(p.book) === next ? prev : new Map(prev).set(p.book, next),
+    );
+  }, []);
+
   const openBook = useCallback(
     (b: ChannelBook) =>
       navigation.navigate("Reader", {
         book: b.book,
-        paragraph: b.para,
+        paragraph: b.para || undefined,
         title: bookTitle(b),
         channelId: uid,
         channelName: name,
@@ -89,14 +197,14 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
   );
 
   const downloadAll = async () => {
-    if (!books) return;
+    if (!merged) return;
     stopped.current = false;
-    setBulk({ done: 0, total: books.length });
-    for (let i = 0; i < books.length; i += 1) {
+    setBulk({ done: 0, total: merged.length });
+    for (let i = 0; i < merged.length; i += 1) {
       if (stopped.current) break;
-      setBulk({ done: i, total: books.length });
+      setBulk({ done: i, total: merged.length });
       try {
-        await downloadBook(uid, books[i].book);
+        await downloadBook(uid, merged[i].book);
       } catch {
         // 单本失败不该中断整批：书列表里那一行会显示失败状态。
       }
@@ -106,12 +214,13 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
 
   const stopAll = () => {
     stopped.current = true;
-    const running = books?.find((b) => isDownloading(uid, b.book));
+    const running = merged?.find((b) => isDownloading(uid, b.book));
     if (running) pauseDownload(uid, running.book);
     setBulk(null);
   };
 
   const studio = studioLabel(info?.studio);
+  const readonly = mode !== "download";
 
   return (
     <Screen contentStyle={styles.content}>
@@ -132,9 +241,9 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>
           {t("channel.books")}
-          {books ? ` · ${t("channel.bookCount", { n: books.length })}` : ""}
+          {visible ? ` · ${t("channel.bookCount", { n: visible.length })}` : ""}
         </Text>
-        {mode === "download" && books && books.length > 0 ? (
+        {!readonly && merged && merged.length > 0 ? (
           bulk ? (
             <Pressable style={styles.action} onPress={stopAll} hitSlop={6}>
               <Ionicons name="pause" size={16} color={colors.vermilion} />
@@ -158,14 +267,14 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
-      {error ? (
-        <Text style={styles.empty}>{error}</Text>
-      ) : books === null ? (
+      {merged === null ? (
         <ActivityIndicator color={colors.vermilion} style={styles.loading} />
+      ) : visible && visible.length === 0 ? (
+        <Text style={styles.empty}>{error ?? t("channel.emptyFiltered")}</Text>
       ) : (
-        books.map((b) => {
+        visible?.map((b) => {
           const layer = bookLayerAt(b.book, b.para);
-          const sub = [
+          const meta = [
             layer
               ? t(
                   layer === "mula"
@@ -173,45 +282,66 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
                     : (`layer.${layer}` as MessageKey),
                 )
               : null,
-            t("channel.translated", { n: Math.round(b.progress * 100) }),
+            b.progress > 0
+              ? t("channel.translated", { n: Math.round(b.progress * 100) })
+              : null,
           ]
             .filter(Boolean)
             .join(" · ");
           return (
-            <View key={`${b.book}-${b.para}`} style={styles.card}>
-              <Pressable style={styles.cardHead} onPress={() => openBook(b)}>
-                <View style={styles.cardBody}>
-                  <Text style={styles.bookTitle} numberOfLines={1}>
-                    {bookTitle(b)}
-                  </Text>
-                  <Text style={styles.bookSub} numberOfLines={1}>
-                    {sub}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.vermilion}
-                />
-              </Pressable>
-              {mode === "download" ? (
-                <DownloadControl
-                  book={b.book}
-                  channelId={uid}
-                  watch={bulk !== null}
-                  colors={{
-                    ink: colors.ink,
-                    inkSoft: colors.inkSoft,
-                    inkFaint: colors.inkFaint,
-                    accent: colors.vermilion,
-                    track: colors.hairline,
-                  }}
-                />
-              ) : null}
-            </View>
+            <BookDownloadCard
+              key={b.book}
+              book={b.book}
+              title={bookTitle(b)}
+              meta={meta}
+              channelId={uid}
+              readonly={readonly}
+              watch={bulk !== null}
+              onPress={() => openBook(b)}
+              onProgress={onProgress}
+            />
           );
         })
       )}
+
+      {/* 过滤器菜单（贴着标题栏右上角落下） */}
+      <Modal
+        visible={menu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenu(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setMenu(false)}>
+          <View style={styles.menu}>
+            {FILTERS.map((f) => (
+              <Pressable
+                key={f}
+                style={styles.menuItem}
+                onPress={() => {
+                  setFilter(f);
+                  setMenu(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.menuText,
+                    filter === f && styles.menuTextActive,
+                  ]}
+                >
+                  {t(FILTER_LABEL[f])}
+                </Text>
+                {filter === f ? (
+                  <Ionicons
+                    name="checkmark"
+                    size={16}
+                    color={colors.vermilion}
+                  />
+                ) : null}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -237,6 +367,9 @@ function dedupe(rows: ChannelBook[]): ChannelBook[] {
 const styles = StyleSheet.create({
   content: {
     paddingTop: spacing.md,
+  },
+  headerBtn: {
+    paddingHorizontal: 4,
   },
   info: {
     flexDirection: "row",
@@ -277,33 +410,6 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.vermilion,
   },
-  card: {
-    backgroundColor: colors.paperRaised,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
-  },
-  cardHead: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  cardBody: {
-    flex: 1,
-  },
-  bookTitle: {
-    ...type.body,
-    fontWeight: "600",
-    fontFamily: serifFont,
-  },
-  bookSub: {
-    ...type.small,
-    marginTop: 2,
-    color: colors.inkSoft,
-  },
   loading: {
     marginTop: spacing.xl,
   },
@@ -311,5 +417,35 @@ const styles = StyleSheet.create({
     ...type.caption,
     textAlign: "center",
     marginTop: spacing.xl,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  menu: {
+    position: "absolute",
+    right: spacing.md,
+    top: spacing.xxl * 3,
+    minWidth: 160,
+    backgroundColor: colors.paperRaised,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    paddingVertical: spacing.xs,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  menuText: {
+    ...type.body,
+  },
+  menuTextActive: {
+    color: colors.vermilion,
+    fontWeight: "600",
   },
 });

@@ -30,7 +30,8 @@ const my: Messages = {
   "discover.authors": "စာရေးသူ (ဘာသာစကားအလိုက်)",
   "discover.channels": "ဘာသာပြန်စုစည်းမှုများ",
   "channelList.title": "အစုလိုက် ဒေါင်းလုဒ်",
-  "channelList.hint": "ဘာသာပြန်တစ်ခုကို ရွေးပြီး ၎င်း၏စာအုပ်များအားလုံးကို ဒေါင်းလုဒ်လုပ်ပါ။",
+  "channelList.hint":
+    "ဘာသာပြန်တစ်ခုကို ရွေးပြီး ၎င်း၏စာအုပ်များအားလုံးကို ဒေါင်းလုဒ်လုပ်ပါ။",
   "channelList.empty": "ဤဘာသာစကားအတွက် စုစည်းမှုမရှိသေးပါ",
   "channel.books": "ပါဝင်သောစာအုပ်များ",
   "channel.paraCount": "ဘာသာပြန် {n} ပိုဒ်",
@@ -38,6 +39,10 @@ const my: Messages = {
   "channel.downloadAll": "အားလုံး ဒေါင်းလုဒ်",
   "channel.downloading": "ဒေါင်းလုဒ်လုပ်နေသည် {done}/{total}",
   "channel.translated": "{n}% ဘာသာပြန်ပြီး",
+  "channel.filter": "စစ်ထုတ်ရန်",
+  "channel.filter.all": "အားလုံး",
+  "channel.emptyFiltered": "ဤစစ်ထုတ်မှုနှင့် ကိုက်ညီသောစာအုပ်မရှိပါ",
+  "bookshelf.downloadedBooks": "စာအုပ် {n} အုပ် ဒေါင်းလုဒ်ပြီး",
   "categoryBrowse.count": " · {n} ခု",
 
   "chapterList.empty": "ဤအမျိုးအစားတွင် စာအုပ်မရှိသေးပါ",
@@ -71,7 +76,8 @@ const my: Messages = {
   "bookshelf.empty.downloaded.sub":
     "ဒေါင်းလုဒ်လုပ်ထားသော စာပေများသည် ဤနေရာတွင် ပေါ်လာပြီး အော့ဖ်လိုင်း ဖတ်နိုင်ပါသည်။",
   "bookshelf.empty.starred.title": "သိမ်းဆည်းထားသည် မရှိပါ",
-  "bookshelf.empty.starred.sub": "သိမ်းဆည်းထားသော စာပေများ ဤနေရာတွင် ပေါ်လာပါမည်။",
+  "bookshelf.empty.starred.sub":
+    "သိမ်းဆည်းထားသော စာပေများ ဤနေရာတွင် ပေါ်လာပါမည်။",
 
   "tools.dict.title": "အဘိဓာန်",
   "tools.dict.desc": "တစ်လုံးချင်း ရှာဖွေခြင်း · မှတ်တမ်း",
@@ -148,7 +154,8 @@ const my: Messages = {
 
   "settings.apiServer": "API ဆာဗာ",
   "settings.apiServerHint": "စာပေအချက်အလက် ရယူမည့် ဆာဗာကို ရွေးပါ။",
-  "settings.envOverride": "လက်ရှိတွင် EXPO_PUBLIC_API_URL ဖြင့် အစားထိုးထားသည်- {url}",
+  "settings.envOverride":
+    "လက်ရှိတွင် EXPO_PUBLIC_API_URL ဖြင့် အစားထိုးထားသည်- {url}",
   "settings.others": "အခြား ဆက်တင်များ",
   "settings.language": "ဘာသာစကား",
   "settings.languageHint": "မူရင်းအားဖြင့် ဖုန်း၏ ဘာသာစကားကို လိုက်နာသည်။",
@@ -156,7 +163,6 @@ const my: Messages = {
   "settings.display": "ပြသမှု (စာလုံးအရွယ် / အပြင်အဆင်)",
   "settings.downloads": "ဒေါင်းလုဒ် စီမံခန့်ခွဲမှု",
   "settings.about": "အကြောင်း / အကြံပြုရန်",
-
 
   "about.version": "ဗားရှင်း {version}",
   "about.section.about": "အကြောင်း",
@@ -170,7 +176,8 @@ const my: Messages = {
   "error.network": "ကွန်ရက် တောင်းဆိုမှု မအောင်မြင်ပါ",
   "error.badJson": "တုံ့ပြန်မှုသည် တရားဝင် JSON မဟုတ်ပါ",
   "error.backend": "ဆာဗာမှ အမှား ပြန်ပို့သည်",
-  "error.noOnlineContent": "ဤဗားရှင်းတွင် ဤအခန်းအတွက် အွန်လိုင်း စာသား မရှိသေးပါ",
+  "error.noOnlineContent":
+    "ဤဗားရှင်းတွင် ဤအခန်းအတွက် အွန်လိုင်း စာသား မရှိသေးပါ",
 
   // အော့ဖ်လိုင်း ဒေါင်းလုဒ်
   "download.section": "အော့ဖ်လိုင်း ဒေါင်းလုဒ်",
@@ -183,12 +190,14 @@ const my: Messages = {
   "download.resume": "ဆက်လုပ်ရန်",
   "download.pause": "ခေတ္တရပ်ရန်",
   "download.delete": "ဖျက်ရန်",
-  "download.deleteConfirm": "ဖျက်ပြီးလျှင် ဤစာအုပ်ကို အော့ဖ်လိုင်းဖြင့် ဖတ်၍မရတော့ဘဲ ပြန်လည်ဒေါင်းလုဒ်ရန် လိုအပ်ပါမည်။",
+  "download.deleteConfirm":
+    "ဖျက်ပြီးလျှင် ဤစာအုပ်ကို အော့ဖ်လိုင်းဖြင့် ဖတ်၍မရတော့ဘဲ ပြန်လည်ဒေါင်းလုဒ်ရန် လိုအပ်ပါမည်။",
   "download.paraCount": "စာပိုဒ် {done} / {total}",
   "download.pickVersionFirst": "ဒေါင်းလုဒ်မဆွဲမီ ဗားရှင်းကို ရွေးပါ။",
 
   "scan.title": "ကုဒ်ဖတ်ရန်",
-  "scan.hint": "WikiPali စာမျက်နှာ QR ကုဒ်ကို ဖတ်ပြီး ကျမ်းပိုဒ်သို့ တိုက်ရိုက်သွားပါ",
+  "scan.hint":
+    "WikiPali စာမျက်နှာ QR ကုဒ်ကို ဖတ်ပြီး ကျမ်းပိုဒ်သို့ တိုက်ရိုက်သွားပါ",
   "scan.permissionTitle": "ကင်မရာ ခွင့်ပြုချက် လိုအပ်သည်",
   "scan.permissionBody": "ကုဒ်ဖတ်ရန် ကင်မရာ လိုအပ်သည်။ ဆက်တင်တွင် ခွင့်ပြုပါ။",
   "scan.grant": "ခွင့်ပြုသည်",

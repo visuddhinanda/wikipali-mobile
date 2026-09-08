@@ -38,6 +38,10 @@ const zhHant: Messages = {
   "channel.downloadAll": "全部下載",
   "channel.downloading": "正在下載 {done}/{total}",
   "channel.translated": "已譯 {n}%",
+  "channel.filter": "篩選",
+  "channel.filter.all": "全部",
+  "channel.emptyFiltered": "沒有符合篩選條件的書",
+  "bookshelf.downloadedBooks": "{n} 本已下載",
   "categoryBrowse.count": " · {n} 項",
 
   "chapterList.empty": "該目錄暫無書籍",
@@ -152,7 +156,6 @@ const zhHant: Messages = {
   "settings.display": "顯示設定（字級 / 主題）",
   "settings.downloads": "下載管理",
   "settings.about": "關於 / 意見回饋",
-
 
   // 關於 / 意見回饋
   "about.version": "版本 {version}",

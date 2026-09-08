@@ -17,7 +17,8 @@ const en: Messages = {
   "common.ok": "OK",
   "common.loadFailed": "Failed to load",
   "ai.unavailableTitle": "AI is not available yet",
-  "ai.unavailableBody": "The chat service is not online yet. Please check back later.",
+  "ai.unavailableBody":
+    "The chat service is not online yet. Please check back later.",
   "common.justNow": "Just now",
   "common.minutesAgo": "{n} min ago",
   "common.hoursAgo": "{n} h ago",
@@ -30,7 +31,8 @@ const en: Messages = {
   "discover.authors": "Authors (by language)",
   "discover.channels": "Translation collections",
   "channelList.title": "Batch download",
-  "channelList.hint": "Pick a translation collection to download all of its books.",
+  "channelList.hint":
+    "Pick a translation collection to download all of its books.",
   "channelList.empty": "No collections in this language yet",
   "channel.books": "Books included",
   "channel.paraCount": "{n} segments translated",
@@ -38,6 +40,10 @@ const en: Messages = {
   "channel.downloadAll": "Download all",
   "channel.downloading": "Downloading {done}/{total}",
   "channel.translated": "{n}% translated",
+  "channel.filter": "Filter",
+  "channel.filter.all": "All",
+  "channel.emptyFiltered": "No books match this filter",
+  "bookshelf.downloadedBooks": "{n} books downloaded",
   "categoryBrowse.count": " · {n} items",
 
   "chapterList.empty": "No books in this category",
@@ -156,7 +162,6 @@ const en: Messages = {
   "settings.downloads": "Downloads",
   "settings.about": "About / Feedback",
 
-
   "about.version": "Version {version}",
   "about.section.about": "About",
   "about.website": "WikiPali website",
@@ -183,14 +188,16 @@ const en: Messages = {
   "download.resume": "Resume",
   "download.pause": "Pause",
   "download.delete": "Delete",
-  "download.deleteConfirm": "You will no longer be able to read this book offline and will need to download it again.",
+  "download.deleteConfirm":
+    "You will no longer be able to read this book offline and will need to download it again.",
   "download.paraCount": "{done} / {total} paragraphs",
   "download.pickVersionFirst": "Choose a version before downloading.",
 
   "scan.title": "Scan",
   "scan.hint": "Scan a WikiPali page QR code to open the passage",
   "scan.permissionTitle": "Camera permission needed",
-  "scan.permissionBody": "Scanning needs the camera. Please allow it in settings.",
+  "scan.permissionBody":
+    "Scanning needs the camera. Please allow it in settings.",
   "scan.grant": "Allow",
   "scan.unknownTitle": "Not recognised",
   "scan.unknownBody": "This is not a WikiPali link the app can open.",

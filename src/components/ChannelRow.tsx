@@ -11,14 +11,17 @@ import { useT } from "../i18n/I18nContext";
 
 export function ChannelRow({
   channel,
+  subtitle,
   onPress,
 }: {
   channel: ChannelSummary;
+  /** 覆盖副标题（书架「已下载」用「N 本已下载」代替译文段数）。 */
+  subtitle?: string;
   onPress: () => void;
 }) {
   const t = useT();
   const studio = studioLabel(channel.studio);
-  const sub = [studio, t("channel.paraCount", { n: channel.count })]
+  const sub = [studio, subtitle ?? t("channel.paraCount", { n: channel.count })]
     .filter(Boolean)
     .join(" · ");
 

@@ -4,9 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
-import { DownloadControl } from "../components/DownloadControl";
+import { ChannelRow } from "../components/ChannelRow";
 import { bookEntryAt, bookLayerAt } from "../catalog";
-import { channelNames, listDownloads, type DownloadProgress } from "../reading";
+import { channelNames, listDownloads } from "../reading";
+import { fetchChannel, type ChannelSummary } from "../api/channels";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -51,7 +52,8 @@ function formatRelative(
   const hour = 60 * minute;
   const day = 24 * hour;
   if (diff < minute) return t("common.justNow");
-  if (diff < hour) return t("common.minutesAgo", { n: Math.floor(diff / minute) });
+  if (diff < hour)
+    return t("common.minutesAgo", { n: Math.floor(diff / minute) });
   if (diff < day) return t("common.hoursAgo", { n: Math.floor(diff / hour) });
   if (diff < 7 * day) return t("common.daysAgo", { n: Math.floor(diff / day) });
   const d = new Date(ts);
@@ -63,13 +65,10 @@ export function BookshelfScreen() {
   const t = useT();
   const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
-  const [downloads, setDownloads] = useState<DownloadProgress[] | null>(null);
+  // 「已下载」按频道归拢：一个频道一张卡，点进去就是批量下载那张详情页。
+  const [channels, setChannels] = useState<DownloadedChannel[] | null>(null);
   // 版本名不存在记录里 —— uid → name 现查，服务端改了名这里立刻跟上。
   const [names, setNames] = useState<Map<string, string>>(new Map());
-
-  const refreshDownloads = useCallback(() => {
-    listDownloads().then(setDownloads);
-  }, []);
 
   // 每次回到「书架」Tab 时重新加载（读完/下载完返回可即时看到更新）。
   useFocusEffect(
@@ -82,12 +81,8 @@ export function BookshelfScreen() {
           if (alive) setNames(m);
         });
       });
-      listDownloads().then((d) => {
-        if (!alive) return;
-        setDownloads(d);
-        channelNames(d.map((x) => x.channel)).then((m) => {
-          if (alive) setNames((prev) => new Map([...prev, ...m]));
-        });
+      loadDownloadedChannels().then((c) => {
+        if (alive) setChannels(c);
       });
       return () => {
         alive = false;
@@ -96,14 +91,17 @@ export function BookshelfScreen() {
   );
 
   const readingList = records ?? [];
-  const downloadList = downloads ?? [];
+  const channelList = channels ?? [];
 
   /**
    * 列表标题用 level=1 的作品名（`toc`），不是丛书名 —— 一个 book 文件
    * 可能装着多部作品，丛书名对读者没有定位作用。
    */
-  const workTitle = (book: number, paragraph?: number, fallback?: string): string =>
-    bookEntryAt(book, paragraph)?.toc ?? fallback ?? String(book);
+  const workTitle = (
+    book: number,
+    paragraph?: number,
+    fallback?: string,
+  ): string => bookEntryAt(book, paragraph)?.toc ?? fallback ?? String(book);
 
   /** 版本显示名：现查 channels 表；查不到才退回旧记录里的名字快照。 */
   const channelLabel = (uid?: string, legacy?: string): string | undefined =>
@@ -114,7 +112,9 @@ export function BookshelfScreen() {
     const layer = bookLayerAt(book, paragraph);
     if (!layer) return null;
     // 「原文」在对读标签栏里叫原文，在书架这里按书的性质叫「根本」。
-    return t(layer === "mula" ? "layer.root" : (`layer.${layer}` as MessageKey));
+    return t(
+      layer === "mula" ? "layer.root" : (`layer.${layer}` as MessageKey),
+    );
   };
 
   return (
@@ -176,7 +176,9 @@ export function BookshelfScreen() {
                     {sub}
                   </Text>
                 </View>
-                <Text style={styles.rowTime}>{formatRelative(r.updatedAt, t)}</Text>
+                <Text style={styles.rowTime}>
+                  {formatRelative(r.updatedAt, t)}
+                </Text>
                 <Ionicons
                   name="chevron-forward"
                   size={18}
@@ -186,49 +188,21 @@ export function BookshelfScreen() {
             );
           })}
         </View>
-      ) : active === "downloaded" && downloadList.length > 0 ? (
+      ) : active === "downloaded" && channelList.length > 0 ? (
         <View>
-          {downloadList.map((d) => (
-            <View key={`${d.channel}-${d.book}`} style={styles.downloadCard}>
-              <Pressable
-                style={styles.downloadHead}
-                onPress={() =>
-                  navigation.navigate("Reader", {
-                    book: d.book,
-                    title: workTitle(d.book),
-                    channelId: d.channel,
-                  })
-                }
-              >
-                <View style={styles.rowBody}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {workTitle(d.book)}
-                  </Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>
-                    {[layerTag(d.book), channelLabel(d.channel)]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.vermilion}
-                />
-              </Pressable>
-              <DownloadControl
-                book={d.book}
-                channelId={d.channel}
-                colors={{
-                  ink: colors.ink,
-                  inkSoft: colors.inkSoft,
-                  inkFaint: colors.inkFaint,
-                  accent: colors.vermilion,
-                  track: colors.hairline,
-                }}
-                onDeleted={refreshDownloads}
-              />
-            </View>
+          {channelList.map((c) => (
+            <ChannelRow
+              key={c.summary.id}
+              channel={c.summary}
+              subtitle={t("bookshelf.downloadedBooks", { n: c.books })}
+              onPress={() =>
+                navigation.navigate("ChannelDetail", {
+                  uid: c.summary.id,
+                  name: c.summary.name,
+                  mode: "download",
+                })
+              }
+            />
           ))}
         </View>
       ) : (
@@ -240,6 +214,55 @@ export function BookshelfScreen() {
       )}
     </Screen>
   );
+}
+
+interface DownloadedChannel {
+  summary: ChannelSummary;
+  /** 该频道下有缓存的书本数。 */
+  books: number;
+}
+
+/**
+ * 本地下载记录按频道归拢。
+ *
+ * 名字先用本地 `channels` 表（离线也有），再尽量向服务端要工作室头像 ——
+ * 拿不到就退回首字占位，不该因为没网就让「已下载」空着。
+ */
+async function loadDownloadedChannels(): Promise<DownloadedChannel[]> {
+  const rows = (await listDownloads()).filter((d) => d.done > 0);
+  const byChannel = new Map<string, { books: number; updatedAt: number }>();
+  for (const r of rows) {
+    const hit = byChannel.get(r.channel) ?? { books: 0, updatedAt: 0 };
+    byChannel.set(r.channel, {
+      books: hit.books + 1,
+      updatedAt: Math.max(hit.updatedAt, r.updatedAt),
+    });
+  }
+
+  const uids = [...byChannel.keys()];
+  const local = await channelNames(uids);
+  const infos = await Promise.all(
+    uids.map((uid) => fetchChannel(uid).catch(() => null)),
+  );
+
+  return uids
+    .map((uid, i) => {
+      const info = infos[i];
+      const stat = byChannel.get(uid)!;
+      return {
+        summary: {
+          id: uid,
+          name: info?.name ?? local.get(uid) ?? uid,
+          summary: info?.summary ?? null,
+          lang: info?.lang,
+          count: 0,
+          studio: info?.studio,
+        },
+        books: stat.books,
+        updatedAt: stat.updatedAt,
+      };
+    })
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 const styles = StyleSheet.create({
@@ -283,20 +306,6 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flex: 1,
-  },
-  downloadCard: {
-    backgroundColor: colors.paperRaised,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
-  },
-  downloadHead: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   rowTitle: {
     ...type.body,

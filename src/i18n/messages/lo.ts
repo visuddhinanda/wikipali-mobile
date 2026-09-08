@@ -17,7 +17,8 @@ const lo: Messages = {
   "common.ok": "ຮັບຊາບ",
   "common.loadFailed": "ໂຫຼດບໍ່ສຳເລັດ",
   "ai.unavailableTitle": "ຟັງຊັນ AI ຍັງບໍ່ເປີດ",
-  "ai.unavailableBody": "ບໍລິການສົນທະນາຍັງບໍ່ທັນເປີດໃຫ້ບໍລິການ. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
+  "ai.unavailableBody":
+    "ບໍລິການສົນທະນາຍັງບໍ່ທັນເປີດໃຫ້ບໍລິການ. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
   "common.justNow": "ຫາກໍ່ຜ່ານມາ",
   "common.minutesAgo": "{n} ນາທີກ່ອນ",
   "common.hoursAgo": "{n} ຊົ່ວໂມງກ່ອນ",
@@ -38,6 +39,10 @@ const lo: Messages = {
   "channel.downloadAll": "ດາວໂຫລດທັງໝົດ",
   "channel.downloading": "ກຳລັງດາວໂຫລດ {done}/{total}",
   "channel.translated": "ແປແລ້ວ {n}%",
+  "channel.filter": "ຕົວກັ່ນຕອງ",
+  "channel.filter.all": "ທັງໝົດ",
+  "channel.emptyFiltered": "ບໍ່ມີປຶ້ມທີ່ກົງກັບຕົວກັ່ນຕອງນີ້",
+  "bookshelf.downloadedBooks": "ດາວໂຫລດແລ້ວ {n} ຫົວ",
   "categoryBrowse.count": " · {n} ລາຍການ",
 
   "chapterList.empty": "ຍັງບໍ່ມີປຶ້ມໃນໝວດນີ້",
@@ -143,8 +148,7 @@ const lo: Messages = {
   "signIn.failed": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ",
   "signIn.badCredentials": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ",
   "signIn.expired": "ເຊດຊັນໝົດອາຍຸແລ້ວ",
-  "signIn.serverHint":
-    "ປ່ຽນເຊີບເວີໄດ້ທີ່ ຂ້ອຍ → ຕັ້ງຄ່າ → ເຊີບເວີ API",
+  "signIn.serverHint": "ປ່ຽນເຊີບເວີໄດ້ທີ່ ຂ້ອຍ → ຕັ້ງຄ່າ → ເຊີບເວີ API",
 
   "settings.apiServer": "ເຊີບເວີ API",
   "settings.apiServerHint": "ເລືອກເຊີບເວີທີ່ໃຊ້ດຶງຂໍ້ມູນພຣະໄຕປິດົກ.",
@@ -156,7 +160,6 @@ const lo: Messages = {
   "settings.display": "ການສະແດງຜົນ (ຂະໜາດຕົວອັກສອນ / ຮູບແບບສີ)",
   "settings.downloads": "ຈັດການດາວໂຫຼດ",
   "settings.about": "ກ່ຽວກັບ / ແຈ້ງບັນຫາ",
-
 
   "about.version": "ເວີຊັນ {version}",
   "about.section.about": "ກ່ຽວກັບ",
@@ -183,7 +186,8 @@ const lo: Messages = {
   "download.resume": "ສືບຕໍ່",
   "download.pause": "ຢຸດຊົ່ວຄາວ",
   "download.delete": "ລຶບ",
-  "download.deleteConfirm": "ຫຼັງຈາກລຶບແລ້ວຈະອ່ານປຶ້ມນີ້ແບບອອບໄລນ໌ບໍ່ໄດ້ ຕ້ອງດາວໂຫຼດໃໝ່.",
+  "download.deleteConfirm":
+    "ຫຼັງຈາກລຶບແລ້ວຈະອ່ານປຶ້ມນີ້ແບບອອບໄລນ໌ບໍ່ໄດ້ ຕ້ອງດາວໂຫຼດໃໝ່.",
   "download.paraCount": "{done} / {total} ວັກ",
   "download.pickVersionFirst": "ກະລຸນາເລືອກສະບັບກ່ອນດາວໂຫຼດ.",
 

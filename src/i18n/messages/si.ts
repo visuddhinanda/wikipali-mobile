@@ -38,6 +38,10 @@ const si: Messages = {
   "channel.downloadAll": "සියල්ල බාගන්න",
   "channel.downloading": "බාගනිමින් {done}/{total}",
   "channel.translated": "{n}% පරිවර්තනයයි",
+  "channel.filter": "පෙරහන",
+  "channel.filter.all": "සියල්ල",
+  "channel.emptyFiltered": "මෙම පෙරහනට ගැළපෙන පොත් නැත",
+  "bookshelf.downloadedBooks": "පොත් {n} බාගෙන ඇත",
   "categoryBrowse.count": " · අයිතම {n}",
 
   "chapterList.empty": "මෙම වර්ගයේ පොත් නොමැත",
@@ -148,7 +152,8 @@ const si: Messages = {
 
   "settings.apiServer": "API සේවාදායකය",
   "settings.apiServerHint": "පෙළ දත්ත සපයන සේවාදායකය තෝරන්න.",
-  "settings.envOverride": "දැනට EXPO_PUBLIC_API_URL මගින් ප්‍රතිස්ථාපිතයි: {url}",
+  "settings.envOverride":
+    "දැනට EXPO_PUBLIC_API_URL මගින් ප්‍රතිස්ථාපිතයි: {url}",
   "settings.others": "වෙනත් සැකසුම්",
   "settings.language": "භාෂාව",
   "settings.languageHint": "පෙරනිමියෙන් උපාංගයේ භාෂාව අනුගමනය කරයි.",
@@ -156,7 +161,6 @@ const si: Messages = {
   "settings.display": "දර්ශනය (අකුරු ප්‍රමාණය / තේමාව)",
   "settings.downloads": "බාගැනීම්",
   "settings.about": "පිළිබඳව / ප්‍රතිපෝෂණ",
-
 
   "about.version": "අනුවාදය {version}",
   "about.section.about": "පිළිබඳව",
@@ -183,7 +187,8 @@ const si: Messages = {
   "download.resume": "දිගටම",
   "download.pause": "විරාම කරන්න",
   "download.delete": "මකන්න",
-  "download.deleteConfirm": "මකා දැමූ පසු මෙම පොත නොබැඳිව කියවිය නොහැක; නැවත බාගත යුතුය.",
+  "download.deleteConfirm":
+    "මකා දැමූ පසු මෙම පොත නොබැඳිව කියවිය නොහැක; නැවත බාගත යුතුය.",
   "download.paraCount": "ඡේද {done} / {total}",
   "download.pickVersionFirst": "බාගැනීමට පෙර සංස්කරණයක් තෝරන්න.",
 

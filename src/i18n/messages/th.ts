@@ -38,6 +38,10 @@ const th: Messages = {
   "channel.downloadAll": "ดาวน์โหลดทั้งหมด",
   "channel.downloading": "กำลังดาวน์โหลด {done}/{total}",
   "channel.translated": "แปลแล้ว {n}%",
+  "channel.filter": "ตัวกรอง",
+  "channel.filter.all": "ทั้งหมด",
+  "channel.emptyFiltered": "ไม่มีหนังสือที่ตรงกับตัวกรองนี้",
+  "bookshelf.downloadedBooks": "ดาวน์โหลดแล้ว {n} เล่ม",
   "categoryBrowse.count": " · {n} รายการ",
 
   "chapterList.empty": "ยังไม่มีหนังสือในหมวดนี้",
@@ -157,7 +161,6 @@ const th: Messages = {
   "settings.downloads": "การดาวน์โหลด",
   "settings.about": "เกี่ยวกับ / แจ้งปัญหา",
 
-
   "about.version": "เวอร์ชัน {version}",
   "about.section.about": "เกี่ยวกับ",
   "about.website": "เว็บไซต์ WikiPali",
@@ -183,7 +186,8 @@ const th: Messages = {
   "download.resume": "ทำต่อ",
   "download.pause": "หยุดชั่วคราว",
   "download.delete": "ลบ",
-  "download.deleteConfirm": "หลังจากลบแล้วจะอ่านหนังสือเล่มนี้แบบออฟไลน์ไม่ได้ ต้องดาวน์โหลดใหม่",
+  "download.deleteConfirm":
+    "หลังจากลบแล้วจะอ่านหนังสือเล่มนี้แบบออฟไลน์ไม่ได้ ต้องดาวน์โหลดใหม่",
   "download.paraCount": "{done} / {total} ย่อหน้า",
   "download.pickVersionFirst": "กรุณาเลือกฉบับก่อนดาวน์โหลด",
 
