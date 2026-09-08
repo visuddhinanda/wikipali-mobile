@@ -23,7 +23,7 @@ const READING_DB = "reading.db3";
 /** 把 `SQLiteDatabase` 适配成 `SqlRunner`（与 `commentary.ts` 共用的接口）。 */
 export function toRunner(db: SQLite.SQLiteDatabase): SqlRunner {
   return {
-    all: <T = unknown,>(sql: string, params: unknown[]) =>
+    all: <T = unknown>(sql: string, params: unknown[]) =>
       db.getAllAsync<T>(sql, params as SQLite.SQLiteBindValue[]),
   };
 }
@@ -51,14 +51,26 @@ async function ensureTipitakaFile(force = false): Promise<void> {
     throw new Error("离线目录数据库不可用：资源未解包（localUri 为空）");
   }
   const source = new File(asset.localUri);
-  source.copy(target);
+  // expo-file-system 57 的 `copy()` 是**异步**的（另有 `copySync()`）。
+  // 早先这里没 await，46 MB 还在拷，下面就去读大小 —— 快的机器侥幸拷完了，
+  // 慢的机器读到的是「文件还不存在」，于是报「拷贝不完整：nul/45989888」。
+  await source.copy(target);
 
   // release 构建里资源来自 APK 的 res/raw，拷贝失败时只会留下 0 字节文件，
   // SQLite 把它当成空库打开，报的是「no such table」而不是拷贝错误 ——
   // 这里当场比一次大小，把真正的原因暴露出来。
-  if (target.size !== source.size) {
+  // 大小要用新的 File 现查：`target` 手里的可能是拷贝之前的元数据快照。
+  const copiedSize = () => new File(dir, TIPITAKA_DB).size ?? 0;
+  if (copiedSize() !== source.size) {
+    // 再同步拷一次兜底（异步那次可能被某些机型的存储实现吞掉）。
+    const retry = new File(dir, TIPITAKA_DB);
+    if (retry.exists) retry.delete();
+    source.copySync(retry);
+  }
+  if (copiedSize() !== source.size) {
     throw new Error(
-      `离线目录数据库拷贝不完整：${target.size}/${source.size} 字节（${asset.localUri}）`,
+      `离线目录数据库拷贝不完整：${copiedSize()}/${source.size} 字节` +
+        `（源 ${asset.localUri} → ${target.uri}，剩余空间 ${Paths.availableDiskSpace} 字节）`,
     );
   }
 }
@@ -147,7 +159,9 @@ export async function tipitakaRunner(): Promise<SqlRunner> {
  * `mint/api-v13` 的 `export:mobile.heading`）。用户数据在另一个库里，
  * 覆盖不影响缓存与下载。
  */
-export async function refreshTipitakaDbIfStale(bundledGeneratedAt: string): Promise<boolean> {
+export async function refreshTipitakaDbIfStale(
+  bundledGeneratedAt: string,
+): Promise<boolean> {
   const db = await openTipitakaDb();
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM meta WHERE key = 'generated_at'",
