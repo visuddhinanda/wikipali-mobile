@@ -31,6 +31,8 @@ const { buildMonth } = require(`${OUT}calendar/lunar/index.js`);
 const { unVesakDayKey } = require(`${OUT}calendar/lunar/vesak.js`);
 const { zonedNoon } = require(`${OUT}calendar/tz.js`);
 const { flightSunEvents } = require(`${OUT}calendar/flight/events.js`);
+const { countdownTo } = require(`${OUT}calendar/countdown.js`);
+const { nextFestival, vassaProgress } = require(`${OUT}calendar/festivals.js`);
 const { findAirport } = require(`${OUT}calendar/flight/airports.js`);
 
 let failures = 0;
@@ -179,7 +181,60 @@ const CITIES = [
   }
 }
 
-// 7. 飞行：赫尔辛基 → 曼谷（12 月）必定遇到日暮，且事件按时间排序
+// 7. 雨安居进度：入安居次日为第 1 天，出安居当天 left=0，期外为 null
+{
+  const tz = "Asia/Yangon";
+  // 2026 缅历：Waso 满月 7/29（入安居），Thadingyut 满月 10/26（出安居）。
+  const cases = [
+    ["2026-07-29", null, "满月当天还没进安居"],
+    ["2026-07-30", { day: 1 }, "次日是第 1 天"],
+    ["2026-10-26", { left: 0 }, "出安居当天剩 0 天"],
+    ["2026-10-27", null, "出安居次日已出期"],
+  ];
+  for (const [key, expect, why] of cases) {
+    const got = vassaProgress("myanmar", key, tz);
+    const ok =
+      expect === null
+        ? got === null
+        : got !== null &&
+          (expect.day === undefined || got.day === expect.day) &&
+          (expect.left === undefined || got.left === expect.left);
+    check(`雨安居 ${key}：${why}`, ok, JSON.stringify(got));
+  }
+  const mid = vassaProgress("myanmar", "2026-09-10", tz);
+  check(
+    "雨安居期间 day + left = total",
+    mid !== null && mid.day + mid.left === mid.total,
+    JSON.stringify(mid),
+  );
+}
+
+// 8. 下一个节日：一个月以内才报
+{
+  const tz = "Asia/Yangon";
+  const near = nextFestival("myanmar", "2026-10-20", tz);
+  check(
+    "2026-10-20 的下一个节日是 6 天后的自恣日",
+    near?.dayKey === "2026-10-26" && near?.inDays === 6,
+    JSON.stringify(near),
+  );
+  const onDay = nextFestival("myanmar", "2026-10-26", tz);
+  check("节日当天报 0 天", onDay?.inDays === 0, JSON.stringify(onDay));
+  const far = nextFestival("myanmar", "2026-11-05", tz);
+  check("一个月以外不报", far === null, JSON.stringify(far));
+}
+
+// 9. 倒计时：只在两小时以内给
+{
+  const now = new Date("2026-09-10T00:00:00Z");
+  const at = (minutes) => new Date(now.getTime() + minutes * 60000);
+  check("92 分钟后 → 1:32:00", countdownTo(at(92), now) === "1:32:00", String(countdownTo(at(92), now)));
+  check("两小时零一分不给", countdownTo(at(121), now) === null);
+  check("已经过去不给", countdownTo(at(-1), now) === null);
+  check("时刻不存在（极昼）不给", countdownTo(null, now) === null);
+}
+
+// 10. 飞行：赫尔辛基 → 曼谷（12 月）必定遇到日暮，且事件按时间排序
 {
   const leg = {
     from: findAirport("HEL"),
