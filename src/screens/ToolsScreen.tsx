@@ -1,15 +1,26 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
+import type { RootStackParamList } from "../navigation/types";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
-const TOOLS: { icon: IoniconName; title: MessageKey; desc: MessageKey }[] = [
+/** 无参数的工具页；`route` 为空表示该工具还没做，卡片点了没反应。 */
+type ToolRoute = "ScriptConvertor";
+
+const TOOLS: {
+  icon: IoniconName;
+  title: MessageKey;
+  desc: MessageKey;
+  route?: ToolRoute;
+}[] = [
   { icon: "search", title: "tools.dict.title", desc: "tools.dict.desc" },
   {
     icon: "calendar",
@@ -20,11 +31,14 @@ const TOOLS: { icon: IoniconName; title: MessageKey; desc: MessageKey }[] = [
     icon: "swap-horizontal",
     title: "tools.transcode.title",
     desc: "tools.transcode.desc",
+    route: "ScriptConvertor",
   },
 ];
 
 export function ToolsScreen() {
   const t = useT();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // 卡片列数随宽度档变化（DESIGN.md §4.5）。
   const { cardWidth } = useLayout();
   const width = cardWidth(spacing.md);
@@ -36,7 +50,8 @@ export function ToolsScreen() {
           <Pressable
             key={tool.title}
             style={[styles.card, { width }]}
-            onPress={() => undefined}
+            disabled={!tool.route}
+            onPress={() => tool.route && navigation.navigate(tool.route)}
           >
             <View style={styles.cardIcon}>
               <Ionicons name={tool.icon} size={24} color={colors.vermilion} />

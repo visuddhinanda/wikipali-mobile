@@ -30,6 +30,7 @@ import { LanguageSettingsScreen } from "../screens/LanguageSettingsScreen";
 import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
 import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
+import { ScriptConvertorScreen } from "../screens/ScriptConvertorScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
@@ -282,6 +283,11 @@ function ToolsStack() {
         name="Tools"
         component={ToolsScreen}
         options={{ title: t("nav.tools") }}
+      />
+      <Stack.Screen
+        name="ScriptConvertor"
+        component={ScriptConvertorScreen}
+        options={{ title: t("tools.script.title") }}
       />
     </Stack.Navigator>
   );
