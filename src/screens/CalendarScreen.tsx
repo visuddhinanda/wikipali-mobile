@@ -1,14 +1,15 @@
 /**
  * 工具 → 佛教日历（月视图）。
  *
- * 设计见 `docs/buddhist-calendar.md` 与界面稿。三条主要决定：
- * - **切历法不切页面**：chip 只换格内的阴历文字与月相，公历骨架不动，读者能
- *   直接看出缅、泰、锡兰对同一个满月的取日差异；
- * - **格内三行**：公历日 · 月相图标（只在四相日出现）· 阴历小字；
- * - **三时刻常驻底卡**：不点进详情也能看到今日明相 / 日中 / 日暮。
+ * 设计见 `docs/buddhist-calendar.md`。几条主要决定：
+ * - **历法是一张卡，不是一排 chip**：五套历法要连着一句出处才说得清楚，
+ *   一排 chip 只放得下名字。卡上写当前选的是哪套，点进去挑（屏 5）。
+ * - **格内三行**：公历日 · 月相图标（只在四相日出现）· 阴历小字。
+ * - **三时刻常驻底卡**，临近两小时内给倒计时 —— 明相与日落是持戒的判据，
+ *   「还有多久」比「几点」更要紧。
  */
-import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -18,33 +19,18 @@ import { colors, radius, spacing, type } from "../theme";
 import { useT, useI18n } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 import type { RootStackParamList } from "../navigation/types";
-import {
-  CALENDAR_SYSTEMS,
-  defaultSystemFor,
-  isSystemAvailable,
-  type CalendarSystem,
-} from "../calendar/lunar";
-import {
-  useCalendarSystem,
-  useLunarMonth,
-  usePlace,
-  useSunTimes,
-} from "../calendar/useCalendar";
+import { defaultSystemFor, type CalendarSystem } from "../calendar/lunar";
+import { useCalendarSystem, useLunarMonth, usePlace, useSunTimes } from "../calendar/useCalendar";
 import { daysInMonth, formatLocalTime, makeDayKey, toLocalParts } from "../calendar/tz";
 import {
+  PALI_TIME_NAMES,
   PALI_WEEKDAYS,
   WEEKDAY_KEYS,
   dayLabelOf,
   eraLineOf,
 } from "../calendar/format";
-
-const SYSTEM_KEYS: Record<CalendarSystem, MessageKey> = {
-  astro: "calendar.system.astro",
-  myanmar: "calendar.system.myanmar",
-  srilanka: "calendar.system.srilanka",
-  thai: "calendar.system.thai",
-  chinese: "calendar.system.chinese",
-};
+import { countdownTo } from "../calendar/countdown";
+import { SYSTEM_TITLE_KEYS, SYSTEM_DESC_KEYS } from "../calendar/systems";
 
 /** 月份标题按界面语言写（中文「2026年9月」、英文「September 2026」）。 */
 function monthTitle(locale: string, year: number, month: number): string {
@@ -67,17 +53,21 @@ export function CalendarScreen() {
   const today = useMemo(() => toLocalParts(new Date(), place.place.timeZone), [
     place.place.timeZone,
   ]);
-  const [system, setSystem] = useCalendarSystem(defaultSystemFor(locale));
+  const [system] = useCalendarSystem(defaultSystemFor(locale));
   const [cursor, setCursor] = useState({ year: today.year, month: today.month });
   const [selected, setSelected] = useState(today.day);
 
-  const month = useLunarMonth(
-    system,
-    cursor.year,
-    cursor.month,
-    place.place.timeZone,
-  );
+  // 倒计时要每秒重画；只有当天在看时才走这个计时器。
+  const [now, setNow] = useState(() => new Date());
+  const showingToday =
+    cursor.year === today.year && cursor.month === today.month && selected === today.day;
+  useEffect(() => {
+    if (!showingToday) return;
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [showingToday]);
 
+  const month = useLunarMonth(system, cursor.year, cursor.month, place.place.timeZone);
   const selectedKey = makeDayKey(cursor.year, cursor.month, selected);
   const selectedDay = month.get(selectedKey);
   const times = useSunTimes(place.place, cursor.year, cursor.month, selected);
@@ -99,7 +89,17 @@ export function CalendarScreen() {
     setSelected(today.day);
   };
 
-  // 首格是当月 1 号的星期几（周日起排）。
+  // 「今天」放在标题栏右侧，任何时候都能一键回来。
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={goToday} hitSlop={8}>
+          <Text style={styles.headerAction}>{t("calendar.today")}</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, t, today.year, today.month, today.day]);
+
   const leading = new Date(Date.UTC(cursor.year, cursor.month - 1, 1)).getUTCDay();
   const total = daysInMonth(cursor.year, cursor.month);
   const cells: (number | null)[] = [
@@ -108,35 +108,38 @@ export function CalendarScreen() {
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
+  const timeBoxes: { key: MessageKey; pali: string; at: Date | null }[] = [
+    { key: "calendar.times.aruna", pali: PALI_TIME_NAMES.aruna, at: times.aruna },
+    { key: "calendar.times.noon", pali: PALI_TIME_NAMES.noon, at: times.noon },
+    { key: "calendar.times.sunset", pali: PALI_TIME_NAMES.sunset, at: times.sunset },
+  ];
+
   return (
     <Screen contentStyle={styles.content}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-        {CALENDAR_SYSTEMS.map((s) => {
-          const available = isSystemAvailable(s);
-          const on = s === system;
-          return (
-            <Pressable
-              key={s}
-              disabled={!available}
-              onPress={() => setSystem(s)}
-              style={[styles.chip, on && styles.chipOn, !available && styles.chipOff]}
-            >
-              <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                {t(SYSTEM_KEYS[s])}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <Pressable
+        style={styles.systemCard}
+        onPress={() => navigation.navigate("CalendarSystem")}
+      >
+        <View style={styles.systemText}>
+          <Text style={styles.systemName}>{t(SYSTEM_TITLE_KEYS[system])}</Text>
+          <Text style={styles.systemDesc} numberOfLines={1}>
+            {t(SYSTEM_DESC_KEYS[system])}
+          </Text>
+          <Text style={styles.systemHint}>{t("calendar.systemHint")}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
+      </Pressable>
 
       <View style={styles.monthBar}>
         <Pressable onPress={() => step(-1)} hitSlop={12}>
           <Text style={styles.arrow}>‹</Text>
         </Pressable>
-        <Pressable onPress={goToday}>
-          <Text style={styles.monthTitle}>{monthTitle(locale, cursor.year, cursor.month)}</Text>
+        <View>
+          <Text style={styles.monthTitle}>
+            {monthTitle(locale, cursor.year, cursor.month)}
+          </Text>
           <Text style={styles.monthSub}>{eraLineOf(selectedDay, t, locale)}</Text>
-        </Pressable>
+        </View>
         <Pressable onPress={() => step(1)} hitSlop={12}>
           <Text style={styles.arrow}>›</Text>
         </Pressable>
@@ -162,28 +165,32 @@ export function CalendarScreen() {
             cursor.month === today.month &&
             cursor.year === today.year;
           return (
-            <Pressable
-              key={day}
-              onPress={() => setSelected(day)}
-              style={[
-                styles.cell,
-                isToday && styles.cellToday,
-                day === selected && styles.cellSelected,
-              ]}
-            >
-              <Text
-                style={[styles.cellDay, lunar?.isUposatha && styles.cellDayUposatha]}
+            <Pressable key={day} onPress={() => setSelected(day)} style={styles.cell}>
+              {/*
+                选中框画在**内层**：直接给格子加 borderWidth 会把 1px 的分隔线
+                吃掉，下缘看着像断了。这里让边框自己占一个略小的盒子。
+              */}
+              <View
+                style={[
+                  styles.cellInner,
+                  isToday && styles.cellToday,
+                  day === selected && styles.cellSelected,
+                ]}
               >
-                {day}
-              </Text>
-              {lunar && lunar.phase !== "none" ? (
-                <MoonIcon angle={lunar.phaseAngle} size={15} />
-              ) : (
-                <View style={styles.moonSpacer} />
-              )}
-              <Text style={styles.cellLunar} numberOfLines={1}>
-                {dayLabelOf(lunar, t, locale)}
-              </Text>
+                <Text
+                  style={[styles.cellDay, lunar?.isUposatha && styles.cellDayUposatha]}
+                >
+                  {day}
+                </Text>
+                {lunar && lunar.phase !== "none" ? (
+                  <MoonIcon angle={lunar.phaseAngle} size={15} />
+                ) : (
+                  <View style={styles.moonSpacer} />
+                )}
+                <Text style={styles.cellLunar} numberOfLines={1}>
+                  {dayLabelOf(lunar, t, locale)}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -202,10 +209,7 @@ export function CalendarScreen() {
         <View style={styles.dayHead}>
           {selectedDay ? <MoonIcon angle={selectedDay.phaseAngle} size={34} /> : null}
           <View style={styles.dayHeadText}>
-            <Text style={styles.dayTitle}>
-              {cursor.year}-{String(cursor.month).padStart(2, "0")}-
-              {String(selected).padStart(2, "0")}
-            </Text>
+            <Text style={styles.dayTitle}>{selectedKey}</Text>
             <Text style={styles.dayLunar}>
               {[eraLineOf(selectedDay, t, locale), dayLabelOf(selectedDay, t, locale)]
                 .filter(Boolean)
@@ -215,7 +219,6 @@ export function CalendarScreen() {
           {selectedDay?.isUposatha ? (
             <Text style={styles.tagUposatha}>{t("calendar.uposatha")}</Text>
           ) : null}
-          {/* 卡片整块可点进详情，右上角给个 › 说明这一点。 */}
           <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
         </View>
 
@@ -236,18 +239,21 @@ export function CalendarScreen() {
         ) : null}
 
         <View style={styles.times}>
-          {[
-            ["calendar.times.aruna", times.aruna],
-            ["calendar.times.noon", times.noon],
-            ["calendar.times.dusk", times.dusk],
-          ].map(([key, value]) => (
-            <View key={key as string} style={styles.timeBox}>
-              <Text style={styles.timeLabel}>{t(key as MessageKey)}</Text>
-              <Text style={styles.timeValue}>
-                {formatLocalTime(value as Date | null, place.place.timeZone)}
-              </Text>
-            </View>
-          ))}
+          {timeBoxes.map(({ key, pali, at }) => {
+            const left = showingToday ? countdownTo(at, now) : null;
+            return (
+              <View key={key} style={styles.timeBox}>
+                <Text style={styles.timePali} numberOfLines={1}>
+                  {pali}
+                </Text>
+                <Text style={styles.timeLabel}>{t(key)}</Text>
+                <Text style={styles.timeValue}>
+                  {formatLocalTime(at, place.place.timeZone)}
+                </Text>
+                {left ? <Text style={styles.timeCountdown}>{left}</Text> : null}
+              </View>
+            );
+          })}
         </View>
 
         <Pressable
@@ -273,20 +279,22 @@ export function CalendarScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingTop: spacing.md, paddingBottom: spacing.xl },
-  chips: { flexGrow: 0, marginBottom: spacing.sm },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+  headerAction: { ...type.body, color: colors.vermilion },
+  systemCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     backgroundColor: colors.paperRaised,
-    marginRight: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  chipOn: { backgroundColor: colors.vermilion, borderColor: colors.vermilion },
-  chipOff: { opacity: 0.4 },
-  chipText: { ...type.small, color: colors.inkSoft },
-  chipTextOn: { color: colors.paperRaised, fontWeight: "500" },
+  systemText: { flex: 1 },
+  systemName: { ...type.body, fontWeight: "700" },
+  systemDesc: { ...type.small, color: colors.inkSoft, marginTop: 1 },
+  systemHint: { fontSize: 11, color: colors.inkFaint, marginTop: 3 },
   monthBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -308,20 +316,26 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap" },
   cell: {
     width: `${100 / 7}%`,
-    minHeight: 56,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 5,
-    paddingBottom: 5,
+    paddingVertical: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.hairline,
   },
+  cellInner: {
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    paddingTop: 4,
+    paddingBottom: 3,
+    borderWidth: 2,
+    borderColor: "transparent",
+    borderRadius: radius.sm,
+  },
   cellToday: { backgroundColor: colors.paperSunken },
-  cellSelected: { borderWidth: 2, borderColor: colors.vermilion, borderRadius: radius.sm },
+  cellSelected: { borderColor: colors.vermilion },
   cellDay: { fontSize: 14, lineHeight: 17, color: colors.ink, fontVariant: ["tabular-nums"] },
   cellDayUposatha: { color: colors.vermilion, fontWeight: "700" },
-  moonSpacer: { height: 15, width: 15 },
   cellLunar: { fontSize: 9, lineHeight: 12, color: colors.inkFaint },
+  moonSpacer: { height: 15, width: 15 },
   dayCard: {
     marginTop: spacing.md,
     backgroundColor: colors.paperRaised,
@@ -360,10 +374,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperSunken,
     borderRadius: radius.sm,
     paddingVertical: spacing.sm,
+    paddingHorizontal: 2,
     alignItems: "center",
   },
+  timePali: { fontSize: 8.5, color: colors.inkFaint, fontStyle: "italic" },
   timeLabel: { fontSize: 10, color: colors.inkFaint },
   timeValue: { fontSize: 16, color: colors.ink, fontVariant: ["tabular-nums"] },
+  timeCountdown: {
+    fontSize: 10,
+    color: colors.vermilion,
+    fontVariant: ["tabular-nums"],
+    marginTop: 1,
+  },
   sourceRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
   sourceText: { ...type.small, color: colors.inkFaint, flex: 1 },
 });
