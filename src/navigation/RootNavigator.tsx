@@ -31,6 +31,11 @@ import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
 import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 import { ScriptConvertorScreen } from "../screens/ScriptConvertorScreen";
+import { CalendarScreen } from "../screens/CalendarScreen";
+import { CalendarDayScreen } from "../screens/CalendarDayScreen";
+import { CalendarLocationScreen } from "../screens/CalendarLocationScreen";
+import { CalendarSystemScreen } from "../screens/CalendarSystemScreen";
+import { FlightSunScreen } from "../screens/FlightSunScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
@@ -288,6 +293,33 @@ function ToolsStack() {
         name="ScriptConvertor"
         component={ScriptConvertorScreen}
         options={{ title: t("tools.script.title") }}
+      />
+      <Stack.Screen
+        name="Calendar"
+        component={CalendarScreen}
+        options={{ title: t("calendar.title") }}
+      />
+      <Stack.Screen
+        name="CalendarDay"
+        component={CalendarDayScreen}
+        options={({ route }) => ({
+          title: `${route.params.year}-${String(route.params.month).padStart(2, "0")}-${String(route.params.day).padStart(2, "0")}`,
+        })}
+      />
+      <Stack.Screen
+        name="CalendarLocation"
+        component={CalendarLocationScreen}
+        options={{ title: t("calendar.location.title") }}
+      />
+      <Stack.Screen
+        name="CalendarSystem"
+        component={CalendarSystemScreen}
+        options={{ title: t("calendar.systemTitle") }}
+      />
+      <Stack.Screen
+        name="FlightSun"
+        component={FlightSunScreen}
+        options={{ title: t("calendar.flight.title") }}
       />
     </Stack.Navigator>
   );

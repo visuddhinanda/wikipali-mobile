@@ -13,7 +13,7 @@ import type { RootStackParamList } from "../navigation/types";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
 /** 无参数的工具页；`route` 为空表示该工具还没做，卡片点了没反应。 */
-type ToolRoute = "ScriptConvertor";
+type ToolRoute = "ScriptConvertor" | "Calendar" | "FlightSun";
 
 const TOOLS: {
   icon: IoniconName;
@@ -26,6 +26,13 @@ const TOOLS: {
     icon: "calendar",
     title: "tools.calendar.title",
     desc: "tools.calendar.desc",
+    route: "Calendar",
+  },
+  {
+    icon: "airplane",
+    title: "calendar.flight.title",
+    desc: "calendar.flight.events",
+    route: "FlightSun",
   },
   {
     icon: "swap-horizontal",

@@ -81,6 +81,20 @@ export type RootStackParamList = {
   Scan: undefined;
   /** 编码转换（工具 → 巴利文字体互转）。 */
   ScriptConvertor: undefined;
+  /** 佛教日历（工具 → 月视图）。 */
+  Calendar: undefined;
+  /** 某一天的三时刻与五历对照。 */
+  CalendarDay: {
+    year: number;
+    month: number;
+    day: number;
+  };
+  /** 观察地：定位失败时搜城镇。 */
+  CalendarLocation: undefined;
+  /** 历法选择（各历法的出处与适用说明）。 */
+  CalendarSystem: undefined;
+  /** 飞行计算：航班号 → 途中太阳事件。 */
+  FlightSun: undefined;
   /** 布局调试页（仅 __DEV__ 从「我」进入）。 */
   DebugLayout: undefined;
 };
