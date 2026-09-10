@@ -13,7 +13,9 @@ import { colors, radius, spacing, type } from "../theme";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 import {
-  NoFlightProviderError,
+  FlightNotFoundError,
+  LookupUnavailableError,
+  OfflineError,
   lookupFlight,
   manualSchedule,
   type FlightSchedule,
@@ -70,12 +72,20 @@ export function FlightSunScreen() {
       setSchedule(await lookupFlight(number, date));
     } catch (e) {
       setSchedule(null);
-      setError(
-        e instanceof NoFlightProviderError
-          ? "calendar.flight.noProvider"
-          : "calendar.flight.unknownAirport",
-      );
-      setManual(true);
+      // 三种失败的说法完全不同：没网是「请手填」，查不到是「核对号码」，
+      // 服务不可用是我们这边的问题，不该让用户以为是他输错了。
+      if (e instanceof OfflineError) {
+        setError("calendar.flight.offline");
+        setManual(true);
+      } else if (e instanceof FlightNotFoundError) {
+        setError("calendar.flight.notFound");
+      } else if (e instanceof LookupUnavailableError) {
+        setError("calendar.flight.serviceDown");
+        setManual(true);
+      } else {
+        setError("calendar.flight.serviceDown");
+        setManual(true);
+      }
     } finally {
       setBusy(false);
     }
