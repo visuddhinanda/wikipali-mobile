@@ -11,8 +11,8 @@ import { findAirport, type Airport } from "./airports";
 
 const KEY_STORAGE = "@wikipali/flight-api-key";
 
-/** 构建期注入的 key（`.env` 的 `EXPO_PUBLIC_FLIGHT_API_KEY`），不进仓库。 */
-const ENV_FLIGHT_KEY = process.env.EXPO_PUBLIC_FLIGHT_API_KEY?.trim() ?? "";
+/** 构建期注入的 key（`.env` 的 `EXPO_PUBLIC_AERODATABOX_API_KEY`），不进仓库。 */
+const ENV_FLIGHT_KEY = process.env.EXPO_PUBLIC_AERODATABOX_API_KEY?.trim() ?? "";
 
 export interface FlightSchedule {
   flightNumber: string;
@@ -87,7 +87,7 @@ async function isOnline(): Promise<boolean> {
  *
  * **联网就查在线实时计划**，联不上才退到手填 —— 判据是网络，不是有没有配好
  * 服务：用户不该为了看一眼航班先去设置页填 key。key 的来源依次是构建期
- * 的 `EXPO_PUBLIC_FLIGHT_API_KEY` 与本地设置。
+ * 的 `EXPO_PUBLIC_AERODATABOX_API_KEY` 与本地设置。
  *
  * 三种失败分开抛，UI 的说法完全不同：没网、查不到、服务不可用。
  */

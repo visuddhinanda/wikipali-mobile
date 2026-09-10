@@ -256,7 +256,14 @@ requestForegroundPermissionsAsync()
 后者被墙或被 DNS 污染时，会把「有网但查不了航班」误报成「没网」，用户白等一次手填。
 只要有响应就算通，404 也算 —— 要的是「包能出去」。
 
-key 依次取自构建期的 `EXPO_PUBLIC_FLIGHT_API_KEY` 与本地设置，不硬编码进包。
+key 依次取自构建期的 `EXPO_PUBLIC_AERODATABOX_API_KEY`（`.env`，不进仓库）与本地设置。
+
+⚠️ **RapidAPI 的 key 要对每个 API 单独订阅**：账号里有 key 不等于能调 AeroDataBox，
+没订阅时返回 `403 You are not subscribed to this API`。到
+<https://rapidapi.com/aedbx-aedbx/api/aerodatabox> 点 Subscribe（Basic 免费档 600 units/月）。
+
+**上真机之前先跑 `node scripts/check-flight-api.mjs UL308 2026-09-11`** —— 它照抄了
+`lookupFlight()` 的错误分类，结论和真机一致，省掉一轮装包与点屏幕。
 **「手填起降机场与时刻」的入口始终在** —— 计算部分完全离线可用。
 
 机场坐标不查 API，用内置的 **OurAirports** 机场表（公有领域，按 IATA 码索引，约 7 000 条大中型机场 < 300 KB）。
@@ -350,7 +357,19 @@ export interface LunarDay {
 | 时区 | `tz-lookup` 或城镇表自带 | |
 | 农历/缅历/泰历 | 自实现 / 移植 | 见 §2 |
 
-### 6.1 几条界面约定
+### 6.1 常用地点
+
+一个人常算的地点就那么几个（自己的寺院、常去挂单的道场、家人所在的城市），
+每次重新搜一遍太笨。位置页顶部放常用地点清单，搜索结果行右侧的 `+` 收藏，
+点行本身才是「用这个地点」—— 两件事分开，别让人误收藏。
+
+按 `lat,lon`（三位小数）去重，上限 12 个，存 AsyncStorage。收藏时丢掉 GPS 的
+`accuracy`：那是一次性的测量值，存进常用没有意义。
+
+页脚常驻一句「离线城镇表 · 约 3.4 万个城镇（人口 1.5 万以上），随包内置，无网可用」，
+数字取自 `CITY_COUNT`，`scripts/check-calendar.mjs` 对着真表校验，改了数据源不会忘记同步。
+
+### 6.2 几条界面约定
 
 | 约定 | 为什么 |
 |---|---|
