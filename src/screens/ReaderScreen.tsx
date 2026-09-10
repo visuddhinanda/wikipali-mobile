@@ -22,8 +22,15 @@ import { ReaderLayerPane } from "./ReaderLayerPane";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import { readerColors, type ReaderChrome } from "../theme/reader";
-import { useT } from "../i18n/I18nContext";
+import { useI18n, useT } from "../i18n/I18nContext";
 import {
+  TARGET_LABELS,
+  TARGET_SCRIPTS,
+  resolvePaliScript,
+  type PaliScriptPreference,
+} from "../pali/script";
+import {
+  DEFAULT_READER_SETTINGS,
   FONT_OPTIONS,
   loadReaderSettings,
   saveReaderSettings,
@@ -67,10 +74,9 @@ export function ReaderScreen({ route, navigation }: Props) {
   const t = useT();
   const { book, paragraph, title, channelId, channelName } = route.params;
 
-  const [settings, setSettings] = useState<ReaderSettings>({
-    theme: "light",
-    fontSize: "md",
-  });
+  const [settings, setSettings] = useState<ReaderSettings>(
+    DEFAULT_READER_SETTINGS,
+  );
   useEffect(() => {
     loadReaderSettings().then(setSettings);
   }, []);
@@ -515,8 +521,71 @@ function SettingsSheet({
             );
           })}
         </View>
+
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.paliScript")}
+        </Text>
+        <PaliScriptPicker
+          value={settings.paliScript}
+          c={c}
+          onChange={(paliScript) => onChange({ ...settings, paliScript })}
+        />
       </View>
     </Modal>
+  );
+}
+
+/**
+ * 巴利字体选择。
+ *
+ * 「跟随语言」排在最前面且是默认值 —— 斯里兰卡 / 缅甸 / 泰国的界面语言各自
+ * 对应本国文字，其余语言用罗马巴利（见 `src/pali/script/preference.ts`）；
+ * 它的胶囊上直接标出当前会落到哪种字体，免得用户要试一下才知道。
+ */
+function PaliScriptPicker({
+  value,
+  c,
+  onChange,
+}: {
+  value: PaliScriptPreference;
+  c: ReaderChrome;
+  onChange: (v: PaliScriptPreference) => void;
+}) {
+  const t = useT();
+  const { locale } = useI18n();
+  const auto = resolvePaliScript("auto", locale);
+
+  const options: { id: PaliScriptPreference; label: string }[] = [
+    { id: "auto", label: `${t("script.auto")} · ${TARGET_LABELS[auto].name}` },
+    ...TARGET_SCRIPTS.map((id) => {
+      const l = TARGET_LABELS[id];
+      return {
+        id: id as PaliScriptPreference,
+        label: l.noteKey ? `${l.name}（${t(l.noteKey)}）` : l.name,
+      };
+    }),
+  ];
+
+  return (
+    <View style={styles.fontRow}>
+      {options.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <Pressable
+            key={opt.id}
+            style={[
+              styles.fontPill,
+              { backgroundColor: active ? c.vermilion : c.paperSunken },
+            ]}
+            onPress={() => onChange(opt.id)}
+          >
+            <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 

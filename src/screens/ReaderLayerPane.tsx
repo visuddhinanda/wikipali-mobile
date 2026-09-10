@@ -48,7 +48,13 @@ import {
   widthClassOf,
 } from "../theme/breakpoints";
 import { readerColors, type ReaderChrome } from "../theme/reader";
-import { useT } from "../i18n/I18nContext";
+import { useI18n, useT } from "../i18n/I18nContext";
+import {
+  convertPaliHtml,
+  convertScript,
+  resolvePaliScript,
+  scriptToRoman,
+} from "../pali/script";
 import { fontSizePx, type ReaderSettings } from "../settings/reader";
 import type { RootStackParamList } from "../navigation/types";
 import { ensureAiAvailable } from "../ai/availability";
@@ -124,7 +130,16 @@ function buildReaderHtml(
     background: var(--paper);
     color: var(--ink);
     overflow-wrap: break-word;
-    font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
+    /*
+     * 巴利可以转成缅甸文 / 泰文 / 锡兰文 / 天城体显示（见 src/pali/script），
+     * 这些字符 Georgia 里没有，字体栈要把系统的 Noto 各字重带上，
+     * 否则落到豆腐块。
+     */
+    font-family: Georgia, "Songti SC", "Noto Serif SC",
+      "Noto Sans Myanmar", "Noto Serif Myanmar", "Padauk",
+      "Noto Sans Sinhala", "Noto Serif Sinhala",
+      "Noto Sans Thai", "Noto Serif Thai",
+      "Noto Sans Tai Tham", "Noto Sans Telugu", serif;
     font-size: var(--base);
     line-height: 1.95;
     -webkit-text-size-adjust: 100%;
@@ -480,11 +495,28 @@ export function ReaderLayerPane({
     return Math.max(280, Math.min(cap, usable));
   }, [readerWidth, sidenoteMode]);
 
+  // 巴利字体：跟随界面语言或用户手工指定（见 src/pali/script/preference.ts）
+  const { locale } = useI18n();
+  const paliScript = resolvePaliScript(settings.paliScript, locale);
+
+  /**
+   * 正文只转服务端标了 `class='original'` 的段落；标题（章节 toc）本身就是
+   * 巴利，整条转。译文频道一个字都不动。
+   */
+  const shown = useMemo<ReaderDoc | null>(() => {
+    if (!doc || paliScript === "roman") return doc;
+    return {
+      ...doc,
+      title: convertScript(doc.title, { from: "roman", to: paliScript }),
+      body: convertPaliHtml(doc.body, { to: paliScript }),
+    };
+  }, [doc, paliScript]);
+
   const html = useMemo(
     () =>
-      doc
+      shown
         ? buildReaderHtml(
-            { ...doc, subtitle: headerSubtitle },
+            { ...shown, subtitle: headerSubtitle },
             {
               fontSizePx: fontSizePx(settings.fontSize),
               dark: isDark,
@@ -495,7 +527,7 @@ export function ReaderLayerPane({
           )
         : "",
     [
-      doc,
+      shown,
       headerSubtitle,
       settings.fontSize,
       isDark,
@@ -582,6 +614,9 @@ export function ReaderLayerPane({
     }
 
     // 查词 / 提问都落到「探索」对话，带上章节坐标当系统提示词。
+    // 屏幕上可能是缅文/泰文，但送给模型的必须是罗马巴利 —— 复制走的是用户
+    // 看到的样子，查词问的是词本身。
+    const pali = scriptToRoman(text, paliScript);
     if (!(await ensureAiAvailable(t))) return;
     const common = {
       passageRef: { book, paragraph: p, title: toc },
@@ -591,13 +626,13 @@ export function ReaderLayerPane({
       // 查词是个完整的问题，直接替用户发出去。
       navigation.navigate("NewChat", {
         ...common,
-        seedText: t("chat.lookupSeed", { text }),
+        seedText: t("chat.lookupSeed", { text: pali }),
       });
     } else {
       // 提问只预填开头，问题本身让用户自己写完再发。
       navigation.navigate("NewChat", {
         ...common,
-        draftText: t("chat.askDraft", { text }),
+        draftText: t("chat.askDraft", { text: pali }),
       });
     }
   };

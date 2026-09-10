@@ -6,6 +6,10 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { MessageKey } from "../i18n";
+import {
+  TARGET_SCRIPTS,
+  type PaliScriptPreference,
+} from "../pali/script";
 
 export type ReaderTheme = "light" | "dark";
 export type ReaderFontSize = "sm" | "md" | "lg" | "xl";
@@ -35,16 +39,23 @@ export function fontSizePx(id: ReaderFontSize): number {
 export interface ReaderSettings {
   theme: ReaderTheme;
   fontSize: ReaderFontSize;
+  /** 巴利原文用哪种字体显示；`auto` = 跟随界面语言（见 `src/pali/script`）。 */
+  paliScript: PaliScriptPreference;
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   theme: "light",
   fontSize: "md",
+  paliScript: "auto",
 };
 
 const KEY = "@wikipali/reader-settings";
 
 const FONT_IDS: readonly ReaderFontSize[] = ["sm", "md", "lg", "xl"];
+
+function isPaliScript(v: unknown): v is PaliScriptPreference {
+  return v === "auto" || TARGET_SCRIPTS.includes(v as never);
+}
 
 export async function loadReaderSettings(): Promise<ReaderSettings> {
   try {
@@ -56,6 +67,7 @@ export async function loadReaderSettings(): Promise<ReaderSettings> {
       fontSize: FONT_IDS.includes(parsed.fontSize as ReaderFontSize)
         ? (parsed.fontSize as ReaderFontSize)
         : "md",
+      paliScript: isPaliScript(parsed.paliScript) ? parsed.paliScript : "auto",
     };
   } catch {
     return DEFAULT_READER_SETTINGS;
