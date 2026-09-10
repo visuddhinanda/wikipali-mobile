@@ -305,6 +305,10 @@ const lo: Messages = {
   "calendar.flight.notFound": "ບໍ່ພົບຖ້ຽວບິນນີ້",
   "calendar.flight.serviceDown": "ບໍລິການຄົ້ນຫາຖ້ຽວບິນໃຊ້ບໍ່ໄດ້",
   "calendar.times.duskAdjusted": "ຄ່ຳ (ແກ້ໄຂແລ້ວ)",
+  "calendar.location.favorites": "ສະຖານທີ່ທີ່ບັນທຶກ",
+  "calendar.location.addFavorite": "ບັນທຶກສະຖານທີ່ນີ້",
+  "calendar.location.favoriteHint": "ແຕະ + ທີ່ຜົນຄົ້ນຫາເພື່ອບັນທຶກ",
+  "calendar.location.offlineNote": "ຕາຕະລາງເມືອງອອບໄລນ໌ · ປະມານ {n} ໝື່ນເມືອງ (ປະຊາກອນ 15,000 ຂຶ້ນໄປ), ມາກັບແອັບ, ບໍ່ຕ້ອງໃຊ້ເນັດ.",
 };
 
 export default lo;

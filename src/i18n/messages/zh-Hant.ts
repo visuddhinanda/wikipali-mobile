@@ -301,6 +301,10 @@ const zhHant: Messages = {
   "calendar.flight.notFound": "查不到這個航班，請核對航班號與日期，或手填起降。",
   "calendar.flight.serviceDown": "航班查詢服務暫時不可用，請手填起降。",
   "calendar.times.duskAdjusted": "實際日暮",
+  "calendar.location.favorites": "常用地點",
+  "calendar.location.addFavorite": "加入常用",
+  "calendar.location.favoriteHint": "搜到的城鎮點右側 + 可以加入常用",
+  "calendar.location.offlineNote": "離線城鎮表 · 約 {n} 萬個城鎮（人口 1.5 萬以上），隨包內置，無網可用。",
 };
 
 export default zhHant;

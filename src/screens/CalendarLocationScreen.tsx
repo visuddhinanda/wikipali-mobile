@@ -3,16 +3,25 @@
  *
  * 定位失败不是弹一个错误框，而是直接给一个能立刻用起来的城镇搜索：
  * 提示语说明「能做什么」和「误差多大」，不写权限错误码。
+ *
+ * 常用地点摆在最上面 —— 一个人常算的地点就那么几个（自己的寺院、常去挂单的
+ * 道场、家人所在的城市），每次重新搜一遍太笨。
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import { useI18n, useT } from "../i18n/I18nContext";
-import { aliasForLocale, searchCities, type City } from "../calendar/location/cities";
-import { placeFromCity } from "../calendar/location/place";
+import { CITY_COUNT, aliasForLocale, searchCities, type City } from "../calendar/location/cities";
+import { placeFromCity, type Place } from "../calendar/location/place";
+import {
+  addFavorite,
+  isSamePlace,
+  loadFavorites,
+  removeFavorite,
+} from "../calendar/location/favorites";
 import { usePlace } from "../calendar/useCalendar";
 
 export function CalendarLocationScreen() {
@@ -21,11 +30,26 @@ export function CalendarLocationScreen() {
   const navigation = useNavigation();
   const { place, busy, failed, gpsAvailable, locateNow, choose } = usePlace();
   const [query, setQuery] = useState("");
+  const [favorites, setFavorites] = useState<Place[]>([]);
+
+  useEffect(() => {
+    void loadFavorites().then(setFavorites);
+  }, []);
 
   const results = useMemo<City[]>(
     () => (query.trim().length >= 1 ? searchCities(query, 20) : []),
     [query],
   );
+
+  const use = useCallback(
+    async (next: Place) => {
+      await choose(next);
+      navigation.goBack();
+    },
+    [choose, navigation],
+  );
+
+  const currentIsSaved = favorites.some((p) => isSamePlace(p, place));
 
   return (
     <Screen contentStyle={styles.content}>
@@ -49,12 +73,56 @@ export function CalendarLocationScreen() {
           size={14}
           color={place.source === "gps" ? colors.success : colors.gold}
         />
-        <Text style={styles.currentText}>
+        <Text style={styles.currentText} numberOfLines={1}>
           {place.name} · {place.lat.toFixed(3)}, {place.lon.toFixed(3)}
-          {/* GPS 才有水平精度；手选城镇没有，就不占位置。 */}
           {place.accuracy ? ` ±${Math.round(place.accuracy)} m` : ""} · {place.timeZone}
         </Text>
+        {!currentIsSaved ? (
+          <Pressable
+            hitSlop={8}
+            onPress={async () => setFavorites(await addFavorite(place))}
+          >
+            <Text style={styles.link}>{t("calendar.location.addFavorite")}</Text>
+          </Pressable>
+        ) : null}
       </View>
+
+      <Pressable style={styles.button} onPress={locateNow} disabled={busy}>
+        <Ionicons name="locate" size={16} color={colors.vermilion} />
+        <Text style={styles.buttonText}>
+          {busy ? t("calendar.location.searching") : t("calendar.location.retry")}
+        </Text>
+      </Pressable>
+
+      {favorites.length ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("calendar.location.favorites")}</Text>
+          {favorites.map((favorite) => (
+            <Pressable
+              key={`${favorite.lat},${favorite.lon}`}
+              style={styles.row}
+              onPress={() => use(favorite)}
+            >
+              <Ionicons name="bookmark" size={14} color={colors.ochre} />
+              <View style={styles.rowText}>
+                <Text style={styles.rowName}>{favorite.name}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {favorite.lat.toFixed(2)}, {favorite.lon.toFixed(2)} · {favorite.timeZone}
+                </Text>
+              </View>
+              {isSamePlace(favorite, place) ? (
+                <Ionicons name="checkmark" size={16} color={colors.vermilion} />
+              ) : null}
+              <Pressable
+                hitSlop={10}
+                onPress={async () => setFavorites(await removeFavorite(favorite))}
+              >
+                <Ionicons name="close" size={16} color={colors.inkFaint} />
+              </Pressable>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <TextInput
         style={styles.field}
@@ -66,38 +134,52 @@ export function CalendarLocationScreen() {
       />
 
       <View>
-        {results.map((city) => (
-          <Pressable
-            key={`${city.name}-${city.lat}-${city.lon}`}
-            style={styles.result}
-            onPress={async () => {
-              await choose(placeFromCity(city));
-              navigation.goBack();
-            }}
-          >
-            <View style={styles.resultText}>
-              <Text style={styles.resultName}>{city.name}</Text>
-              <Text style={styles.resultSub} numberOfLines={1}>
-                {city.ascii !== city.name ? `${city.ascii} · ` : ""}
-                {city.country}
-                {aliasForLocale(city, locale) ? ` · ${aliasForLocale(city, locale)}` : ""}
+        {results.map((city) => {
+          const asPlace = placeFromCity(city);
+          const saved = favorites.some((p) => isSamePlace(p, asPlace));
+          return (
+            <Pressable
+              key={`${city.name}-${city.lat}-${city.lon}`}
+              style={styles.row}
+              onPress={() => use(asPlace)}
+            >
+              <View style={styles.rowText}>
+                <Text style={styles.rowName}>{city.name}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {city.ascii !== city.name ? `${city.ascii} · ` : ""}
+                  {city.country}
+                  {aliasForLocale(city, locale) ? ` · ${aliasForLocale(city, locale)}` : ""}
+                </Text>
+              </View>
+              <Text style={styles.rowCoord}>
+                {city.lat.toFixed(2)}, {city.lon.toFixed(2)}
+                {"\n"}
+                {city.timeZone}
               </Text>
-            </View>
-            <Text style={styles.resultCoord}>
-              {city.lat.toFixed(2)}, {city.lon.toFixed(2)}
-              {"\n"}
-              {city.timeZone}
-            </Text>
-          </Pressable>
-        ))}
+              {/* + 只管收藏，点行本身才是「用这个地点」，两件事分开 */}
+              <Pressable
+                hitSlop={10}
+                disabled={saved}
+                onPress={async () => setFavorites(await addFavorite(asPlace))}
+              >
+                <Ionicons
+                  name={saved ? "bookmark" : "add"}
+                  size={18}
+                  color={saved ? colors.ochre : colors.vermilion}
+                />
+              </Pressable>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <Pressable style={styles.button} onPress={locateNow} disabled={busy}>
-        <Ionicons name="locate" size={16} color={colors.vermilion} />
-        <Text style={styles.buttonText}>
-          {busy ? t("calendar.location.searching") : t("calendar.location.retry")}
-        </Text>
-      </Pressable>
+      {query.length && !favorites.length ? (
+        <Text style={styles.hint}>{t("calendar.location.favoriteHint")}</Text>
+      ) : null}
+
+      <Text style={styles.hint}>
+        {t("calendar.location.offlineNote", { n: (CITY_COUNT / 10000).toFixed(1) })}
+      </Text>
     </Screen>
   );
 }
@@ -114,6 +196,9 @@ const styles = StyleSheet.create({
   noticeText: { ...type.small, color: colors.inkSoft },
   current: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   currentText: { ...type.small, color: colors.inkFaint, flex: 1 },
+  link: { ...type.small, color: colors.vermilion },
+  section: { gap: 2 },
+  sectionTitle: { ...type.small, color: colors.inkFaint, marginBottom: spacing.xs },
   field: {
     backgroundColor: colors.paperSunken,
     borderRadius: radius.md,
@@ -124,18 +209,18 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
-  result: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.hairline,
   },
-  resultText: { flex: 1 },
-  resultName: { ...type.body },
-  resultSub: { ...type.small, color: colors.inkFaint },
-  resultCoord: { ...type.small, color: colors.inkFaint, textAlign: "right" },
+  rowText: { flex: 1 },
+  rowName: { ...type.body },
+  rowSub: { ...type.small, color: colors.inkFaint },
+  rowCoord: { ...type.small, color: colors.inkFaint, textAlign: "right" },
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -148,4 +233,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   buttonText: { ...type.body, color: colors.vermilion },
+  hint: { ...type.small, color: colors.inkFaint },
 });

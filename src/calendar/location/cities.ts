@@ -29,6 +29,14 @@ interface Table {
   rows: Row[];
 }
 
+/**
+ * 表里的城镇数。
+ *
+ * 写死是为了让「离线可用」那句提示不必为显示一个数字就把 2 MB 的表读进内存；
+ * `scripts/check-calendar.mjs` 会对着真表校验，改了数据源不会忘记同步。
+ */
+export const CITY_COUNT = 34135;
+
 let table: Table | null = null;
 
 function load(): Table {

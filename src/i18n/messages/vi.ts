@@ -308,6 +308,10 @@ const vi: Messages = {
   "calendar.flight.notFound": "Không tìm thấy chuyến bay này.",
   "calendar.flight.serviceDown": "Dịch vụ tra cứu tạm thời không khả dụng.",
   "calendar.times.duskAdjusted": "Hoàng hôn (đã hiệu chỉnh)",
+  "calendar.location.favorites": "Địa điểm thường dùng",
+  "calendar.location.addFavorite": "Lưu địa điểm này",
+  "calendar.location.favoriteHint": "Chạm + ở kết quả tìm kiếm để lưu lại",
+  "calendar.location.offlineNote": "Danh mục ngoại tuyến · khoảng {n}0 nghìn thị trấn (dân số từ 15.000), đi kèm ứng dụng, không cần mạng.",
 };
 
 export default vi;

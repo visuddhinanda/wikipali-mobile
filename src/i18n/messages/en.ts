@@ -308,6 +308,10 @@ const en: Messages = {
   "calendar.flight.notFound": "No such flight — check the number and date, or enter it yourself.",
   "calendar.flight.serviceDown": "The flight lookup service is unavailable — enter the flight yourself.",
   "calendar.times.duskAdjusted": "Dusk (adjusted)",
+  "calendar.location.favorites": "Saved places",
+  "calendar.location.addFavorite": "Save this place",
+  "calendar.location.favoriteHint": "Tap + on a search result to keep it here",
+  "calendar.location.offlineNote": "Offline gazetteer · {n}0k towns (population 15,000+), bundled with the app, works without a network.",
 };
 
 export default en;

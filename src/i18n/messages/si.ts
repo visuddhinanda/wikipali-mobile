@@ -306,6 +306,10 @@ const si: Messages = {
   "calendar.flight.notFound": "එවැනි ගුවන් ගමනක් නැත.",
   "calendar.flight.serviceDown": "ගුවන් සෙවුම් සේවාව තාවකාලිකව නොමැත.",
   "calendar.times.duskAdjusted": "සැඳෑව (නිවැරදි කළ)",
+  "calendar.location.favorites": "සුරකින ලද ස්ථාන",
+  "calendar.location.addFavorite": "මෙම ස්ථානය සුරකින්න",
+  "calendar.location.favoriteHint": "සෙවුම් ප්‍රතිඵලයක + ටැප් කර සුරකින්න",
+  "calendar.location.offlineNote": "නොබැඳි නගර ලැයිස්තුව · නගර {n}0k ක් (ජනගහනය 15,000+), යෙදුම සමඟ, ජාලයක් අවශ්‍ය නැත.",
 };
 
 export default si;

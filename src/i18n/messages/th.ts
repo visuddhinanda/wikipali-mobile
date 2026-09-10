@@ -305,6 +305,10 @@ const th: Messages = {
   "calendar.flight.notFound": "ไม่พบเที่ยวบินนี้ ตรวจสอบหมายเลขและวันที่",
   "calendar.flight.serviceDown": "บริการค้นหาเที่ยวบินใช้ไม่ได้ชั่วคราว",
   "calendar.times.duskAdjusted": "พลบค่ำ (แก้แล้ว)",
+  "calendar.location.favorites": "สถานที่ที่บันทึกไว้",
+  "calendar.location.addFavorite": "บันทึกสถานที่นี้",
+  "calendar.location.favoriteHint": "แตะ + ที่ผลค้นหาเพื่อบันทึกไว้",
+  "calendar.location.offlineNote": "ตารางเมืองออฟไลน์ · ราว {n} หมื่นเมือง (ประชากร 15,000 ขึ้นไป) มากับแอป ใช้ได้โดยไม่ต้องต่อเน็ต",
 };
 
 export default th;

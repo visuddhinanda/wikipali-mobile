@@ -321,6 +321,10 @@ const zhHans = {
   "calendar.flight.notFound": "查不到这个航班，请核对航班号与日期，或手填起降。",
   "calendar.flight.serviceDown": "航班查询服务暂时不可用，请手填起降。",
   "calendar.times.duskAdjusted": "实际日暮",
+  "calendar.location.favorites": "常用地点",
+  "calendar.location.addFavorite": "加入常用",
+  "calendar.location.favoriteHint": "搜到的城镇点右侧 + 可以加入常用",
+  "calendar.location.offlineNote": "离线城镇表 · 约 {n} 万个城镇（人口 1.5 万以上），随包内置，无网可用。",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

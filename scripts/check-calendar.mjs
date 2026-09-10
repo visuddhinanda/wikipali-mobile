@@ -33,6 +33,7 @@ const { zonedNoon } = require(`${OUT}calendar/tz.js`);
 const { flightSunEvents } = require(`${OUT}calendar/flight/events.js`);
 const { countdownTo } = require(`${OUT}calendar/countdown.js`);
 const { nextFestival, vassaProgress } = require(`${OUT}calendar/festivals.js`);
+const { CITY_COUNT, searchCities } = require(`${OUT}calendar/location/cities.js`);
 const { findAirport } = require(`${OUT}calendar/flight/airports.js`);
 
 let failures = 0;
@@ -234,7 +235,21 @@ const CITIES = [
   check("时刻不存在（极昼）不给", countdownTo(null, now) === null);
 }
 
-// 10. 飞行：赫尔辛基 → 曼谷（12 月）必定遇到日暮，且事件按时间排序
+// 10. 离线城镇表：常量与真表一致（提示文案里的数字靠它，不能脱节）
+{
+  const cities = require(`${OUT}calendar/location/cities.json`);
+  check(
+    `城镇数常量 ${CITY_COUNT} 与表一致`,
+    CITY_COUNT === cities.rows.length,
+    `表里有 ${cities.rows.length} 条`,
+  );
+  check(
+    "本国文字能搜到城镇（缅文 မန္တလေး → Mandalay）",
+    searchCities("မန္တလေး", 5).some((c) => c.ascii === "Mandalay"),
+  );
+}
+
+// 11. 飞行：赫尔辛基 → 曼谷（12 月）必定遇到日暮，且事件按时间排序
 {
   const leg = {
     from: findAirport("HEL"),

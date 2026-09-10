@@ -310,6 +310,10 @@ const my: Messages = {
   "calendar.flight.notFound": "ဤလေယာဉ်ကို မတွေ့ပါ။",
   "calendar.flight.serviceDown": "ရှာဖွေမှုဝန်ဆောင်မှု ယာယီမရပါ။",
   "calendar.times.duskAdjusted": "အမှန်တကယ် နေဝင်မှောင်",
+  "calendar.location.favorites": "သိမ်းထားသောနေရာများ",
+  "calendar.location.addFavorite": "ဤနေရာကို သိမ်းရန်",
+  "calendar.location.favoriteHint": "ရှာတွေ့သည့်မြို့၏ + ကိုနှိပ်၍ သိမ်းနိုင်သည်",
+  "calendar.location.offlineNote": "အော့ဖ်လိုင်းမြို့စာရင်း · မြို့ {n} သောင်း၊ အက်ပ်ထဲပါဝင်၊ အင်တာနက်မလို။",
 };
 
 export default my;
