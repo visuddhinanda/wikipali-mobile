@@ -207,6 +207,22 @@ const en: Messages = {
   "scan.grant": "Allow",
   "scan.unknownTitle": "Not recognised",
   "scan.unknownBody": "This is not a WikiPali link the app can open.",
+
+  "reader.paliScript": "Pāli script",
+  "script.auto": "Follow language",
+  "script.traditional": "traditional",
+  "script.modern": "modern",
+  "script.taiOld": "Old Tai",
+  "tools.script.title": "Script conversion",
+  "tools.script.input": "Input script",
+  "tools.script.output": "Output script",
+  "tools.script.niggahita": "Niggahīta",
+  "tools.script.inputHint": "Paste or type Pāli here",
+  "tools.script.outputHint": "Converted text",
+  "tools.script.convert": "Convert",
+  "tools.script.copy": "Copy",
+  "tools.script.copied": "Copied",
+  "tools.script.clear": "Clear",
 };
 
 export default en;

@@ -204,6 +204,22 @@ const th: Messages = {
   "scan.grant": "อนุญาต",
   "scan.unknownTitle": "ไม่รู้จัก",
   "scan.unknownBody": "นี่ไม่ใช่ลิงก์ WikiPali ที่เปิดได้",
+
+  "reader.paliScript": "อักษรบาลี",
+  "script.auto": "ตามภาษา",
+  "script.traditional": "ดั้งเดิม",
+  "script.modern": "สมัยใหม่",
+  "script.taiOld": "ไทเดิม",
+  "tools.script.title": "แปลงอักษร",
+  "tools.script.input": "อักษรต้นทาง",
+  "tools.script.output": "อักษรปลายทาง",
+  "tools.script.niggahita": "นิคหิต",
+  "tools.script.inputHint": "วางหรือพิมพ์ข้อความบาลีที่นี่",
+  "tools.script.outputHint": "ผลการแปลง",
+  "tools.script.convert": "แปลง",
+  "tools.script.copy": "คัดลอก",
+  "tools.script.copied": "คัดลอกแล้ว",
+  "tools.script.clear": "ล้าง",
 };
 
 export default th;

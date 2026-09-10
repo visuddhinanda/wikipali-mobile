@@ -219,6 +219,23 @@ const zhHans = {
   "scan.grant": "允许",
   "scan.unknownTitle": "无法识别",
   "scan.unknownBody": "这不是可以打开的 WikiPali 链接。",
+
+  // 巴利字体转换（工具页 + 阅读器设置）
+  "reader.paliScript": "巴利字体",
+  "script.auto": "跟随语言",
+  "script.traditional": "传统",
+  "script.modern": "现代",
+  "script.taiOld": "旧傣文",
+  "tools.script.title": "编码转换",
+  "tools.script.input": "输入字体",
+  "tools.script.output": "输出字体",
+  "tools.script.niggahita": "鼻音符号",
+  "tools.script.inputHint": "在此粘贴或输入巴利文",
+  "tools.script.outputHint": "转换结果",
+  "tools.script.convert": "转换",
+  "tools.script.copy": "复制",
+  "tools.script.copied": "已复制",
+  "tools.script.clear": "清空",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

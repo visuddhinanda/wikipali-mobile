@@ -207,6 +207,22 @@ const vi: Messages = {
   "scan.grant": "Cho phép",
   "scan.unknownTitle": "Không nhận ra",
   "scan.unknownBody": "Đây không phải liên kết WikiPali mà ứng dụng mở được.",
+
+  "reader.paliScript": "Chữ viết Pāli",
+  "script.auto": "Theo ngôn ngữ",
+  "script.traditional": "truyền thống",
+  "script.modern": "hiện đại",
+  "script.taiOld": "Thái cổ",
+  "tools.script.title": "Chuyển đổi chữ viết",
+  "tools.script.input": "Chữ viết nguồn",
+  "tools.script.output": "Chữ viết đích",
+  "tools.script.niggahita": "Niggahīta",
+  "tools.script.inputHint": "Dán hoặc nhập văn bản Pāli tại đây",
+  "tools.script.outputHint": "Kết quả chuyển đổi",
+  "tools.script.convert": "Chuyển đổi",
+  "tools.script.copy": "Sao chép",
+  "tools.script.copied": "Đã sao chép",
+  "tools.script.clear": "Xoá",
 };
 
 export default vi;

@@ -204,6 +204,22 @@ const lo: Messages = {
   "scan.grant": "ອະນຸຍາດ",
   "scan.unknownTitle": "ບໍ່ຮູ້ຈັກ",
   "scan.unknownBody": "ນີ້ບໍ່ແມ່ນລິ້ງ WikiPali ທີ່ເປີດໄດ້.",
+
+  "reader.paliScript": "ອັກສອນບາລີ",
+  "script.auto": "ຕາມພາສາ",
+  "script.traditional": "ດັ້ງເດີມ",
+  "script.modern": "ສະໄໝໃໝ່",
+  "script.taiOld": "ໄທເດີມ",
+  "tools.script.title": "ແປງອັກສອນ",
+  "tools.script.input": "ອັກສອນຕົ້ນທາງ",
+  "tools.script.output": "ອັກສອນປາຍທາງ",
+  "tools.script.niggahita": "ນິກຄະຫິດ",
+  "tools.script.inputHint": "ວາງ ຫຼື ພິມຂໍ້ຄວາມບາລີໃສ່ນີ້",
+  "tools.script.outputHint": "ຜົນການແປງ",
+  "tools.script.convert": "ແປງ",
+  "tools.script.copy": "ສຳເນົາ",
+  "tools.script.copied": "ສຳເນົາແລ້ວ",
+  "tools.script.clear": "ລຶບ",
 };
 
 export default lo;

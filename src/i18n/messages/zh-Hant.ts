@@ -200,6 +200,22 @@ const zhHant: Messages = {
   "scan.grant": "允許",
   "scan.unknownTitle": "無法識別",
   "scan.unknownBody": "這不是可以開啟的 WikiPali 連結。",
+
+  "reader.paliScript": "巴利字體",
+  "script.auto": "跟隨語言",
+  "script.traditional": "傳統",
+  "script.modern": "現代",
+  "script.taiOld": "舊傣文",
+  "tools.script.title": "編碼轉換",
+  "tools.script.input": "輸入字體",
+  "tools.script.output": "輸出字體",
+  "tools.script.niggahita": "鼻音符號",
+  "tools.script.inputHint": "在此貼上或輸入巴利文",
+  "tools.script.outputHint": "轉換結果",
+  "tools.script.convert": "轉換",
+  "tools.script.copy": "複製",
+  "tools.script.copied": "已複製",
+  "tools.script.clear": "清空",
 };
 
 export default zhHant;

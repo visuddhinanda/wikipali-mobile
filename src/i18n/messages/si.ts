@@ -205,6 +205,22 @@ const si: Messages = {
   "scan.grant": "අවසර දෙන්න",
   "scan.unknownTitle": "හඳුනාගත නොහැක",
   "scan.unknownBody": "මෙය විවෘත කළ හැකි WikiPali සබැඳියක් නොවේ.",
+
+  "reader.paliScript": "පාලි අකුරු",
+  "script.auto": "භාෂාවට අනුව",
+  "script.traditional": "සම්ප්‍රදායික",
+  "script.modern": "නවීන",
+  "script.taiOld": "පැරණි තායි",
+  "tools.script.title": "අකුරු පරිවර්තනය",
+  "tools.script.input": "ආදාන අකුරු",
+  "tools.script.output": "ප්‍රතිදාන අකුරු",
+  "tools.script.niggahita": "නිග්ගහීත",
+  "tools.script.inputHint": "පාලි පෙළ මෙහි අලවන්න",
+  "tools.script.outputHint": "පරිවර්තිත පෙළ",
+  "tools.script.convert": "පරිවර්තනය",
+  "tools.script.copy": "පිටපත් කරන්න",
+  "tools.script.copied": "පිටපත් විය",
+  "tools.script.clear": "හිස් කරන්න",
 };
 
 export default si;

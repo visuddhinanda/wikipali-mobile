@@ -209,6 +209,22 @@ const my: Messages = {
   "scan.grant": "ခွင့်ပြုသည်",
   "scan.unknownTitle": "မသိရှိနိုင်ပါ",
   "scan.unknownBody": "ဤသည် ဖွင့်နိုင်သော WikiPali လင့်ခ် မဟုတ်ပါ။",
+
+  "reader.paliScript": "ပါဠိစာလုံး",
+  "script.auto": "ဘာသာစကားအလိုက်",
+  "script.traditional": "ရိုးရာ",
+  "script.modern": "ခေတ်သစ်",
+  "script.taiOld": "ရှမ်းဟောင်း",
+  "tools.script.title": "စာလုံးပြောင်းလဲခြင်း",
+  "tools.script.input": "ထည့်သွင်းစာလုံး",
+  "tools.script.output": "ထွက်ရှိစာလုံး",
+  "tools.script.niggahita": "နိဂ္ဂဟိတ",
+  "tools.script.inputHint": "ပါဠိစာသားကို ဤနေရာတွင် ကူးထည့်ပါ",
+  "tools.script.outputHint": "ပြောင်းလဲပြီးစာသား",
+  "tools.script.convert": "ပြောင်းရန်",
+  "tools.script.copy": "ကူးယူရန်",
+  "tools.script.copied": "ကူးယူပြီး",
+  "tools.script.clear": "ရှင်းလင်းရန်",
 };
 
 export default my;
