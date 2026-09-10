@@ -106,11 +106,41 @@ export interface ChannelBook {
   updated_at?: string;
 }
 
-/** 频道下的书列表（v3 progress，level=1 即作品粒度）。 */
+/** 一页的条数。服务端不传 limit 时只回 10 条，必须显式翻页。 */
+const BOOKS_PAGE_SIZE = 200;
+
+/** 翻页的兜底上限，防止服务端 total 不对时空转。 */
+const BOOKS_MAX_PAGES = 50;
+
+/**
+ * 频道下的书列表（v3 progress，level=1 即作品粒度）。
+ *
+ * 接口分页，按 `total` 循环取完整列表。必须带 `order=updated_at`：不指定排序
+ * 时服务端的顺序没有稳定 tiebreaker，offset 切片跨页会漂移，实测会漏行 + 重复；
+ * 带上它之后各种页大小都是无损的。
+ */
 export async function fetchChannelBooks(uid: string): Promise<ChannelBook[]> {
   const base = toApiV3Base(await resolveBaseUrl());
-  const env = await request<Envelope<{ rows: ChannelBook[] }>>(
-    `${base}/progress?view=channel&channels=${uid}&level=1`,
-  );
-  return unwrap(env).rows;
+  const rows: ChannelBook[] = [];
+  let total = Infinity;
+
+  for (let page = 0; page < BOOKS_MAX_PAGES && rows.length < total; page += 1) {
+    const env = await request<Envelope<{ rows: ChannelBook[]; total?: number }>>(
+      `${base}/progress?view=channel&channels=${encodeURIComponent(uid)}` +
+        `&level=1&order=updated_at&offset=${rows.length}&limit=${BOOKS_PAGE_SIZE}`,
+    );
+    const data = unwrap(env);
+    const batch = data.rows ?? [];
+    if (batch.length === 0) break;
+    rows.push(...batch);
+    // total 缺失时退化成「取到不满一页就结束」。
+    total =
+      typeof data.total === "number"
+        ? data.total
+        : batch.length < BOOKS_PAGE_SIZE
+          ? rows.length
+          : Infinity;
+  }
+
+  return rows;
 }
