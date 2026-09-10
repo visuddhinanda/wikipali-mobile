@@ -111,6 +111,18 @@ export function deltaLabelOf(day: LunarDay | undefined): string {
   return day.deltaDays > 0 ? `Δ+${day.deltaDays}` : `Δ${day.deltaDays}`;
 }
 
+/**
+ * 三个时刻的巴利名。
+ *
+ * 律中判日界的是 `aruṇuggamana`（明相）、判非时食的是 `majjhanhika`（日中）、
+ * `atthaṅgama` 是日落。写在中文标签上方，让读经的人对得上术语。
+ */
+export const PALI_TIME_NAMES = {
+  aruna: "aruṇuggamana",
+  noon: "majjhanhika",
+  sunset: "atthaṅgama",
+} as const;
+
 /** 七曜的巴利星名，压在星期头下面（缅、泰、锡兰读者按星名认星期）。 */
 export const PALI_WEEKDAYS = ["Ravi", "Canda", "Bhumma", "Budha", "Guru", "Sukka", "Sani"];
 

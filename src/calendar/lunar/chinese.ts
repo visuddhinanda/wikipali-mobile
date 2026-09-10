@@ -152,8 +152,19 @@ export function chineseMonth({ year, month, timeZone }: MonthRequest): LunarMont
     if (!span) continue;
 
     const dayOfMonth = n - span.start + 1;
-    const phase =
-      dayOfMonth === 1 ? "new" : dayOfMonth === 15 ? "full" : "none";
+    // 农历也画月相：初一朔、十五望，初八/廿三前后是上下弦（定朔历里弦不固定
+    // 落在同一日，取最接近的那天）。
+    const half = Math.round(span.end - span.start) >= 30 ? 8 : 7;
+    const phase: LunarDay["phase"] =
+      dayOfMonth === 1
+        ? "new"
+        : dayOfMonth === 15
+          ? "full"
+          : dayOfMonth === half
+            ? "firstQuarter"
+            : dayOfMonth === 15 + half
+              ? "lastQuarter"
+              : "none";
 
     out.set(key, {
       system: "chinese",
