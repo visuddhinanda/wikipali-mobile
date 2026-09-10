@@ -251,7 +251,7 @@ const vi: Messages = {
   "calendar.festival.pavarana": "Lễ Tự tứ",
   "calendar.times.aruna": "Minh tướng",
   "calendar.times.noon": "Chính ngọ",
-  "calendar.times.dusk": "Hoàng hôn",
+  "calendar.times.dusk": "Hoàng hôn dân dụng",
   "calendar.times.sunrise": "Mặt trời mọc",
   "calendar.times.sunset": "Mặt trời lặn",
   "calendar.times.civilDawn": "Bình minh dân dụng",
@@ -281,7 +281,6 @@ const vi: Messages = {
   "calendar.flight.events": "Sự kiện mặt trời trên đường bay",
   "calendar.flight.none": "Chuyến bay này không gặp minh tướng hay hoàng hôn.",
   "calendar.flight.disclaimer": "Tính theo giờ bay dự kiến và tuyến vòng lớn.",
-  "calendar.flight.noProvider": "Chưa cấu hình dịch vụ dữ liệu chuyến bay.",
   "calendar.flight.altitude": "Độ cao mặt trời",
   "calendar.flight.airport": "Sân bay (IATA)",
   "calendar.flight.unknownAirport": "Mã sân bay không xác định",
@@ -299,6 +298,16 @@ const vi: Messages = {
   "calendar.leapMonthNo": "Tháng nhuận {n}",
   "calendar.repeatMonthNo": "Tháng {n} thứ hai",
   "calendar.dayNo": "Ngày {n}",
+  "calendar.systemHint": "Chạm để đổi hệ lịch",
+  "calendar.vassa.progress": "Ngày {day} mùa an cư, còn {left} ngày",
+  "calendar.nextFestival": "{name} · còn {n} ngày",
+  "calendar.nextFestivalToday": "{name} · hôm nay",
+  "calendar.nextFestivalTomorrow": "{name} · ngày mai",
+  "calendar.sunPath": "Độ cao mặt trời",
+  "calendar.flight.offline": "Không có mạng. Hãy tự nhập sân bay và giờ bay.",
+  "calendar.flight.notFound": "Không tìm thấy chuyến bay này.",
+  "calendar.flight.serviceDown": "Dịch vụ tra cứu tạm thời không khả dụng.",
+  "calendar.times.duskAdjusted": "Hoàng hôn (đã hiệu chỉnh)",
 };
 
 export default vi;

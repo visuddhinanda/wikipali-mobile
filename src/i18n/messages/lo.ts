@@ -248,7 +248,7 @@ const lo: Messages = {
   "calendar.festival.pavarana": "ວັນອອກພັນສາ",
   "calendar.times.aruna": "ອະລຸນ",
   "calendar.times.noon": "ທ່ຽງວັນ",
-  "calendar.times.dusk": "ຄ່ຳ",
+  "calendar.times.dusk": "ຄ່ຳພົນລະເຮືອນ",
   "calendar.times.sunrise": "ຕາເວັນຂຶ້ນ",
   "calendar.times.sunset": "ຕາເວັນຕົກ",
   "calendar.times.civilDawn": "ອະລຸນພົນລະເຮືອນ",
@@ -278,7 +278,6 @@ const lo: Messages = {
   "calendar.flight.events": "ເຫດການຕາເວັນລະຫວ່າງທາງ",
   "calendar.flight.none": "ຖ້ຽວບິນນີ້ບໍ່ພົບອະລຸນຫຼືຄ່ຳ",
   "calendar.flight.disclaimer": "ຄຳນວນຕາມຕາຕະລາງບິນ",
-  "calendar.flight.noProvider": "ຍັງບໍ່ໄດ້ຕັ້ງບໍລິການຂໍ້ມູນຖ້ຽວບິນ",
   "calendar.flight.altitude": "ຄວາມສູງຕາເວັນ",
   "calendar.flight.airport": "ສະໜາມບິນ (IATA)",
   "calendar.flight.unknownAirport": "ບໍ່ຮູ້ຈັກລະຫັດສະໜາມບິນ",
@@ -296,6 +295,16 @@ const lo: Messages = {
   "calendar.leapMonthNo": "ເດືອນ {n} ອະທິກະມາດ",
   "calendar.repeatMonthNo": "ເດືອນ {n} ທີສອງ",
   "calendar.dayNo": "ມື້ທີ {n}",
+  "calendar.systemHint": "ແຕະເພື່ອປ່ຽນປະຕິທິນ",
+  "calendar.vassa.progress": "ເຂົ້າພັນສາມື້ທີ {day}, ຍັງອີກ {left} ມື້",
+  "calendar.nextFestival": "{name} · ອີກ {n} ມື້",
+  "calendar.nextFestivalToday": "{name} · ມື້ນີ້",
+  "calendar.nextFestivalTomorrow": "{name} · ມື້ອື່ນ",
+  "calendar.sunPath": "ຄວາມສູງຕາເວັນ",
+  "calendar.flight.offline": "ບໍ່ມີເນັດ. ປ້ອນສະໜາມບິນແລະເວລາເອງໄດ້",
+  "calendar.flight.notFound": "ບໍ່ພົບຖ້ຽວບິນນີ້",
+  "calendar.flight.serviceDown": "ບໍລິການຄົ້ນຫາຖ້ຽວບິນໃຊ້ບໍ່ໄດ້",
+  "calendar.times.duskAdjusted": "ຄ່ຳ (ແກ້ໄຂແລ້ວ)",
 };
 
 export default lo;

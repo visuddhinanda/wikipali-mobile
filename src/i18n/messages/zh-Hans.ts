@@ -264,7 +264,7 @@ const zhHans = {
   "calendar.festival.pavarana": "自恣日 · 出安居",
   "calendar.times.aruna": "明相",
   "calendar.times.noon": "日中",
-  "calendar.times.dusk": "日暮",
+  "calendar.times.dusk": "民用日暮",
   "calendar.times.sunrise": "日出",
   "calendar.times.sunset": "日落",
   "calendar.times.civilDawn": "民用曙光",
@@ -294,7 +294,6 @@ const zhHans = {
   "calendar.flight.events": "途中太阳事件",
   "calendar.flight.none": "本航程未遇明相或日暮。",
   "calendar.flight.disclaimer": "按计划时刻与大圆航线推算；实际起降时间以航司为准。",
-  "calendar.flight.noProvider": "没有配置航班数据服务，请手填起降机场与时刻。",
   "calendar.flight.altitude": "太阳高度",
   "calendar.flight.airport": "机场（IATA）",
   "calendar.flight.unknownAirport": "不认识这个机场代码",
@@ -312,6 +311,16 @@ const zhHans = {
   "calendar.leapMonthNo": "闰 {n} 月",
   "calendar.repeatMonthNo": "第二个 {n} 月",
   "calendar.dayNo": "{n} 日",
+  "calendar.systemHint": "点这里换一套历法",
+  "calendar.vassa.progress": "雨安居第 {day} 天，还有 {left} 天",
+  "calendar.nextFestival": "{name} · 还有 {n} 天",
+  "calendar.nextFestivalToday": "{name} · 就在今天",
+  "calendar.nextFestivalTomorrow": "{name} · 就在明天",
+  "calendar.sunPath": "太阳高度",
+  "calendar.flight.offline": "当前没有网络。可以手填起降机场与时刻，计算完全离线可用。",
+  "calendar.flight.notFound": "查不到这个航班，请核对航班号与日期，或手填起降。",
+  "calendar.flight.serviceDown": "航班查询服务暂时不可用，请手填起降。",
+  "calendar.times.duskAdjusted": "实际日暮",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

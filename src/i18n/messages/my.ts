@@ -253,7 +253,7 @@ const my: Messages = {
   "calendar.festival.pavarana": "သီတင်းကျွတ် ဝါကျွတ်",
   "calendar.times.aruna": "အရုဏ်တက်",
   "calendar.times.noon": "မွန်းတည့်",
-  "calendar.times.dusk": "နေဝင်မှောင်",
+  "calendar.times.dusk": "အရပ်သုံးနေဝင်",
   "calendar.times.sunrise": "နေထွက်",
   "calendar.times.sunset": "နေဝင်",
   "calendar.times.civilDawn": "အရပ်သုံးအရုဏ်",
@@ -283,7 +283,6 @@ const my: Messages = {
   "calendar.flight.events": "ခရီးလမ်းတွင် နေအဖြစ်အပျက်",
   "calendar.flight.none": "ဤခရီးတွင် အရုဏ်နှင့် နေဝင်မကြုံပါ။",
   "calendar.flight.disclaimer": "အချိန်ဇယားအရသာ တွက်ချက်ထားသည်။",
-  "calendar.flight.noProvider": "လေယာဉ်အချက်အလက်ဝန်ဆောင်မှုမရှိပါ။",
   "calendar.flight.altitude": "နေအမြင့်",
   "calendar.flight.airport": "လေဆိပ် (IATA)",
   "calendar.flight.unknownAirport": "လေဆိပ်ကုဒ်မသိပါ",
@@ -301,6 +300,16 @@ const my: Messages = {
   "calendar.leapMonthNo": "အထပ် {n} လ",
   "calendar.repeatMonthNo": "ဒုတိယ {n} လ",
   "calendar.dayNo": "{n} ရက်",
+  "calendar.systemHint": "အခြားပြက္ခဒိန်သုံးရန် နှိပ်ပါ",
+  "calendar.vassa.progress": "ဝါတွင်း {day} ရက်မြောက်၊ {left} ရက်ကျန်",
+  "calendar.nextFestival": "{name} · {n} ရက်အလို",
+  "calendar.nextFestivalToday": "{name} · ယနေ့",
+  "calendar.nextFestivalTomorrow": "{name} · မနက်ဖြန်",
+  "calendar.sunPath": "နေအမြင့်",
+  "calendar.flight.offline": "အင်တာနက်မရှိပါ။ လေဆိပ်နှင့်အချိန်ကို ကိုယ်တိုင်ဖြည့်ပါ။",
+  "calendar.flight.notFound": "ဤလေယာဉ်ကို မတွေ့ပါ။",
+  "calendar.flight.serviceDown": "ရှာဖွေမှုဝန်ဆောင်မှု ယာယီမရပါ။",
+  "calendar.times.duskAdjusted": "အမှန်တကယ် နေဝင်မှောင်",
 };
 
 export default my;

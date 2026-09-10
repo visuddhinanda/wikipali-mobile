@@ -244,7 +244,7 @@ const zhHant: Messages = {
   "calendar.festival.pavarana": "自恣日 · 出安居",
   "calendar.times.aruna": "明相",
   "calendar.times.noon": "日中",
-  "calendar.times.dusk": "日暮",
+  "calendar.times.dusk": "民用日暮",
   "calendar.times.sunrise": "日出",
   "calendar.times.sunset": "日落",
   "calendar.times.civilDawn": "民用曙光",
@@ -274,7 +274,6 @@ const zhHant: Messages = {
   "calendar.flight.events": "途中太陽事件",
   "calendar.flight.none": "本航程未遇明相或日暮。",
   "calendar.flight.disclaimer": "按計劃時刻與大圓航線推算；實際起降時間以航司為準。",
-  "calendar.flight.noProvider": "沒有配置航班數據服務，請手填起降機場與時刻。",
   "calendar.flight.altitude": "太陽高度",
   "calendar.flight.airport": "機場（IATA）",
   "calendar.flight.unknownAirport": "不認識這個機場代碼",
@@ -292,6 +291,16 @@ const zhHant: Messages = {
   "calendar.leapMonthNo": "閏 {n} 月",
   "calendar.repeatMonthNo": "第二個 {n} 月",
   "calendar.dayNo": "{n} 日",
+  "calendar.systemHint": "點這裡換一套曆法",
+  "calendar.vassa.progress": "雨安居第 {day} 天，還有 {left} 天",
+  "calendar.nextFestival": "{name} · 還有 {n} 天",
+  "calendar.nextFestivalToday": "{name} · 就在今天",
+  "calendar.nextFestivalTomorrow": "{name} · 就在明天",
+  "calendar.sunPath": "太陽高度",
+  "calendar.flight.offline": "當前沒有網絡。可以手填起降機場與時刻，計算完全離線可用。",
+  "calendar.flight.notFound": "查不到這個航班，請核對航班號與日期，或手填起降。",
+  "calendar.flight.serviceDown": "航班查詢服務暫時不可用，請手填起降。",
+  "calendar.times.duskAdjusted": "實際日暮",
 };
 
 export default zhHant;

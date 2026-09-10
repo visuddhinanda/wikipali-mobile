@@ -248,7 +248,7 @@ const th: Messages = {
   "calendar.festival.pavarana": "วันออกพรรษา",
   "calendar.times.aruna": "อรุณ",
   "calendar.times.noon": "เที่ยงวัน",
-  "calendar.times.dusk": "พลบค่ำ",
+  "calendar.times.dusk": "พลบค่ำพลเรือน",
   "calendar.times.sunrise": "พระอาทิตย์ขึ้น",
   "calendar.times.sunset": "พระอาทิตย์ตก",
   "calendar.times.civilDawn": "รุ่งอรุณพลเรือน",
@@ -278,7 +278,6 @@ const th: Messages = {
   "calendar.flight.events": "เหตุการณ์ดวงอาทิตย์ระหว่างทาง",
   "calendar.flight.none": "เที่ยวบินนี้ไม่ผ่านอรุณหรือพลบค่ำ",
   "calendar.flight.disclaimer": "คำนวณจากเวลาตามตารางบิน",
-  "calendar.flight.noProvider": "ยังไม่ได้ตั้งค่าบริการข้อมูลเที่ยวบิน",
   "calendar.flight.altitude": "มุมเงยดวงอาทิตย์",
   "calendar.flight.airport": "สนามบิน (IATA)",
   "calendar.flight.unknownAirport": "ไม่รู้จักรหัสสนามบินนี้",
@@ -296,6 +295,16 @@ const th: Messages = {
   "calendar.leapMonthNo": "เดือน {n} อธิกมาส",
   "calendar.repeatMonthNo": "เดือน {n} หลัง",
   "calendar.dayNo": "วันที่ {n}",
+  "calendar.systemHint": "แตะเพื่อเปลี่ยนปฏิทิน",
+  "calendar.vassa.progress": "เข้าพรรษาวันที่ {day} เหลืออีก {left} วัน",
+  "calendar.nextFestival": "{name} · อีก {n} วัน",
+  "calendar.nextFestivalToday": "{name} · วันนี้",
+  "calendar.nextFestivalTomorrow": "{name} · พรุ่งนี้",
+  "calendar.sunPath": "มุมเงยดวงอาทิตย์",
+  "calendar.flight.offline": "ไม่มีอินเทอร์เน็ต กรอกสนามบินและเวลาเองได้",
+  "calendar.flight.notFound": "ไม่พบเที่ยวบินนี้ ตรวจสอบหมายเลขและวันที่",
+  "calendar.flight.serviceDown": "บริการค้นหาเที่ยวบินใช้ไม่ได้ชั่วคราว",
+  "calendar.times.duskAdjusted": "พลบค่ำ (แก้แล้ว)",
 };
 
 export default th;

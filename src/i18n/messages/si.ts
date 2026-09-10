@@ -249,7 +249,7 @@ const si: Messages = {
   "calendar.festival.pavarana": "වස් අවසානය",
   "calendar.times.aruna": "අරුණෝදය",
   "calendar.times.noon": "මධ්‍යාහ්නය",
-  "calendar.times.dusk": "සැඳෑව",
+  "calendar.times.dusk": "සිවිල් සැඳෑව",
   "calendar.times.sunrise": "හිරු උදාව",
   "calendar.times.sunset": "හිරු බැසීම",
   "calendar.times.civilDawn": "සිවිල් අරුණ",
@@ -279,7 +279,6 @@ const si: Messages = {
   "calendar.flight.events": "ගමනේදී හිරු සිදුවීම්",
   "calendar.flight.none": "මෙම ගමනේදී අරුණෝදයක් හෝ සැඳෑවක් නැත.",
   "calendar.flight.disclaimer": "කාලසටහන අනුව ගණනය කර ඇත.",
-  "calendar.flight.noProvider": "ගුවන් දත්ත සේවාවක් සකසා නැත.",
   "calendar.flight.altitude": "හිරු උන්නතාංශය",
   "calendar.flight.airport": "ගුවන් තොටුපළ (IATA)",
   "calendar.flight.unknownAirport": "නොදන්නා ගුවන් තොටුපළ කේතය",
@@ -297,6 +296,16 @@ const si: Messages = {
   "calendar.leapMonthNo": "අධික {n} වන මාසය",
   "calendar.repeatMonthNo": "දෙවන {n} වන මාසය",
   "calendar.dayNo": "{n} වන දිනය",
+  "calendar.systemHint": "වෙනත් දින දර්ශනයක් සඳහා තට්ටු කරන්න",
+  "calendar.vassa.progress": "වස් {day} වන දිනය, තව දින {left}",
+  "calendar.nextFestival": "{name} · තව දින {n}",
+  "calendar.nextFestivalToday": "{name} · අද",
+  "calendar.nextFestivalTomorrow": "{name} · හෙට",
+  "calendar.sunPath": "හිරු උන්නතාංශය",
+  "calendar.flight.offline": "ජාලයක් නැත. ගුවන් තොටුපළ සහ වේලාවන් අතින් ඇතුළු කරන්න.",
+  "calendar.flight.notFound": "එවැනි ගුවන් ගමනක් නැත.",
+  "calendar.flight.serviceDown": "ගුවන් සෙවුම් සේවාව තාවකාලිකව නොමැත.",
+  "calendar.times.duskAdjusted": "සැඳෑව (නිවැරදි කළ)",
 };
 
 export default si;

@@ -251,7 +251,7 @@ const en: Messages = {
   "calendar.festival.pavarana": "Pavāraṇā · End of the Rains",
   "calendar.times.aruna": "Dawn (aruṇa)",
   "calendar.times.noon": "Solar noon",
-  "calendar.times.dusk": "Dusk",
+  "calendar.times.dusk": "Civil dusk",
   "calendar.times.sunrise": "Sunrise",
   "calendar.times.sunset": "Sunset",
   "calendar.times.civilDawn": "Civil dawn",
@@ -281,7 +281,6 @@ const en: Messages = {
   "calendar.flight.events": "Sun events en route",
   "calendar.flight.none": "This flight crosses neither dawn nor dusk.",
   "calendar.flight.disclaimer": "Computed from scheduled times and the great-circle route; actual times may differ.",
-  "calendar.flight.noProvider": "No flight data service configured — enter the airports and times yourself.",
   "calendar.flight.altitude": "Sun altitude",
   "calendar.flight.airport": "Airport (IATA)",
   "calendar.flight.unknownAirport": "Unknown airport code",
@@ -299,6 +298,16 @@ const en: Messages = {
   "calendar.leapMonthNo": "Leap month {n}",
   "calendar.repeatMonthNo": "Second month {n}",
   "calendar.dayNo": "Day {n}",
+  "calendar.systemHint": "Tap to use another calendar",
+  "calendar.vassa.progress": "Day {day} of the Rains Retreat, {left} days to go",
+  "calendar.nextFestival": "{name} · in {n} days",
+  "calendar.nextFestivalToday": "{name} · today",
+  "calendar.nextFestivalTomorrow": "{name} · tomorrow",
+  "calendar.sunPath": "Sun altitude",
+  "calendar.flight.offline": "You're offline. Enter the airports and times yourself — the computation works without a network.",
+  "calendar.flight.notFound": "No such flight — check the number and date, or enter it yourself.",
+  "calendar.flight.serviceDown": "The flight lookup service is unavailable — enter the flight yourself.",
+  "calendar.times.duskAdjusted": "Dusk (adjusted)",
 };
 
 export default en;
