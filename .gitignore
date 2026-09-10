@@ -55,3 +55,4 @@ yarn-error.*
 # local eas-cli install (workaround for global npm cache EACCES)
 eas-tool/
 .check-script-convert/
+.calendar-build/

@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "commonjs",
+    "target": "es2022",
+    "moduleResolution": "bundler",
+    "outDir": "../.calendar-build",
+    "rootDir": "../src",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["../src/calendar/**/*.ts"]
+}
