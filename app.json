@@ -81,6 +81,12 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "允许 WikiPali 取得位置，按当地经纬度计算明相、日中与日暮时间。"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "允许 WikiPali 使用相机扫描二维码，打开对应经文。"
