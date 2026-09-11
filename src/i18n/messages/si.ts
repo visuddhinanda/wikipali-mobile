@@ -257,6 +257,7 @@ const si: Messages = {
   "calendar.times.nauticalDawn": "නාවික අරුණ",
   "calendar.refraction": "වර්තන නිවැරදි කිරීම",
   "calendar.refractionNote": "අරුණෝදය = සිවිල් අරුණ − වර්තන නිවැරදි කිරීම",
+  "calendar.altitudeNote": "කෝණ යනු හිරුගේ ජ්‍යාමිතික උන්නතාංශයයි (වායුගෝලීය වර්තනය රහිත).",
   "calendar.method.fallback": "නාවික අරුණ නැත; −6.833° භාවිතා කළා",
   "calendar.polar": "අද අරුණෝදයක් නැත",
   "calendar.compare": "දින දර්ශන පහ",

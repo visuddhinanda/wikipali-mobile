@@ -26,7 +26,7 @@ for (const [from, to] of [
   copyFileSync(new URL(`../${from}`, import.meta.url).pathname, target);
 }
 
-const { sunTimes, sunAltitude } = require(`${OUT}calendar/astro.js`);
+const { sunTimes, sunAltitude, sunAltitudeGeometric } = require(`${OUT}calendar/astro.js`);
 const { buildMonth } = require(`${OUT}calendar/lunar/index.js`);
 const { unVesakDayKey } = require(`${OUT}calendar/lunar/vesak.js`);
 const { zonedNoon } = require(`${OUT}calendar/tz.js`);
@@ -101,18 +101,18 @@ const CITIES = [
       const at = new Date(Date.UTC(2026, 0, day));
       const t = sunTimes({ lat, lon }, zonedNoon(2026, at.getUTCMonth() + 1, at.getUTCDate(), tz));
       if (t.method !== "subtraction" || !t.aruna || !t.dusk || !t.sunset || !t.noon) continue;
-      const a = sunAltitude({ lat, lon }, t.aruna);
-      const d = sunAltitude({ lat, lon }, t.dusk);
-      const s = sunAltitude({ lat, lon }, t.sunset);
+      const a = sunAltitudeGeometric({ lat, lon }, t.aruna);
+      const d = sunAltitudeGeometric({ lat, lon }, t.dusk);
+      const s = sunAltitudeGeometric({ lat, lon }, t.sunset);
       worstSym = Math.max(worstSym, Math.abs(a - d));
       if (Math.abs(a - d) > 0.3) {
         symmetric = false;
         console.log(`  不对称 ${name} 第 ${day} 天 明相 ${a.toFixed(3)}° 日落 ${d.toFixed(3)}°`);
       }
       if (s - d < 5) distinct = false;
-      const noonAlt = sunAltitude({ lat, lon }, t.noon);
+      const noonAlt = sunAltitudeGeometric({ lat, lon }, t.noon);
       for (const dt of [-1800e3, -600e3, 600e3, 1800e3]) {
-        if (sunAltitude({ lat, lon }, new Date(t.noon.getTime() + dt)) > noonAlt + 1e-6) {
+        if (sunAltitudeGeometric({ lat, lon }, new Date(t.noon.getTime() + dt)) > noonAlt + 1e-6) {
           noonIsMax = false;
         }
       }
@@ -121,6 +121,40 @@ const CITIES = [
   check(`明相与日落的太阳高度角对称（最大差 ${worstSym.toFixed(3)}°）`, symmetric);
   check("日没比日落高 5° 以上，两者不是同一条", distinct);
   check("日中是当天太阳高度角的极大值（上中天，不是 90°）", noonIsMax);
+}
+
+// 1c. 各阈值按**几何**高度角定义 —— 日详情列出的角度就是这一个
+//
+// 含折射的视高度在民用曙光处是 −5.39° 而不是 −6°，拿它去跟阈值比会差好几分钟。
+// 飞行事件（events.ts）判 −6.833° 穿越用的必须也是几何角。
+{
+  let exact = true;
+  let differs = false;
+  for (const [name, lat, lon, tz] of CITIES) {
+    for (let day = 1; day <= 365; day += 30) {
+      const at = new Date(Date.UTC(2026, 0, day));
+      const t = sunTimes({ lat, lon }, zonedNoon(2026, at.getUTCMonth() + 1, at.getUTCDate(), tz));
+      const want = [
+        ["航海曙光", t.nauticalDawn, -12],
+        ["民用曙光", t.civilDawn, -6],
+        ["民用暮光", t.civilDusk, -6],
+        ["航海暮光", t.nauticalDusk, -12],
+        ["日出", t.sunrise, -0.833],
+        ["日没", t.sunset, -0.833],
+      ];
+      for (const [label, when, expected] of want) {
+        if (!when) continue;
+        const got = sunAltitudeGeometric({ lat, lon }, when);
+        if (Math.abs(got - expected) > 0.02) {
+          exact = false;
+          console.log(`  ${name} ${label} 几何高度 ${got.toFixed(3)}°，应为 ${expected}°`);
+        }
+        if (Math.abs(sunAltitude({ lat, lon }, when) - got) > 0.3) differs = true;
+      }
+    }
+  }
+  check("晨昏阈值按几何高度角成立（−12° / −6° / −0.833°）", exact);
+  check("几何高度角与视高度角在地平线附近确有差别（约 0.6°）", differs);
 }
 
 // 2. 明相夹在航海曙光与民用曙光之间，且热带的晨昏段长度合理

@@ -259,6 +259,7 @@ const en: Messages = {
   "calendar.times.nauticalDawn": "Nautical dawn",
   "calendar.refraction": "Refraction correction",
   "calendar.refractionNote": "Dawn = civil dawn − refraction; refraction = (civil − nautical) − (sunrise − civil).",
+  "calendar.altitudeNote": "Angles are the sun’s geometric altitude (no atmospheric refraction) — the twilight thresholds are defined that way.",
   "calendar.method.fallback": "No nautical dawn; fell back to −6.833°",
   "calendar.polar": "Polar day/night — no dawn today",
   "calendar.compare": "All five calendars",

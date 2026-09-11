@@ -171,11 +171,27 @@ export function sunTimes(p: GeoPoint, anyInstantOfDay: Date): SunTimes {
   };
 }
 
-/** 太阳在某时某地的地平高度角（度）。飞行计算按它逐点判断昼夜。 */
+/**
+ * 太阳在某时某地的**视**高度角（度，含大气折射）—— 肉眼看上去的位置。
+ */
 export function sunAltitude(p: GeoPoint, at: Date): number {
   const time = new AstroTime(at);
   const eq = Equator(Body.Sun, time, observerOf(p), true, true);
   return Horizon(time, observerOf(p), eq.ra, eq.dec, "normal").altitude;
+}
+
+/**
+ * 太阳的**几何**高度角（度，不含大气折射）。
+ *
+ * 晨昏的各种定义用的都是这一个：民用曙光 = 几何中心在地平线下 6°、航海曙光
+ * −12°、`ARUNA_FALLBACK_ALTITUDE` −6.833° 也是几何角。拿含折射的视高度去跟
+ * 这些阈值比会差 0.5°–0.6°，换算成时间是好几分钟，所以凡是**与阈值比较或
+ * 标注判据角度**的地方，一律用这一个，别用 `sunAltitude`。
+ */
+export function sunAltitudeGeometric(p: GeoPoint, at: Date): number {
+  const time = new AstroTime(at);
+  const eq = Equator(Body.Sun, time, observerOf(p), true, true);
+  return Horizon(time, observerOf(p), eq.ra, eq.dec, undefined).altitude;
 }
 
 /** 月相角（度）：0 朔、90 上弦、180 望、270 下弦。 */

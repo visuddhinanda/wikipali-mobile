@@ -259,6 +259,7 @@ const vi: Messages = {
   "calendar.times.nauticalDawn": "Bình minh hàng hải",
   "calendar.refraction": "Hiệu chỉnh khúc xạ",
   "calendar.refractionNote": "Minh tướng = bình minh dân dụng − hiệu chỉnh khúc xạ.",
+  "calendar.altitudeNote": "Góc là độ cao hình học của mặt trời (không kể khúc xạ khí quyển) — các ngưỡng tranh tối tranh sáng vốn được định nghĩa như vậy.",
   "calendar.method.fallback": "Không có bình minh hàng hải; dùng −6,833°",
   "calendar.polar": "Ngày/đêm vùng cực — hôm nay không có minh tướng",
   "calendar.compare": "Đối chiếu năm hệ lịch",

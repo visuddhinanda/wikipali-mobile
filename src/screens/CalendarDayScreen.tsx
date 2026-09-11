@@ -26,6 +26,7 @@ import {
   isSystemAvailable,
 } from "../calendar/lunar";
 import { SYSTEM_TITLE_KEYS } from "../calendar/systems";
+import { sunAltitudeGeometric } from "../calendar/astro";
 import { useCalendarSystem, usePlace, useSunTimes } from "../calendar/useCalendar";
 import { formatLocalTime, formatOffset, makeDayKey, toLocalParts, zonedNoon } from "../calendar/tz";
 import { PALI_TIME_NAMES, dayLabelOf, deltaLabelOf, eraLineOf, phaseLabelOf } from "../calendar/format";
@@ -36,6 +37,19 @@ function minutesLabel(seconds: number | null): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}′${String(s).padStart(2, "0")}″`;
+}
+
+/**
+ * 该时刻的太阳**几何**高度角，标在每一行后面。
+ *
+ * 用几何角而不是视高度：晨昏的定义（−6° / −12° / −6.833°）本来就是几何角，
+ * 含折射的视高度在民用曙光那一行会写成 −5.39°，跟「地平线下 6°」这个定义
+ * 对不上，读的人会以为算错了。
+ */
+function altitudeLabel(at: Date | null, lat: number, lon: number): string | null {
+  if (!at) return null;
+  const a = sunAltitudeGeometric({ lat, lon }, at);
+  return `${a < 0 ? "−" : "+"}${Math.abs(a).toFixed(2)}°`;
 }
 
 /** 当地时刻换成 0-24 的小数，用来在高度图上画标线。 */
@@ -146,12 +160,16 @@ export function CalendarDayScreen() {
                 {pali ? <Text style={styles.timePali}>{pali}</Text> : null}
                 <Text style={styles.timeLabel}>{t(label)}</Text>
               </View>
+              <Text style={styles.timeAltitude}>
+                {altitudeLabel(at, place.lat, place.lon) ?? ""}
+              </Text>
               <Text style={[styles.timeValue, strong && styles.timeValueStrong]}>
                 {formatLocalTime(at, place.timeZone)}
               </Text>
             </View>
           ))}
         </View>
+        <Text style={styles.note}>{t("calendar.altitudeNote")}</Text>
 
         {times.method === "none" ? (
           <Text style={styles.note}>{t("calendar.polar")}</Text>
@@ -268,6 +286,14 @@ const styles = StyleSheet.create({
   timeLabelBox: { flex: 1 },
   timePali: { fontSize: 9, color: colors.inkFaint, fontStyle: "italic" },
   timeLabel: { ...type.small, color: colors.inkSoft },
+  timeAltitude: {
+    ...type.small,
+    color: colors.inkFaint,
+    fontVariant: ["tabular-nums"],
+    textAlign: "right",
+    width: 62,
+    marginRight: spacing.sm,
+  },
   timeValue: { fontSize: 15, color: colors.ink, fontVariant: ["tabular-nums"] },
   timeValueStrong: { color: colors.vermilion, fontWeight: "700" },
   note: { ...type.small, color: colors.inkFaint, marginTop: spacing.sm },

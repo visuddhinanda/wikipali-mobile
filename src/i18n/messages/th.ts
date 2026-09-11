@@ -256,6 +256,7 @@ const th: Messages = {
   "calendar.times.nauticalDawn": "รุ่งอรุณนาวี",
   "calendar.refraction": "ค่าแก้การหักเหแสง",
   "calendar.refractionNote": "อรุณ = รุ่งอรุณพลเรือน − ค่าแก้การหักเหแสง",
+  "calendar.altitudeNote": "องศาคือมุมสูงเชิงเรขาคณิตของดวงอาทิตย์ (ไม่รวมการหักเหของบรรยากาศ) ตามนิยามของเวลาสนธยา",
   "calendar.method.fallback": "ไม่มีรุ่งอรุณนาวี ใช้ −6.833° แทน",
   "calendar.polar": "วันนี้ไม่มีอรุณ",
   "calendar.compare": "เทียบห้าปฏิทิน",

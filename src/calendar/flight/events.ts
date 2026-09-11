@@ -8,7 +8,7 @@
  * 巡航高度会让地平线下沉：`dip = arccos(R / (R + h))`，10 km 高空约 3.2°，
  * 也就是比地面早三分多钟见到日出。默认按 11 km 巡航计入，UI 会写明。
  */
-import { sunAltitude } from "../astro";
+import { sunAltitudeGeometric } from "../astro";
 import { ARUNA_FALLBACK_ALTITUDE } from "../astro";
 import { EARTH_RADIUS_KM, distanceKm, interpolate, type LatLon } from "./greatcircle";
 
@@ -54,7 +54,7 @@ function samples(leg: FlightLeg, dip: number): Sample[] {
     const f = i / steps;
     const t = start + span * f;
     const position = interpolate(leg.from, leg.to, f);
-    out.push({ t, position, altitude: sunAltitude(position, new Date(t)) + dip });
+    out.push({ t, position, altitude: sunAltitudeGeometric(position, new Date(t)) + dip });
   }
   return out;
 }
@@ -75,7 +75,7 @@ function refine(
     const t = (lo.t + hi.t) / 2;
     const f = span === 0 ? 0 : (t - start) / span;
     const position = interpolate(leg.from, leg.to, f);
-    const altitude = sunAltitude(position, new Date(t)) + dip;
+    const altitude = sunAltitudeGeometric(position, new Date(t)) + dip;
     const mid: Sample = { t, position, altitude };
     const crossesInLower = (lo.altitude - threshold) * (altitude - threshold) <= 0;
     if (crossesInLower) hi = mid;

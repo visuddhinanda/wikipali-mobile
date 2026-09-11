@@ -261,6 +261,7 @@ const my: Messages = {
   "calendar.times.nauticalDawn": "ရေကြောင်းအရုဏ်",
   "calendar.refraction": "ရောင်ခြည်ကွေးပြင်ဆင်ချက်",
   "calendar.refractionNote": "အရုဏ် = အရပ်သုံးအရုဏ် − ပြင်ဆင်ချက်။",
+  "calendar.altitudeNote": "ထောင့်များသည် ထိုအချိန်၏ နေ၏ ဂျီဩမေတြီ အမြင့်ထောင့် (လေထုရောင်ပြန်မပါ) ဖြစ်သည်။",
   "calendar.method.fallback": "ရေကြောင်းအရုဏ်မရှိ၊ −6.833° သုံးထားသည်",
   "calendar.polar": "ဤနေ့တွင် အရုဏ်မတက်ပါ",
   "calendar.compare": "ပြက္ခဒိန်ငါးမျိုး နှိုင်းယှဉ်",

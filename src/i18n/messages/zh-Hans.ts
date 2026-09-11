@@ -272,6 +272,7 @@ const zhHans = {
   "calendar.times.nauticalDawn": "航海曙光",
   "calendar.refraction": "蒙气差",
   "calendar.refractionNote": "明相 = 民用曙光 − 蒙气差；蒙气差 =（民用曙光 − 航海曙光）−（日出 − 民用曙光）。",
+  "calendar.altitudeNote": "角度是该时刻太阳的几何高度角（不含大气折射），晨昏各阈值本来就按几何角定义。",
   "calendar.method.fallback": "航海曙光不存在，已按 −6.833° 兜底",
   "calendar.polar": "极昼 / 极夜 —— 本日无明相",
   "calendar.compare": "五历对照",

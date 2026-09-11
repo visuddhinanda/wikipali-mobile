@@ -256,6 +256,7 @@ const lo: Messages = {
   "calendar.times.nauticalDawn": "ອະລຸນນາວີ",
   "calendar.refraction": "ການແກ້ໄຂການຫັກເຫ",
   "calendar.refractionNote": "ອະລຸນ = ອະລຸນພົນລະເຮືອນ − ການແກ້ໄຂ",
+  "calendar.altitudeNote": "ອົງສາແມ່ນມຸມສູງເລຂາຄະນິດຂອງຕາເວັນ (ບໍ່ລວມການຫັກເหຂອງບັນຍາກາດ).",
   "calendar.method.fallback": "ບໍ່ມີອະລຸນນາວີ, ໃຊ້ −6.833°",
   "calendar.polar": "ມື້ນີ້ບໍ່ມີອະລຸນ",
   "calendar.compare": "ທຽບປະຕິທິນ ໕ ລະບົບ",

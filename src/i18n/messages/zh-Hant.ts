@@ -252,6 +252,7 @@ const zhHant: Messages = {
   "calendar.times.nauticalDawn": "航海曙光",
   "calendar.refraction": "蒙氣差",
   "calendar.refractionNote": "明相 = 民用曙光 − 蒙氣差；蒙氣差 =（民用曙光 − 航海曙光）−（日出 − 民用曙光）。",
+  "calendar.altitudeNote": "角度是該時刻太陽的幾何高度角（不含大氣折射），晨昏各閾值本來就按幾何角定義。",
   "calendar.method.fallback": "航海曙光不存在，已按 −6.833° 兜底",
   "calendar.polar": "極晝 / 極夜 —— 本日無明相",
   "calendar.compare": "五曆對照",
