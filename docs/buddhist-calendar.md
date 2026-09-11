@@ -4,6 +4,10 @@
 > 真机（小米 2304FPN6DC）验过 GPS：定位 → 最近城镇 → 时区 → 三时刻重算整条链路通。
 > 代码：`src/calendar/`、`src/screens/Calendar*.tsx`、`src/screens/FlightSunScreen.tsx`；自检 `scripts/check-calendar.mjs`。
 > 界面稿（artifact）：<https://claude.ai/code/artifact/f7eac3b7-8ab5-4eba-a4c3-9bb2f0ed08a4>
+> 屏 2 日详情的太阳高度图另存了一份本地截图：`docs/images/calendar-day-sunpath-mock.png`
+> —— artifact 链接对非成员读不开，实现时对细节只能靠这张图（曲线粗细、五个圆点的
+> 实心 / 空心、标签的上下左右错位，都是照它量出来的）。注意稿子是照中纬度地点画的，
+> 近赤道的分日曲线本来就接近直线（§2.2）。
 > 入口：`src/screens/ToolsScreen.tsx` 中已占位的 `tools.calendar.*` 卡片。
 
 ---
