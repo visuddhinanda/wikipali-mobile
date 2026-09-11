@@ -313,6 +313,14 @@ const lo: Messages = {
   "calendar.location.offlineNote": "ຕາຕະລາງເມືອງອອບໄລນ໌ · ປະມານ {n} ໝື່ນເມືອງ (ປະຊາກອນ 15,000 ຂຶ້ນໄປ), ມາກັບແອັບ, ບໍ່ຕ້ອງໃຊ້ເນັດ.",
   "calendar.location.usingCity": "ກຳລັງຄຳນວນຕາມເມືອງທີ່ທ່ານເລືອກ, ໃຊ້ພິກັດຂອງບ່ອນນັ້ນ.",
   "calendar.location.auto": "ຫາຕຳແໜ່ງ",
+  "calendar.notify.title": "ອຸໂປສະຖ",
+  "calendar.notify.eve": "ມື້ອື່ນເປັນວັນອຸໂປສະຖ ({label}).",
+  "calendar.notify.morn": "ມື້ນີ້ເປັນວັນອຸໂປສະຖ ({label}).",
+  "settings.notifications": "ການແຈ້ງເຕືອນ",
+  "settings.uposathaNotify": "ເຕືອນວັນອຸໂປສະຖ",
+  "settings.uposathaNotifyHint": "ສອງເທື່ອ: 20:00 ມື້ກ່ອນ ແລະ 07:00 ມື້ນັ້ນ. ຄຳນວນໃນເຄື່ອງ, ບໍ່ຕ້ອງໃຊ້ເນັດ.",
+  "settings.uposathaNotifyDenied": "ຍັງບໍ່ໄດ້ຮັບສິດແຈ້ງເຕືອນ. ກະລຸນາອະນຸຍາດໃນການຕັ້ງຄ່າ.",
+  "settings.uposathaNotifyScheduled": "ຕັ້ງການເຕືອນແລ້ວ {n} ລາຍການ",
 };
 
 export default lo;

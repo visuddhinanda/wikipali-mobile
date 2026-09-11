@@ -329,6 +329,14 @@ const zhHans = {
   "calendar.location.offlineNote": "离线城镇表 · 约 {n} 万个城镇（人口 1.5 万以上），随包内置，无网可用。",
   "calendar.location.usingCity": "正在按手选的城镇计算。日出日落取该点经纬度，误差约每 100 公里 1–2 分钟。",
   "calendar.location.auto": "自动定位",
+  "calendar.notify.title": "布萨",
+  "calendar.notify.eve": "明天是布萨日（{label}）。",
+  "calendar.notify.morn": "今天是布萨日（{label}）。",
+  "settings.notifications": "通知",
+  "settings.uposathaNotify": "布萨日提醒",
+  "settings.uposathaNotifyHint": "前一天 20:00 与当天 07:00 各提醒一次。日期在本机推算，无需联网。",
+  "settings.uposathaNotifyDenied": "系统未授予通知权限，请在手机的应用设置里允许通知。",
+  "settings.uposathaNotifyScheduled": "已排 {n} 条提醒",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

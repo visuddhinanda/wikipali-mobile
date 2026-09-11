@@ -314,6 +314,14 @@ const si: Messages = {
   "calendar.location.offlineNote": "නොබැඳි නගර ලැයිස්තුව · නගර {n}0k ක් (ජනගහනය 15,000+), යෙදුම සමඟ, ජාලයක් අවශ්‍ය නැත.",
   "calendar.location.usingCity": "ඔබ තෝරාගත් නගරයේ ඛණ්ඩාංක අනුව ගණනය කරයි.",
   "calendar.location.auto": "ස්ථානගත කරන්න",
+  "calendar.notify.title": "උපෝසථ",
+  "calendar.notify.eve": "හෙට උපෝසථ දිනයයි ({label}).",
+  "calendar.notify.morn": "අද උපෝසථ දිනයයි ({label}).",
+  "settings.notifications": "දැනුම්දීම්",
+  "settings.uposathaNotify": "උපෝසථ දින මතක් කිරීම",
+  "settings.uposathaNotifyHint": "දෙවරක්: කලින් දින 20:00 සහ එදින 07:00. දින මෙම උපාංගයේ ගණනය වේ — ජාලයක් අවශ්‍ය නැත.",
+  "settings.uposathaNotifyDenied": "දැනුම්දීම් අවසරය ලබා දී නැත. උපාංග සැකසුම් තුළ අවසර දෙන්න.",
+  "settings.uposathaNotifyScheduled": "මතක් කිරීම් {n} ක් සකසා ඇත",
 };
 
 export default si;

@@ -318,6 +318,14 @@ const my: Messages = {
   "calendar.location.offlineNote": "အော့ဖ်လိုင်းမြို့စာရင်း · မြို့ {n} သောင်း၊ အက်ပ်ထဲပါဝင်၊ အင်တာနက်မလို။",
   "calendar.location.usingCity": "သင်ရွေးထားသောမြို့၏ တည်နေရာဖြင့် တွက်ချက်နေသည်။",
   "calendar.location.auto": "အလိုအလျောက်",
+  "calendar.notify.title": "ဥပုသ်",
+  "calendar.notify.eve": "မနက်ဖြန် ဥပုသ်နေ့ ဖြစ်သည် ({label})။",
+  "calendar.notify.morn": "ယနေ့ ဥပုသ်နေ့ ဖြစ်သည် ({label})။",
+  "settings.notifications": "အကြောင်းကြားချက်",
+  "settings.uposathaNotify": "ဥပုသ်နေ့ သတိပေးချက်",
+  "settings.uposathaNotifyHint": "မတိုင်မီနေ့ ၂၀:၀၀ နှင့် ထိုနေ့ ၀၇:၀၀ တွင် တစ်ကြိမ်စီ။ ရက်စွဲကို ဖုန်းထဲမှာတွက်သဖြင့် အင်တာနက်မလို။",
+  "settings.uposathaNotifyDenied": "အကြောင်းကြားခွင့် မရသေးပါ။ ဖုန်းဆက်တင်တွင် ခွင့်ပြုပါ။",
+  "settings.uposathaNotifyScheduled": "သတိပေးချက် {n} ခု စီစဉ်ပြီး",
 };
 
 export default my;

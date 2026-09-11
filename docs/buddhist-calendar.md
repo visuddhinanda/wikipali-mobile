@@ -225,6 +225,32 @@ const isUNVesak = sameLocalDate(t, day);
 
 日详情页把五套结果并排显示，并给出与天文朔望的取日差 **Δ**。**Δ≠0 是历法本身的规则差异，不是 bug**，UI 文案必须这么写。这也是最好的自测手段：任何一套实现出错，Δ 会立刻出现异常跳变（正常范围 −1 ~ +1 日）。
 
+### 2.11 布萨日通知
+
+**纯本地，不需要任何后端。** 这一点值得单独写清楚，因为它决定了要不要引入一整套服务端。
+
+布萨日是**算出来的，不是查出来的**：五套历法全是纯算法（真朔望 / 缅历 mmcal / Suriyayatra / 定朔定气），`src/calendar/` 里除 `flight/provider.ts` 之外没有任何 `fetch`。所以离线设备自己就能把布萨日排到任意远的未来。剩下的只是「到点弹个通知」，`expo-notifications` 的本地排程不碰 FCM、不需要 push token、不需要服务器。
+
+**只有三种情况才真需要后端**，都跟「算不出来」有关：人为公告的日期修正（某僧团临时改期）、跨设备同步提醒偏好、给从不打开 App 的人推送。按目前的产品形态都不涉及。
+
+排程规则：每个布萨日两条 —— **前一天 20:00**（`EVENING_HOUR`）与**当天 07:00**（`MORNING_HOUR`），当地时间。
+
+几个约束与对策：
+
+| 约束 | 对策 |
+|---|---|
+| **iOS 待发本地通知上限 64 条**（系统硬限制，超出即丢） | 只排 `HORIZON = 24` 个布萨日 × 2 = 48 条，约管半年，留了余量；每次启动重排 |
+| **Android 13+ 要 `POST_NOTIFICATIONS` 运行时权限** | 由 expo-notifications 的清单自动合入；**只在用户主动打开开关时请求**，绝不在启动时静默弹框 |
+| **Android 12+ 精确闹钟要 `SCHEDULE_EXACT_ALARM`** | **不申请**。布萨提醒晚几分钟无所谓，走普通通知；该权限在 Play 上架要额外说明用途 |
+| Doze 模式可能延迟投递 | 接受。同上 |
+| 设备重启后排程是否保留 | expo-notifications 自带 `RECEIVE_BOOT_COMPLETED` 与 `BOOT_COMPLETED` 接收器，原生层已处理；每次启动无条件重排是兜底 |
+| 换时区 / 改历法 / 改界面语言 | 一律**先全部取消再重排**，不逐条对账。文案在排程那一刻就写死（投递时 App 可能没在跑，没法回调现算），所以改语言必须重排 |
+| 今天就是布萨日 | 已经过去的时刻不排，否则会立刻弹一条莫名其妙的通知 |
+
+代码分两层：`uposatha.ts` 是**纯逻辑**（扫布萨日、算出每条通知的时刻与文案），不 import 任何原生模块，所以自检能直接跑它；`notifications.ts` 只管权限、Android 渠道和调用 `expo-notifications`。
+
+默认**关**。通知是打扰，不能装上就自己开。
+
 ---
 
 ## 3. 位置与时区
@@ -331,6 +357,9 @@ src/calendar/
     thai.ts           # §2.6（移植 pythaidate，MIT）
     srilanka.ts       # §2.7
     index.ts          # 统一接口 LunarDay { phase, dayName, isUposatha, era, delta }
+  uposatha.ts         # §2.11 未来的布萨日 + 通知排程的纯逻辑（自检直接跑）
+  notifications.ts    # §2.11 权限 / Android 渠道 / expo-notifications 调用
+  useUposathaNotifications.ts  # 启动时重排（挂在 App 根，不走 usePlace 免得弹定位框）
   location/
     gps.ts            # expo-location 封装 + 降级
     cities.ts         # 离线城镇表检索
@@ -462,6 +491,12 @@ P1 已经是一个可用的完整功能，P2 之后才是这个工具区别于�
   不是把界面换成泰文；Thadingyut、Vap 这类**专名**例外，那是名字不是语言。
 
 ---
+
+### 8.1 布萨日通知（P5）
+
+| 期 | 状态 | 内容 |
+|---|---|---|
+| P5 | ✅ 待真机验 | 布萨日本地通知：前一天 20:00 + 当天 07:00，设置页开关，默认关。纯离线（§2.11），自检 7 条 |
 
 ## 9. 待定
 

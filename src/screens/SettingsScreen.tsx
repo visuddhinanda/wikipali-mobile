@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -9,6 +9,11 @@ import { ENV_API_URL } from "../api/config";
 import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useI18n } from "../i18n/I18nContext";
+import { getUposathaNotify, setUposathaNotify } from "../settings/notifications";
+import { notifyTextOf, rescheduleUposathaNotifications } from "../calendar/notifications";
+import { defaultSystemFor } from "../calendar/lunar";
+import { fallbackPlace, loadSavedPlace } from "../calendar/location/place";
+import { useCalendarSystem } from "../calendar/useCalendar";
 import { LOCALE_OPTIONS } from "../i18n";
 import type { MessageKey } from "../i18n";
 
@@ -18,6 +23,34 @@ export function SettingsScreen() {
   const navigation = useNavigation<Nav>();
   const [server, setServer] = useState<string>(DEFAULT_SERVER);
   const { t, preference, locale } = useI18n();
+  const [notify, setNotify] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  // 排出去几条 / 有没有被系统拒权限，都要让用户看得见 —— 否则打开开关之后
+  // 什么反馈都没有，只能等到下一个布萨日才知道成没成。
+  const [scheduled, setScheduled] = useState<number | null>(null);
+  const [denied, setDenied] = useState(false);
+  const [system] = useCalendarSystem(defaultSystemFor(locale));
+
+  const toggleNotify = useCallback(
+    async (next: boolean) => {
+      setNotifyBusy(true);
+      // 先落盘再排程：万一排程过程中被杀掉，下次启动也能按用户的意愿恢复。
+      await setUposathaNotify(next);
+      setNotify(next);
+      const place = (await loadSavedPlace()) ?? fallbackPlace();
+      const n = await rescheduleUposathaNotifications({
+        enabled: next,
+        system,
+        timeZone: place.timeZone,
+        text: notifyTextOf(t),
+      });
+      // 开了却一条没排出去，只可能是权限被拒。
+      setDenied(next && n === 0);
+      setScheduled(next ? n : null);
+      setNotifyBusy(false);
+    },
+    [system, t],
+  );
 
   // 「跟随系统」时显示实际生效的语言，让用户一眼看到当前是哪种。
   const currentLanguageLabel =
@@ -38,6 +71,9 @@ export function SettingsScreen() {
       let alive = true;
       getApiServer().then((v) => {
         if (alive) setServer(v);
+      });
+      getUposathaNotify().then((v) => {
+        if (alive) setNotify(v);
       });
       return () => {
         alive = false;
@@ -74,6 +110,31 @@ export function SettingsScreen() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
       </Pressable>
+
+      <View style={styles.divider} />
+
+      {/* 布萨日提醒：纯本地排程，不需要后端（docs/buddhist-calendar.md §2.10） */}
+      <Text style={styles.sectionTitle}>{t("settings.notifications")}</Text>
+      <View style={styles.row}>
+        <Ionicons name="notifications-outline" size={20} color={colors.inkSoft} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowLabel}>{t("settings.uposathaNotify")}</Text>
+          <Text style={styles.rowHint}>{t("settings.uposathaNotifyHint")}</Text>
+          {denied ? (
+            <Text style={styles.rowWarn}>{t("settings.uposathaNotifyDenied")}</Text>
+          ) : scheduled ? (
+            <Text style={styles.rowHint}>
+              {t("settings.uposathaNotifyScheduled", { n: scheduled })}
+            </Text>
+          ) : null}
+        </View>
+        <Switch
+          value={notify}
+          disabled={notifyBusy}
+          onValueChange={(v) => void toggleNotify(v)}
+          trackColor={{ true: colors.vermilion, false: colors.border }}
+        />
+      </View>
 
       <View style={styles.divider} />
 
@@ -130,6 +191,16 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     ...type.body,
+  },
+  rowHint: {
+    ...type.small,
+    color: colors.inkFaint,
+    marginTop: 2,
+  },
+  rowWarn: {
+    ...type.small,
+    color: colors.ochre,
+    marginTop: 2,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

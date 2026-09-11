@@ -313,6 +313,14 @@ const th: Messages = {
   "calendar.location.offlineNote": "ตารางเมืองออฟไลน์ · ราว {n} หมื่นเมือง (ประชากร 15,000 ขึ้นไป) มากับแอป ใช้ได้โดยไม่ต้องต่อเน็ต",
   "calendar.location.usingCity": "กำลังคำนวณจากเมืองที่คุณเลือก ใช้พิกัดของเมืองนั้น",
   "calendar.location.auto": "ระบุตำแหน่ง",
+  "calendar.notify.title": "อุโบสถ",
+  "calendar.notify.eve": "พรุ่งนี้เป็นวันอุโบสถ ({label})",
+  "calendar.notify.morn": "วันนี้เป็นวันอุโบสถ ({label})",
+  "settings.notifications": "การแจ้งเตือน",
+  "settings.uposathaNotify": "เตือนวันอุโบสถ",
+  "settings.uposathaNotifyHint": "เตือนสองครั้ง: 20:00 ของวันก่อนหน้า และ 07:00 ของวันนั้น คำนวณในเครื่อง ไม่ต้องใช้เน็ต",
+  "settings.uposathaNotifyDenied": "ยังไม่ได้รับสิทธิ์แจ้งเตือน กรุณาอนุญาตในการตั้งค่าของเครื่อง",
+  "settings.uposathaNotifyScheduled": "ตั้งการเตือนแล้ว {n} รายการ",
 };
 
 export default th;

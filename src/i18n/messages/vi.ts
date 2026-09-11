@@ -316,6 +316,14 @@ const vi: Messages = {
   "calendar.location.offlineNote": "Danh mục ngoại tuyến · khoảng {n}0 nghìn thị trấn (dân số từ 15.000), đi kèm ứng dụng, không cần mạng.",
   "calendar.location.usingCity": "Đang tính theo thị trấn bạn đã chọn, dùng toạ độ của nơi đó.",
   "calendar.location.auto": "Định vị",
+  "calendar.notify.title": "Bố-tát",
+  "calendar.notify.eve": "Ngày mai là ngày Bố-tát ({label}).",
+  "calendar.notify.morn": "Hôm nay là ngày Bố-tát ({label}).",
+  "settings.notifications": "Thông báo",
+  "settings.uposathaNotify": "Nhắc ngày Bố-tát",
+  "settings.uposathaNotifyHint": "Hai lần: 20:00 hôm trước và 07:00 hôm đó. Ngày được tính ngay trên máy, không cần mạng.",
+  "settings.uposathaNotifyDenied": "Chưa được cấp quyền thông báo. Hãy cho phép trong cài đặt hệ thống.",
+  "settings.uposathaNotifyScheduled": "Đã đặt {n} lời nhắc",
 };
 
 export default vi;

@@ -316,6 +316,14 @@ const en: Messages = {
   "calendar.location.offlineNote": "Offline gazetteer · {n}0k towns (population 15,000+), bundled with the app, works without a network.",
   "calendar.location.usingCity": "Computing from the town you picked — times use its coordinates, about 1–2 minutes per 100 km.",
   "calendar.location.auto": "Locate me",
+  "calendar.notify.title": "Uposatha",
+  "calendar.notify.eve": "Tomorrow is an uposatha day ({label}).",
+  "calendar.notify.morn": "Today is an uposatha day ({label}).",
+  "settings.notifications": "Notifications",
+  "settings.uposathaNotify": "Uposatha reminders",
+  "settings.uposathaNotifyHint": "Twice per uposatha: 20:00 the day before and 07:00 on the day. Dates are computed on this device — no network needed.",
+  "settings.uposathaNotifyDenied": "Notification permission was not granted. Allow notifications for this app in your system settings.",
+  "settings.uposathaNotifyScheduled": "{n} reminders scheduled",
 };
 
 export default en;

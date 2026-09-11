@@ -309,6 +309,14 @@ const zhHant: Messages = {
   "calendar.location.offlineNote": "離線城鎮表 · 約 {n} 萬個城鎮（人口 1.5 萬以上），隨包內置，無網可用。",
   "calendar.location.usingCity": "正在按手選的城鎮計算。日出日落取該點經緯度，誤差約每 100 公里 1–2 分鐘。",
   "calendar.location.auto": "自動定位",
+  "calendar.notify.title": "布薩",
+  "calendar.notify.eve": "明天是布薩日（{label}）。",
+  "calendar.notify.morn": "今天是布薩日（{label}）。",
+  "settings.notifications": "通知",
+  "settings.uposathaNotify": "布薩日提醒",
+  "settings.uposathaNotifyHint": "前一天 20:00 與當天 07:00 各提醒一次。日期在本機推算，無需連網。",
+  "settings.uposathaNotifyDenied": "系統未授予通知權限，請在手機的應用設定裡允許通知。",
+  "settings.uposathaNotifyScheduled": "已排 {n} 條提醒",
 };
 
 export default zhHant;

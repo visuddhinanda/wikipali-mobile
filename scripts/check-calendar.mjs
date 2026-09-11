@@ -33,6 +33,13 @@ const { zonedNoon } = require(`${OUT}calendar/tz.js`);
 const { flightSunEvents } = require(`${OUT}calendar/flight/events.js`);
 const { countdownTo } = require(`${OUT}calendar/countdown.js`);
 const { nextFestival, vassaProgress } = require(`${OUT}calendar/festivals.js`);
+const {
+  EVENING_HOUR,
+  MORNING_HOUR,
+  plannedNotifications,
+  previousDayKey,
+  upcomingUposatha,
+} = require(`${OUT}calendar/uposatha.js`);
 const { CITY_COUNT, searchCities } = require(`${OUT}calendar/location/cities.js`);
 const { findAirport } = require(`${OUT}calendar/flight/airports.js`);
 
@@ -335,6 +342,93 @@ const CITIES = [
     "HEL → BKK（12 月）途中遇到日落与明相",
     events.some((e) => e.kind === "dusk") && events.some((e) => e.kind === "aruna"),
     events.map((e) => e.kind).join(","),
+  );
+}
+
+
+// 9. 布萨日通知排程（§2.10）
+//
+// 排程本身是纯函数，不碰 expo-notifications，所以能在这里跑。要断言的是：
+// 数量对、两条的先后对、**换算回当地时间确实是 20:00 与 07:00**（时区和夏令时
+// 最容易在这里出错），以及已经过去的时刻不会被排出去。
+{
+  const text = {
+    title: "布萨",
+    eveBody: (d) => `明天是布萨日（${d.dayLabel}）`,
+    mornBody: (d) => `今天是布萨日（${d.dayLabel}）`,
+  };
+  let countOk = true;
+  let hoursOk = true;
+  let orderOk = true;
+  let futureOk = true;
+  let gapOk = true;
+
+  for (const [name, lat, lon, tz] of CITIES) {
+    const now = new Date(Date.UTC(2026, 2, 15, 3, 0, 0));
+    const days = upcomingUposatha("astro", tz, now, 12);
+    if (days.length !== 12) {
+      countOk = false;
+      console.log(`  ${name} 只扫到 ${days.length} 个布萨日`);
+    }
+    // 布萨相邻间隔应在 6–9 天（半月十四或十五）。
+    for (let i = 1; i < days.length; i++) {
+      const a = Date.parse(days[i - 1].dayKey);
+      const b = Date.parse(days[i].dayKey);
+      const gap = (b - a) / 86400000;
+      if (gap < 6 || gap > 9) {
+        gapOk = false;
+        console.log(`  ${name} 布萨间隔 ${gap} 天：${days[i - 1].dayKey} → ${days[i].dayKey}`);
+      }
+    }
+
+    const planned = plannedNotifications(days, tz, now, text);
+    if (planned.length !== days.length * 2) countOk = false;
+
+    for (const item of planned) {
+      if (item.at.getTime() <= now.getTime()) futureOk = false;
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "2-digit",
+        hour12: false,
+        minute: "2-digit",
+      }).formatToParts(item.at);
+      const hour = Number(parts.find((p) => p.type === "hour").value);
+      const minute = Number(parts.find((p) => p.type === "minute").value);
+      const want = item.kind === "eve" ? EVENING_HOUR : MORNING_HOUR;
+      if (hour !== want || minute !== 0) {
+        hoursOk = false;
+        console.log(`  ${name} ${item.dayKey} ${item.kind} 落在当地 ${hour}:${minute}，应为 ${want}:00`);
+      }
+    }
+
+    // 同一个布萨日：前一天傍晚必须早于当天早上。
+    for (const day of days) {
+      const two = planned.filter((p) => p.dayKey === day.dayKey);
+      if (two.length === 2 && !(two[0].kind === "eve" && two[0].at < two[1].at)) orderOk = false;
+    }
+  }
+
+  check("每个布萨日排两条，数量与扫描结果一致", countOk);
+  check("相邻布萨相差 6–9 天", gapOk);
+  check(`两条分别落在当地 ${EVENING_HOUR}:00 与 ${MORNING_HOUR}:00（跨时区与夏令时）`, hoursOk);
+  check("前一天那条早于当天那条", orderOk);
+  check("已经过去的时刻不排", futureOk);
+
+  // 今天就是布萨日时，前一天傍晚那条早已过去，不能排出来。
+  {
+    const tz = "Asia/Colombo";
+    const days = upcomingUposatha("astro", tz, new Date(Date.UTC(2026, 2, 15, 3, 0, 0)), 1);
+    const today = days[0];
+    // 把「现在」设成该布萨日当天中午：eve 与 morn 都已过去。
+    const noonOfDay = new Date(Date.parse(`${today.dayKey}T12:00:00Z`));
+    const planned = plannedNotifications([today], tz, noonOfDay, text);
+    check("当天中午重排时不会补发当天早上那条", planned.length === 0);
+  }
+
+  check(
+    "前一天的日期换算正确（跨月）",
+    previousDayKey("2026-03-01") === "2026-02-28" &&
+      previousDayKey("2026-01-01") === "2025-12-31",
   );
 }
 
