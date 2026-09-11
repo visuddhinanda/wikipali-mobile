@@ -250,6 +250,7 @@ const si: Messages = {
   "calendar.times.aruna": "අරුණෝදය",
   "calendar.times.noon": "මධ්‍යාහ්නය",
   "calendar.times.dusk": "සිවිල් සැඳෑව",
+  "calendar.times.nauticalDusk": "නාවික සැඳෑව",
   "calendar.times.sunrise": "හිරු උදාව",
   "calendar.times.sunset": "හිරු බැසීම",
   "calendar.times.civilDawn": "සිවිල් අරුණ",

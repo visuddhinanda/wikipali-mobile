@@ -252,6 +252,7 @@ const en: Messages = {
   "calendar.times.aruna": "Dawn (aruṇa)",
   "calendar.times.noon": "Solar noon",
   "calendar.times.dusk": "Civil dusk",
+  "calendar.times.nauticalDusk": "Nautical dusk",
   "calendar.times.sunrise": "Sunrise",
   "calendar.times.sunset": "Sunset",
   "calendar.times.civilDawn": "Civil dawn",

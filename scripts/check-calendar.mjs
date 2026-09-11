@@ -298,7 +298,7 @@ const CITIES = [
   const sorted = events.every((e, i) => i === 0 || events[i - 1].at <= e.at);
   check("飞行事件按时间排序", sorted);
   check(
-    "HEL → BKK（12 月）途中遇到日暮与明相",
+    "HEL → BKK（12 月）途中遇到日落与明相",
     events.some((e) => e.kind === "dusk") && events.some((e) => e.kind === "aruna"),
     events.map((e) => e.kind).join(","),
   );

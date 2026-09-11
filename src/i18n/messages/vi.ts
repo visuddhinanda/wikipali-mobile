@@ -252,6 +252,7 @@ const vi: Messages = {
   "calendar.times.aruna": "Minh tướng",
   "calendar.times.noon": "Chính ngọ",
   "calendar.times.dusk": "Hoàng hôn dân dụng",
+  "calendar.times.nauticalDusk": "Hoàng hôn hàng hải",
   "calendar.times.sunrise": "Mặt trời mọc",
   "calendar.times.sunset": "Mặt trời lặn",
   "calendar.times.civilDawn": "Bình minh dân dụng",

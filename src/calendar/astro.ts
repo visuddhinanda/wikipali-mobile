@@ -37,7 +37,7 @@ export interface SunTimes {
   sunset: Date | null;
   civilDusk: Date | null;
   nauticalDusk: Date | null;
-  /** 日落（民用日暮加回蒙气差修正）—— 与明相对称，律上的日落取这一条。 */
+  /** 日落（民用暮光加回蒙气差修正）—— 与明相对称，律上的日落取这一条。 */
   dusk: Date | null;
   /** 早晚各自的蒙气差修正量（秒）；走兜底分支时为 `null`。 */
   refractionMorning: number | null;
@@ -89,7 +89,7 @@ const SECOND = 1000;
  * 蒙气差修正（§2.2）：
  *   蒙气差 = (民用曙光 − 航海曙光) − (日出 − 民用曙光)
  *   明相   = 民用曙光 − 蒙气差
- * 日暮侧对称。修正量为负时钳到 0（高纬度冬季会出现），航海曙光不存在时
+ * 日落侧对称。修正量为负时钳到 0（高纬度冬季会出现），航海曙光不存在时
  * 退回按 −6.833° 单次搜索。
  */
 export function sunTimes(p: GeoPoint, anyInstantOfDay: Date): SunTimes {

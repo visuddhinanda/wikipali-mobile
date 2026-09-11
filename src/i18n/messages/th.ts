@@ -249,6 +249,7 @@ const th: Messages = {
   "calendar.times.aruna": "อรุณ",
   "calendar.times.noon": "เที่ยงวัน",
   "calendar.times.dusk": "พลบค่ำพลเรือน",
+  "calendar.times.nauticalDusk": "พลบค่ำนาวี",
   "calendar.times.sunrise": "พระอาทิตย์ขึ้น",
   "calendar.times.sunset": "พระอาทิตย์ตก",
   "calendar.times.civilDawn": "รุ่งอรุณพลเรือน",

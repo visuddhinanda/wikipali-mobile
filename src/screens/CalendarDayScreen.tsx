@@ -79,6 +79,10 @@ export function CalendarDayScreen() {
 
   // 一列时刻必须**按时间先后**排，哪怕明相是从民用曙光倒推出来的：
   // 数字不单调递增，读的人第一反应是算错了。
+  //
+  // 早晚各四条，互为镜像 —— 航海曙光 −12° / 明相 −6°加蒙气差 / 民用曙光 −6° /
+  // 日出 0°，对着日没 0° / 民用暮光 −6° / 日落 −6°加蒙气差 / 航海暮光 −12°。
+  // 早上有航海曙光、晚上却没有航海暮光，读的人会以为是漏算了。
   const timeRows: { key: MessageKey; pali?: string; at: Date | null; strong?: boolean }[] = [
     { key: "calendar.times.nauticalDawn", at: times.nauticalDawn },
     { key: "calendar.times.aruna", pali: PALI_TIME_NAMES.aruna, at: times.aruna, strong: true },
@@ -93,6 +97,7 @@ export function CalendarDayScreen() {
       at: times.dusk,
       strong: true,
     },
+    { key: "calendar.times.nauticalDusk", at: times.nauticalDusk },
   ];
 
   // 曲线上的五个圆点：明相 / 日出 / 日中 / 日没 / 日落。日出与日没正落在地平线上，

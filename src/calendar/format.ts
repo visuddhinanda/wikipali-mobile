@@ -119,7 +119,7 @@ export function deltaLabelOf(day: LunarDay | undefined): string {
  *
  * `atthaṅgama` 挂在 **`dusk`（−6° 加蒙气差修正）** 上，不是挂在 `sunset`
  * （0°，日面上缘切地平）上：律上的日落要与明相对称 —— 明相是民用曙光减去
- * 蒙气差，日落就是民用日暮加回同一份量。0° 那一条是天文意义的日没，另有其名。
+ * 蒙气差，日落就是民用暮光加回同一份量。0° 那一条是天文意义的日没，另有其名。
  */
 export const PALI_TIME_NAMES = {
   aruna: "aruṇuggamana",

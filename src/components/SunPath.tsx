@@ -41,7 +41,7 @@ export interface SunMark {
   /** 只有日中带名字，写在时刻后面。 */
   name?: string;
   /**
-   * - `threshold` 明相 / 日暮：地平线之下的阈值时刻，空心环。
+   * - `threshold` 明相 / 日落：地平线之下的阈值时刻，空心环。
    * - `horizon` 日出 / 日没：太阳正在地平线上，实心赭点。
    * - `peak` 日中：太阳上中天，实心朱砂点，画得大一点。
    */
@@ -155,7 +155,7 @@ export function SunPath({ place, year, month, day, marks = [], height = 132 }: P
               const y = yAtHour(mark.hour);
               const w = mark.name ? LABEL_NAMED_W : LABEL_W;
               // 明相与日出只差二十几分钟，两个点几乎叠在一起，标签必须**上下加左右**
-              // 都岔开：阈值时刻（明相 / 日暮）的标签在点上方，升没（日出 / 日没）
+              // 都岔开：阈值时刻（明相 / 日落）的标签在点上方，升没（日出 / 日没）
               // 在下方；再把上午那一对往左推、下午那一对往右推，各自贴着自己的点。
               const above = mark.kind !== "horizon";
               const morning = mark.hour < 12;

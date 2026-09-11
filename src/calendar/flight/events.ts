@@ -2,7 +2,7 @@
  * 沿途太阳事件（§4.2）。
  *
  * 把航程按每分钟切一个采样点，对每点用它自己的经纬度求太阳高度角：
- * - 升穿 −6.833° = 明相，降穿 = 日暮（阈值与地面一致，机上判日界用同一个定义）；
+ * - 升穿 −6.833° = 明相，降穿 = 日落（阈值与地面一致，机上判日界用同一个定义）；
  * - 高度角的局部极大 = 日中（对飞行中的观察者，地面那套「上中天」公式不成立）。
  *
  * 巡航高度会让地平线下沉：`dip = arccos(R / (R + h))`，10 km 高空约 3.2°，
@@ -104,7 +104,7 @@ export function flightSunEvents(leg: FlightLeg): FlightEvent[] {
     const prev = pts[i - 1];
     const cur = pts[i];
 
-    // 穿越 −6.833°：升为明相，降为日暮。
+    // 穿越 −6.833°：升为明相，降为日落。
     if ((prev.altitude - threshold) * (cur.altitude - threshold) < 0) {
       const hit = refine(leg, dip, prev, cur, threshold);
       events.push({

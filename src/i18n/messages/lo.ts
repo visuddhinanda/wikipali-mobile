@@ -249,6 +249,7 @@ const lo: Messages = {
   "calendar.times.aruna": "ອະລຸນ",
   "calendar.times.noon": "ທ່ຽງວັນ",
   "calendar.times.dusk": "ຄ່ຳພົນລະເຮືອນ",
+  "calendar.times.nauticalDusk": "ຄ່ຳນາວີ",
   "calendar.times.sunrise": "ຕາເວັນຂຶ້ນ",
   "calendar.times.sunset": "ຕາເວັນຕົກ",
   "calendar.times.civilDawn": "ອະລຸນພົນລະເຮືອນ",

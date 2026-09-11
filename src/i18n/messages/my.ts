@@ -254,6 +254,7 @@ const my: Messages = {
   "calendar.times.aruna": "အရုဏ်တက်",
   "calendar.times.noon": "မွန်းတည့်",
   "calendar.times.dusk": "အရပ်သုံးနေဝင်",
+  "calendar.times.nauticalDusk": "ရေကြောင်းနေဝင်",
   "calendar.times.sunrise": "နေထွက်",
   "calendar.times.sunset": "နေဝင်",
   "calendar.times.civilDawn": "အရပ်သုံးအရုဏ်",
