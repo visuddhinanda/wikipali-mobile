@@ -10,7 +10,11 @@ import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useI18n } from "../i18n/I18nContext";
 import { getUposathaNotify, setUposathaNotify } from "../settings/notifications";
-import { notifyTextOf, rescheduleUposathaNotifications } from "../calendar/notifications";
+import {
+  notifyTextOf,
+  rescheduleUposathaNotifications,
+  scheduleTestNotification,
+} from "../calendar/notifications";
 import { defaultSystemFor } from "../calendar/lunar";
 import { fallbackPlace, loadSavedPlace } from "../calendar/location/place";
 import { useCalendarSystem } from "../calendar/useCalendar";
@@ -30,6 +34,16 @@ export function SettingsScreen() {
   const [scheduled, setScheduled] = useState<number | null>(null);
   const [denied, setDenied] = useState(false);
   const [system] = useCalendarSystem(defaultSystemFor(locale));
+
+  // 开发期真机自检：两分钟后发一条，好当场看到通知长什么样，不用等下一个布萨日。
+  // 只在 __DEV__ 出现，release 包里没有这个入口。
+  const [testAt, setTestAt] = useState<Date | null>(null);
+  const sendTest = useCallback(async () => {
+    const place = (await loadSavedPlace()) ?? fallbackPlace();
+    setTestAt(
+      await scheduleTestNotification({ system, timeZone: place.timeZone, text: notifyTextOf(t) }),
+    );
+  }, [system, t]);
 
   const toggleNotify = useCallback(
     async (next: boolean) => {
@@ -135,6 +149,20 @@ export function SettingsScreen() {
           trackColor={{ true: colors.vermilion, false: colors.border }}
         />
       </View>
+
+      {__DEV__ ? (
+        <Pressable style={styles.row} onPress={() => void sendTest()}>
+          <Ionicons name="flask-outline" size={20} color={colors.inkSoft} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowLabel}>发一条测试通知（仅开发版）</Text>
+            <Text style={styles.rowHint}>
+              {testAt
+                ? `将在 ${testAt.toLocaleTimeString()} 发出 —— 现在可以退出 App 锁屏等它`
+                : "两分钟后发出，内容取自下一个真实布萨日，走正式排程的同一条路径"}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       <View style={styles.divider} />
 

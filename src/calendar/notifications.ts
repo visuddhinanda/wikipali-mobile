@@ -121,6 +121,45 @@ export function notifyTextOf(
   };
 }
 
+/**
+ * 开发期真机自检：把**下一个真实布萨日**的那条通知照原样排一遍，但两分钟后就发。
+ *
+ * 走的是和正式排程完全相同的路径 —— 同样的文案生成、同样的 Android 渠道、
+ * 同样的 DATE trigger，只把触发时刻挪到眼前。所以它验的是整条链路，而不是
+ * 「能不能弹一个写死的字符串」。
+ *
+ * 故意**不取消已有排程**：测试归测试，不该把用户已经排好的提醒清掉。
+ *
+ * 只在 `__DEV__` 下由设置页调用，release 包里没有入口。
+ */
+export async function scheduleTestNotification(opts: {
+  system: CalendarSystem;
+  timeZone: string;
+  text: NotifyText;
+  /** 多久之后发，默认两分钟 —— 够你按下按钮、退出 App、锁屏。 */
+  delaySeconds?: number;
+}): Promise<Date | null> {
+  if (!(await ensureNotificationPermission())) return null;
+  await ensureChannel();
+
+  const next = upcomingUposatha(opts.system, opts.timeZone, new Date(), 1)[0];
+  const at = new Date(Date.now() + (opts.delaySeconds ?? 120) * 1000);
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: opts.text.title,
+      // 用「前一天」那条的文案：它带日期，一眼能看出算的是哪一天。
+      body: next ? opts.text.eveBody(next) : opts.text.title,
+      data: { test: true, dayKey: next?.dayKey },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: at,
+      channelId: CHANNEL_ID,
+    },
+  });
+  return at;
+}
+
 /** 当前系统里还挂着多少条待发通知 —— 设置页显示用，也方便真机排查。 */
 export async function scheduledCount(): Promise<number> {
   return (await Notifications.getAllScheduledNotificationsAsync()).length;
