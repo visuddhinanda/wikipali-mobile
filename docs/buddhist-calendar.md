@@ -247,6 +247,36 @@ const isUNVesak = sameLocalDate(t, day);
 | 换时区 / 改历法 / 改界面语言 | 一律**先全部取消再重排**，不逐条对账。文案在排程那一刻就写死（投递时 App 可能没在跑，没法回调现算），所以改语言必须重排 |
 | 今天就是布萨日 | 已经过去的时刻不排，否则会立刻弹一条莫名其妙的通知 |
 
+#### 国产 ROM 的省电策略会把提醒推迟数天（真机实测）
+
+**这是本功能最严重的约束，比 iOS 的 64 条上限重要得多。**
+
+小米 2304FPN6DC 真机实测：通知排好之后 `dumpsys alarm` 显示闹钟确实登记了、时刻分毫不差，但最终生效时间被系统改成了**三天后**：
+
+```
+tag=*walarm*:expo.modules.notifications.NOTIFICATION_EVENT
+origWhen=2026-09-24 20:00:00.000   window=+1h
+policyWhenElapsed: requester=+13d10h33m ... power_pending=+16d10h33m
+whenElapsed=+16d10h33m            ← 最终按这个发
+```
+
+`power_pending` 是 MIUI 自家省电框架加的，**不是 AOSP 的策略**。试过而无效的手段：
+
+| 手段 | 结果 |
+|---|---|
+| `am set-standby-bucket <pkg> active` | `app_standby` 约束解除，`power_pending` 不变 |
+| `dumpsys deviceidle whitelist +<pkg>` | `battery_saver` 约束解除，`power_pending` 不变 |
+| `appops set <pkg> AUTO_START allow` | `Unknown operation string` —— 没有这个 op |
+| 申请 `SCHEDULE_EXACT_ALARM` | 救不了 `power_pending`；何况我们刻意不申请 |
+
+**结论：代码层面无解，只能引导用户去系统设置里把省电策略改成「无限制」并允许自启动。**
+
+所以设置页在开关打开后会显示一条提示 + 一个跳转按钮（`Linking.openSettings()`，即 `ACTION_APPLICATION_DETAILS_SETTINGS`）。各家 ROM 把这一项藏在不同层级，没法深链到具体那一项，应用详情页是能做到的最近一步。
+
+是否显示按**厂商名单**判断（`src/settings/powerRestriction.ts`，参考 dontkillmyapp.com），不去探测实际限制 —— Android 没有公开 API 能查「我的闹钟会不会被推迟」（`isIgnoringBatteryOptimizations` 只覆盖 AOSP 的 doze，查不到 MIUI 这一层）。名单宁可宽一点：多提示一句的代价，远小于提醒静默失效。
+
+**这个失败模式特别隐蔽**：权限被拒至少是完全没有通知，用户会发现；省电限制是通知照来但迟到几天，用户根本不会归因到这里。
+
 代码分两层：`uposatha.ts` 是**纯逻辑**（扫布萨日、算出每条通知的时刻与文案），不 import 任何原生模块，所以自检能直接跑它；`notifications.ts` 只管权限、Android 渠道和调用 `expo-notifications`。
 
 默认**关**。通知是打扰，不能装上就自己开。

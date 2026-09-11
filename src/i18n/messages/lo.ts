@@ -321,6 +321,8 @@ const lo: Messages = {
   "settings.uposathaNotifyHint": "ສອງເທື່ອ: 20:00 ມື້ກ່ອນ ແລະ 07:00 ມື້ນັ້ນ. ຄຳນວນໃນເຄື່ອງ, ບໍ່ຕ້ອງໃຊ້ເນັດ.",
   "settings.uposathaNotifyDenied": "ຍັງບໍ່ໄດ້ຮັບສິດແຈ້ງເຕືອນ. ກະລຸນາອະນຸຍາດໃນການຕັ້ງຄ່າ.",
   "settings.uposathaNotifyScheduled": "ຕັ້ງການເຕືອນແລ້ວ {n} ລາຍການ",
+  "settings.uposathaNotifyPower": "ໂໝດປະຢັດພະລັງງານຂອງເຄື່ອງນີ້ຈະຊັກຊ້າການແຈ້ງເຕືອນເບື້ອງຫຼັງ ທົດສອບແລ້ວເຖິງສາມມື້. ກະລຸນາຕັ້ງແອັບນີ້ເປັນບໍ່ຈຳກັດ ແລະ ອະນຸຍາດໃຫ້ເລີ່ມອັດຕະໂນມັດ.",
+  "settings.uposathaNotifyPowerAction": "ເປີດການຕັ້ງຄ່າລະບົບ",
 };
 
 export default lo;

@@ -317,6 +317,8 @@ const zhHant: Messages = {
   "settings.uposathaNotifyHint": "前一天 20:00 與當天 07:00 各提醒一次。日期在本機推算，無需連網。",
   "settings.uposathaNotifyDenied": "系統未授予通知權限，請在手機的應用設定裡允許通知。",
   "settings.uposathaNotifyScheduled": "已排 {n} 條提醒",
+  "settings.uposathaNotifyPower": "這台裝置的省電策略會延遲背景提醒，實測可達三天。請在系統設定裡把本應用的省電策略設為「無限制」，並允許自啟動。",
+  "settings.uposathaNotifyPowerAction": "打開系統設定",
 };
 
 export default zhHant;

@@ -321,6 +321,8 @@ const th: Messages = {
   "settings.uposathaNotifyHint": "เตือนสองครั้ง: 20:00 ของวันก่อนหน้า และ 07:00 ของวันนั้น คำนวณในเครื่อง ไม่ต้องใช้เน็ต",
   "settings.uposathaNotifyDenied": "ยังไม่ได้รับสิทธิ์แจ้งเตือน กรุณาอนุญาตในการตั้งค่าของเครื่อง",
   "settings.uposathaNotifyScheduled": "ตั้งการเตือนแล้ว {n} รายการ",
+  "settings.uposathaNotifyPower": "โหมดประหยัดพลังงานของเครื่องนี้จะหน่วงการแจ้งเตือนเบื้องหลัง ทดสอบแล้วนานถึงสามวัน กรุณาตั้งค่าแอปนี้เป็นไม่จำกัด และอนุญาตให้เริ่มทำงานอัตโนมัติ",
+  "settings.uposathaNotifyPowerAction": "เปิดการตั้งค่าระบบ",
 };
 
 export default th;

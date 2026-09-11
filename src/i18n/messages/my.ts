@@ -326,6 +326,8 @@ const my: Messages = {
   "settings.uposathaNotifyHint": "မတိုင်မီနေ့ ၂၀:၀၀ နှင့် ထိုနေ့ ၀၇:၀၀ တွင် တစ်ကြိမ်စီ။ ရက်စွဲကို ဖုန်းထဲမှာတွက်သဖြင့် အင်တာနက်မလို။",
   "settings.uposathaNotifyDenied": "အကြောင်းကြားခွင့် မရသေးပါ။ ဖုန်းဆက်တင်တွင် ခွင့်ပြုပါ။",
   "settings.uposathaNotifyScheduled": "သတိပေးချက် {n} ခု စီစဉ်ပြီး",
+  "settings.uposathaNotifyPower": "ဤစက်၏ ဘက်ထရီချွေတာမှုက နောက်ခံသတိပေးချက်များကို သုံးရက်အထိ နှောင့်နှေးစေနိုင်သည်။ စနစ်ဆက်တင်တွင် ဤအက်ပ်ကို ကန့်သတ်မထားရန် နှင့် အလိုအလျောက်စတင်ရန် ခွင့်ပြုပါ။",
+  "settings.uposathaNotifyPowerAction": "စနစ်ဆက်တင် ဖွင့်ရန်",
 };
 
 export default my;

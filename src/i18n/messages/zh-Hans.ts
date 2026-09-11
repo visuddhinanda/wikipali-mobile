@@ -337,6 +337,8 @@ const zhHans = {
   "settings.uposathaNotifyHint": "前一天 20:00 与当天 07:00 各提醒一次。日期在本机推算，无需联网。",
   "settings.uposathaNotifyDenied": "系统未授予通知权限，请在手机的应用设置里允许通知。",
   "settings.uposathaNotifyScheduled": "已排 {n} 条提醒",
+  "settings.uposathaNotifyPower": "这台设备的省电策略会推迟后台提醒，实测可达三天。请在系统设置里把本应用的省电策略设为「无限制」，并允许自启动。",
+  "settings.uposathaNotifyPowerAction": "打开系统设置",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

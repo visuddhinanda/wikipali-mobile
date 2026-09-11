@@ -322,6 +322,8 @@ const si: Messages = {
   "settings.uposathaNotifyHint": "දෙවරක්: කලින් දින 20:00 සහ එදින 07:00. දින මෙම උපාංගයේ ගණනය වේ — ජාලයක් අවශ්‍ය නැත.",
   "settings.uposathaNotifyDenied": "දැනුම්දීම් අවසරය ලබා දී නැත. උපාංග සැකසුම් තුළ අවසර දෙන්න.",
   "settings.uposathaNotifyScheduled": "මතක් කිරීම් {n} ක් සකසා ඇත",
+  "settings.uposathaNotifyPower": "මෙම උපාංගයේ බැටරි ඉතිරිකිරීම පසුබිම් මතක් කිරීම් ප්‍රමාද කරයි — පරීක්ෂණයේදී දින තුනක් දක්වා. පද්ධති සැකසුම් තුළ මෙම යෙදුමට සීමා රහිත බලය සහ ස්වයං-ආරම්භය ලබා දෙන්න.",
+  "settings.uposathaNotifyPowerAction": "පද්ධති සැකසුම් විවෘත කරන්න",
 };
 
 export default si;

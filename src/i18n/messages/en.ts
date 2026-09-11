@@ -324,6 +324,8 @@ const en: Messages = {
   "settings.uposathaNotifyHint": "Twice per uposatha: 20:00 the day before and 07:00 on the day. Dates are computed on this device — no network needed.",
   "settings.uposathaNotifyDenied": "Notification permission was not granted. Allow notifications for this app in your system settings.",
   "settings.uposathaNotifyScheduled": "{n} reminders scheduled",
+  "settings.uposathaNotifyPower": "This device’s battery saver delays background reminders — by up to three days in our testing. In system settings, set this app’s battery policy to unrestricted and allow autostart.",
+  "settings.uposathaNotifyPowerAction": "Open system settings",
 };
 
 export default en;

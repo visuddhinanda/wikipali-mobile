@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -18,6 +18,7 @@ import {
 import { defaultSystemFor } from "../calendar/lunar";
 import { fallbackPlace, loadSavedPlace } from "../calendar/location/place";
 import { useCalendarSystem } from "../calendar/useCalendar";
+import { hasAggressivePowerManagement, openAppSettings } from "../settings/powerRestriction";
 import { LOCALE_OPTIONS } from "../i18n";
 import type { MessageKey } from "../i18n";
 
@@ -34,6 +35,8 @@ export function SettingsScreen() {
   const [scheduled, setScheduled] = useState<number | null>(null);
   const [denied, setDenied] = useState(false);
   const [system] = useCalendarSystem(defaultSystemFor(locale));
+  // 厂商是固定的，没必要每次渲染都问一次原生常量。
+  const powerRestricted = useMemo(() => hasAggressivePowerManagement(), []);
 
   // 开发期真机自检：两分钟后发一条，好当场看到通知长什么样，不用等下一个布萨日。
   // 只在 __DEV__ 出现，release 包里没有这个入口。
@@ -141,6 +144,21 @@ export function SettingsScreen() {
               {t("settings.uposathaNotifyScheduled", { n: scheduled })}
             </Text>
           ) : null}
+          {/*
+            省电策略的提示只在**开关打开后**出现：没开提醒时说这个是噪音。
+            这一条比权限被拒更隐蔽 —— 权限被拒至少没有通知，省电限制是通知会
+            来但迟到好几天，用户根本不会归因到这里（见 powerRestriction.ts）。
+          */}
+          {notify && powerRestricted ? (
+            <>
+              <Text style={styles.rowWarn}>{t("settings.uposathaNotifyPower")}</Text>
+              <Pressable onPress={() => void openAppSettings()} hitSlop={6}>
+                <Text style={styles.rowAction}>
+                  {t("settings.uposathaNotifyPowerAction")}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
         <Switch
           value={notify}
@@ -229,6 +247,12 @@ const styles = StyleSheet.create({
     ...type.small,
     color: colors.ochre,
     marginTop: 2,
+  },
+  rowAction: {
+    ...type.small,
+    color: colors.vermilion,
+    marginTop: spacing.xs,
+    textDecorationLine: "underline",
   },
   divider: {
     height: StyleSheet.hairlineWidth,

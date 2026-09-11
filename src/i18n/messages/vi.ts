@@ -324,6 +324,8 @@ const vi: Messages = {
   "settings.uposathaNotifyHint": "Hai lần: 20:00 hôm trước và 07:00 hôm đó. Ngày được tính ngay trên máy, không cần mạng.",
   "settings.uposathaNotifyDenied": "Chưa được cấp quyền thông báo. Hãy cho phép trong cài đặt hệ thống.",
   "settings.uposathaNotifyScheduled": "Đã đặt {n} lời nhắc",
+  "settings.uposathaNotifyPower": "Chế độ tiết kiệm pin của máy này làm trễ thông báo nền — thử nghiệm cho thấy có thể tới ba ngày. Hãy đặt ứng dụng này là không giới hạn và cho phép tự khởi động trong cài đặt hệ thống.",
+  "settings.uposathaNotifyPowerAction": "Mở cài đặt hệ thống",
 };
 
 export default vi;
