@@ -310,6 +310,8 @@ const si: Messages = {
   "calendar.location.addFavorite": "මෙම ස්ථානය සුරකින්න",
   "calendar.location.favoriteHint": "සෙවුම් ප්‍රතිඵලයක + ටැප් කර සුරකින්න",
   "calendar.location.offlineNote": "නොබැඳි නගර ලැයිස්තුව · නගර {n}0k ක් (ජනගහනය 15,000+), යෙදුම සමඟ, ජාලයක් අවශ්‍ය නැත.",
+  "calendar.location.usingCity": "ඔබ තෝරාගත් නගරයේ ඛණ්ඩාංක අනුව ගණනය කරයි.",
+  "calendar.location.auto": "ස්ථානගත කරන්න",
 };
 
 export default si;

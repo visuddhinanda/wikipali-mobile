@@ -305,6 +305,8 @@ const zhHant: Messages = {
   "calendar.location.addFavorite": "加入常用",
   "calendar.location.favoriteHint": "搜到的城鎮點右側 + 可以加入常用",
   "calendar.location.offlineNote": "離線城鎮表 · 約 {n} 萬個城鎮（人口 1.5 萬以上），隨包內置，無網可用。",
+  "calendar.location.usingCity": "正在按手選的城鎮計算。日出日落取該點經緯度，誤差約每 100 公里 1–2 分鐘。",
+  "calendar.location.auto": "自動定位",
 };
 
 export default zhHant;

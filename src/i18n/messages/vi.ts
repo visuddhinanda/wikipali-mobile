@@ -312,6 +312,8 @@ const vi: Messages = {
   "calendar.location.addFavorite": "Lưu địa điểm này",
   "calendar.location.favoriteHint": "Chạm + ở kết quả tìm kiếm để lưu lại",
   "calendar.location.offlineNote": "Danh mục ngoại tuyến · khoảng {n}0 nghìn thị trấn (dân số từ 15.000), đi kèm ứng dụng, không cần mạng.",
+  "calendar.location.usingCity": "Đang tính theo thị trấn bạn đã chọn, dùng toạ độ của nơi đó.",
+  "calendar.location.auto": "Định vị",
 };
 
 export default vi;

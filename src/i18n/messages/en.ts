@@ -312,6 +312,8 @@ const en: Messages = {
   "calendar.location.addFavorite": "Save this place",
   "calendar.location.favoriteHint": "Tap + on a search result to keep it here",
   "calendar.location.offlineNote": "Offline gazetteer · {n}0k towns (population 15,000+), bundled with the app, works without a network.",
+  "calendar.location.usingCity": "Computing from the town you picked — times use its coordinates, about 1–2 minutes per 100 km.",
+  "calendar.location.auto": "Locate me",
 };
 
 export default en;

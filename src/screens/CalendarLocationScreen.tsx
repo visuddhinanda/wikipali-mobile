@@ -36,6 +36,25 @@ export function CalendarLocationScreen() {
     void loadFavorites().then(setFavorites);
   }, []);
 
+  // 「自动定位」放标题栏：它是这一页的主操作，摆在正文里会跟常用地点、
+  // 搜索结果抢位置，而且滚下去就看不见了。
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={locateNow} disabled={busy} hitSlop={8} style={styles.headerAction}>
+          <Ionicons
+            name="locate"
+            size={15}
+            color={busy ? colors.inkFaint : colors.vermilion}
+          />
+          <Text style={[styles.headerActionText, busy && styles.headerActionBusy]}>
+            {busy ? t("calendar.location.searching") : t("calendar.location.auto")}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, t, locateNow, busy]);
+
   const results = useMemo<City[]>(
     () => (query.trim().length >= 1 ? searchCities(query, 20) : []),
     [query],
@@ -54,10 +73,11 @@ export function CalendarLocationScreen() {
   return (
     <Screen contentStyle={styles.content}>
       {/*
-        没定上位就一直摆着，不只是失败那一瞬间：用户手选了城镇之后仍然需要知道
-        「现在用的不是 GPS」以及误差有多大。
+        「定位失败」和「用户自己挑了城镇」是两回事，不能共用一句话：
+        挑完城镇再进来还说「没能取到定位」，会让人以为定位坏了。
+        真失败过才报警（金色框），手选城镇只给一句中性说明。
       */}
-      {!gpsAvailable || failed || place.source !== "gps" ? (
+      {!gpsAvailable || failed ? (
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
             {gpsAvailable
@@ -65,6 +85,8 @@ export function CalendarLocationScreen() {
               : t("calendar.location.unavailable")}
           </Text>
         </View>
+      ) : place.source !== "gps" ? (
+        <Text style={styles.hint}>{t("calendar.location.usingCity")}</Text>
       ) : null}
 
       <View style={styles.current}>
@@ -86,13 +108,6 @@ export function CalendarLocationScreen() {
           </Pressable>
         ) : null}
       </View>
-
-      <Pressable style={styles.button} onPress={locateNow} disabled={busy}>
-        <Ionicons name="locate" size={16} color={colors.vermilion} />
-        <Text style={styles.buttonText}>
-          {busy ? t("calendar.location.searching") : t("calendar.location.retry")}
-        </Text>
-      </Pressable>
 
       {favorites.length ? (
         <View style={styles.section}>
@@ -221,17 +236,8 @@ const styles = StyleSheet.create({
   rowName: { ...type.body },
   rowSub: { ...type.small, color: colors.inkFaint },
   rowCoord: { ...type.small, color: colors.inkFaint, textAlign: "right" },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    backgroundColor: colors.paperRaised,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-  },
-  buttonText: { ...type.body, color: colors.vermilion },
+  headerAction: { flexDirection: "row", alignItems: "center", gap: 4 },
+  headerActionText: { ...type.body, color: colors.vermilion },
+  headerActionBusy: { color: colors.inkFaint },
   hint: { ...type.small, color: colors.inkFaint },
 });

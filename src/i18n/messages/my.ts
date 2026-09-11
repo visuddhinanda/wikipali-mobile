@@ -314,6 +314,8 @@ const my: Messages = {
   "calendar.location.addFavorite": "ဤနေရာကို သိမ်းရန်",
   "calendar.location.favoriteHint": "ရှာတွေ့သည့်မြို့၏ + ကိုနှိပ်၍ သိမ်းနိုင်သည်",
   "calendar.location.offlineNote": "အော့ဖ်လိုင်းမြို့စာရင်း · မြို့ {n} သောင်း၊ အက်ပ်ထဲပါဝင်၊ အင်တာနက်မလို။",
+  "calendar.location.usingCity": "သင်ရွေးထားသောမြို့၏ တည်နေရာဖြင့် တွက်ချက်နေသည်။",
+  "calendar.location.auto": "အလိုအလျောက်",
 };
 
 export default my;

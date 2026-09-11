@@ -325,6 +325,8 @@ const zhHans = {
   "calendar.location.addFavorite": "加入常用",
   "calendar.location.favoriteHint": "搜到的城镇点右侧 + 可以加入常用",
   "calendar.location.offlineNote": "离线城镇表 · 约 {n} 万个城镇（人口 1.5 万以上），随包内置，无网可用。",
+  "calendar.location.usingCity": "正在按手选的城镇计算。日出日落取该点经纬度，误差约每 100 公里 1–2 分钟。",
+  "calendar.location.auto": "自动定位",
 } as const;
 
 export type MessageKey = keyof typeof zhHans;

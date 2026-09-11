@@ -309,6 +309,8 @@ const lo: Messages = {
   "calendar.location.addFavorite": "ບັນທຶກສະຖານທີ່ນີ້",
   "calendar.location.favoriteHint": "ແຕະ + ທີ່ຜົນຄົ້ນຫາເພື່ອບັນທຶກ",
   "calendar.location.offlineNote": "ຕາຕະລາງເມືອງອອບໄລນ໌ · ປະມານ {n} ໝື່ນເມືອງ (ປະຊາກອນ 15,000 ຂຶ້ນໄປ), ມາກັບແອັບ, ບໍ່ຕ້ອງໃຊ້ເນັດ.",
+  "calendar.location.usingCity": "ກຳລັງຄຳນວນຕາມເມືອງທີ່ທ່ານເລືອກ, ໃຊ້ພິກັດຂອງບ່ອນນັ້ນ.",
+  "calendar.location.auto": "ຫາຕຳແໜ່ງ",
 };
 
 export default lo;
