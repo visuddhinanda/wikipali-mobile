@@ -231,7 +231,7 @@ const th: Messages = {
   "calendar.system.thai": "ไทย",
   "calendar.system.chinese": "จีน",
   "calendar.system.astro.desc": "เวลาจันทร์ดับ/เพ็ญจริง ตามเขตเวลาท้องถิ่น",
-  "calendar.system.myanmar.desc": "Modern Myanmar Calendrical Calculations",
+  "calendar.system.myanmar.desc": "ปฏิทินพม่าสมัยใหม่ (Yan Naing Aye)",
   "calendar.system.srilanka.desc": "กำหนดวันตามเกณฑ์เที่ยงวันโคลัมโบ",
   "calendar.system.thai.desc": "ปฏิทินสุริยยาตร์ มีอธิกมาสและอธิกวาร",
   "calendar.system.chinese.desc": "จันทร์ดับจริงและสุริยคติ เขตเวลา UTC+8",

@@ -234,7 +234,7 @@ const vi: Messages = {
   "calendar.system.thai": "Thái Lan",
   "calendar.system.chinese": "Âm lịch Trung Hoa",
   "calendar.system.astro.desc": "Thời điểm sóc vọng thật, theo múi giờ nơi bạn ở",
-  "calendar.system.myanmar.desc": "Modern Myanmar Calendrical Calculations",
+  "calendar.system.myanmar.desc": "Lịch Miến Điện hiện đại (Yan Naing Aye)",
   "calendar.system.srilanka.desc": "Lấy ngày theo quy tắc chính ngọ Colombo",
   "calendar.system.thai.desc": "Lịch số học Suriyayatra, có tháng nhuận và ngày nhuận",
   "calendar.system.chinese.desc": "Định sóc định khí, múi giờ UTC+8",

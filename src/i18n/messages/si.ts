@@ -232,7 +232,7 @@ const si: Messages = {
   "calendar.system.thai": "තායිලන්ත",
   "calendar.system.chinese": "චීන",
   "calendar.system.astro.desc": "සැබෑ අමාවක/පසළොස්වක මොහොත, ඔබේ වේලා කලාපයෙන්",
-  "calendar.system.myanmar.desc": "Modern Myanmar Calendrical Calculations",
+  "calendar.system.myanmar.desc": "නවීන මියන්මාර් දින දර්ශන ගණනය (Yan Naing Aye)",
   "calendar.system.srilanka.desc": "කොළඹ මධ්‍යාහ්න නීතියෙන්",
   "calendar.system.thai.desc": "Suriyayatra ගණිත දින දර්ශනය",
   "calendar.system.chinese.desc": "සැබෑ අමාවක සහ සූර්ය කාල, UTC+8",

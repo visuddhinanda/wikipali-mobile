@@ -231,7 +231,7 @@ const lo: Messages = {
   "calendar.system.thai": "ໄທ",
   "calendar.system.chinese": "ຈີນ",
   "calendar.system.astro.desc": "ເວລາເດືອນດັບ/ເພັງແທ້ ຕາມເຂດເວລາທ້ອງຖິ່ນ",
-  "calendar.system.myanmar.desc": "Modern Myanmar Calendrical Calculations",
+  "calendar.system.myanmar.desc": "ປະຕິທິນມຽນມາສະໄໝໃໝ່ (Yan Naing Aye)",
   "calendar.system.srilanka.desc": "ຖືເອົາມື້ຕາມກົດທ່ຽງວັນໂຄລົມໂບ",
   "calendar.system.thai.desc": "ປະຕິທິນ Suriyayatra ມີເດືອນອະທິກະມາດ",
   "calendar.system.chinese.desc": "ຕາມເດືອນດັບແທ້, UTC+8",
