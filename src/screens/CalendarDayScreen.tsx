@@ -14,7 +14,7 @@ import type { RouteProp } from "@react-navigation/native";
 import { useRoute } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { MoonIcon } from "../components/MoonIcon";
-import { SunPath } from "../components/SunPath";
+import { SunPath, type SunMark } from "../components/SunPath";
 import { colors, radius, spacing, type } from "../theme";
 import { useI18n, useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
@@ -90,13 +90,21 @@ export function CalendarDayScreen() {
     { key: "calendar.times.duskAdjusted", at: times.dusk },
   ];
 
-  const markers = [
-    { at: times.aruna, color: colors.vermilion },
-    { at: times.noon, color: colors.vermilion },
-    { at: times.sunset, color: colors.vermilion },
+  // 曲线上的五个圆点：明相 / 日出 / 日中 / 日没 / 日暮。日出与日没正落在地平线上，
+  // 明相与日暮在地平线之下 —— 点的高低本身就说明了这几个时刻是怎么定义的，
+  // 所以只有日中需要写名字，另外四个看位置就知道是哪个。
+  const marks = [
+    { at: times.aruna, kind: "threshold" as const },
+    { at: times.sunrise, kind: "horizon" as const },
+    { at: times.noon, kind: "peak" as const, name: t("calendar.times.noon") },
+    { at: times.sunset, kind: "horizon" as const },
+    { at: times.dusk, kind: "threshold" as const },
   ]
-    .map(({ at, color }) => ({ hour: localHour(at, place.timeZone), color }))
-    .filter((m): m is { hour: number; color: string } => m.hour !== null);
+    .flatMap<SunMark>(({ at, kind, name }) => {
+      const hour = localHour(at, place.timeZone);
+      if (hour === null) return [];
+      return [{ hour, label: formatLocalTime(at, place.timeZone), name, kind }];
+    });
 
   return (
     <Screen contentStyle={styles.content}>
@@ -106,7 +114,7 @@ export function CalendarDayScreen() {
           year={year}
           month={month}
           day={day}
-          markers={markers}
+          marks={marks}
         />
 
         <View style={styles.head}>
