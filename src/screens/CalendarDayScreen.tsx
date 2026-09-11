@@ -85,14 +85,19 @@ export function CalendarDayScreen() {
     { key: "calendar.times.civilDawn", at: times.civilDawn },
     { key: "calendar.times.sunrise", at: times.sunrise },
     { key: "calendar.times.noon", pali: PALI_TIME_NAMES.noon, at: times.noon, strong: true },
-    { key: "calendar.times.sunset", pali: PALI_TIME_NAMES.sunset, at: times.sunset, strong: true },
+    { key: "calendar.times.sunset", at: times.sunset },
     { key: "calendar.times.dusk", at: times.civilDusk },
-    { key: "calendar.times.duskAdjusted", at: times.dusk },
+    {
+      key: "calendar.times.duskAdjusted",
+      pali: PALI_TIME_NAMES.dusk,
+      at: times.dusk,
+      strong: true,
+    },
   ];
 
-  // 曲线上的五个圆点：明相 / 日出 / 日中 / 日没 / 日暮。日出与日没正落在地平线上，
-  // 明相与日暮在地平线之下 —— 点的高低本身就说明了这几个时刻是怎么定义的，
-  // 所以只有日中需要写名字，另外四个看位置就知道是哪个。
+  // 曲线上的五个圆点：明相 / 日出 / 日中 / 日没 / 日落。日出与日没正落在地平线上，
+  // 明相与日落在地平线之下同样深 —— 点的高低本身就说明了这几个时刻是怎么定义的、
+  // 哪两个是一对，所以只有日中需要写名字，另外四个看位置就知道是哪个。
   const marks = [
     { at: times.aruna, kind: "threshold" as const },
     { at: times.sunrise, kind: "horizon" as const },

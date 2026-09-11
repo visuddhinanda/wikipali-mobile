@@ -307,7 +307,7 @@ const en: Messages = {
   "calendar.flight.offline": "You're offline. Enter the airports and times yourself — the computation works without a network.",
   "calendar.flight.notFound": "No such flight — check the number and date, or enter it yourself.",
   "calendar.flight.serviceDown": "The flight lookup service is unavailable — enter the flight yourself.",
-  "calendar.times.duskAdjusted": "Dusk (adjusted)",
+  "calendar.times.duskAdjusted": "Dusk",
   "calendar.location.favorites": "Saved places",
   "calendar.location.addFavorite": "Save this place",
   "calendar.location.favoriteHint": "Tap + on a search result to keep it here",

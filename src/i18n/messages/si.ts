@@ -305,7 +305,7 @@ const si: Messages = {
   "calendar.flight.offline": "ජාලයක් නැත. ගුවන් තොටුපළ සහ වේලාවන් අතින් ඇතුළු කරන්න.",
   "calendar.flight.notFound": "එවැනි ගුවන් ගමනක් නැත.",
   "calendar.flight.serviceDown": "ගුවන් සෙවුම් සේවාව තාවකාලිකව නොමැත.",
-  "calendar.times.duskAdjusted": "සැඳෑව (නිවැරදි කළ)",
+  "calendar.times.duskAdjusted": "සැඳෑව",
   "calendar.location.favorites": "සුරකින ලද ස්ථාන",
   "calendar.location.addFavorite": "මෙම ස්ථානය සුරකින්න",
   "calendar.location.favoriteHint": "සෙවුම් ප්‍රතිඵලයක + ටැප් කර සුරකින්න",

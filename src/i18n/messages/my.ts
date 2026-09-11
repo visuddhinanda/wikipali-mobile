@@ -309,7 +309,7 @@ const my: Messages = {
   "calendar.flight.offline": "အင်တာနက်မရှိပါ။ လေဆိပ်နှင့်အချိန်ကို ကိုယ်တိုင်ဖြည့်ပါ။",
   "calendar.flight.notFound": "ဤလေယာဉ်ကို မတွေ့ပါ။",
   "calendar.flight.serviceDown": "ရှာဖွေမှုဝန်ဆောင်မှု ယာယီမရပါ။",
-  "calendar.times.duskAdjusted": "အမှန်တကယ် နေဝင်မှောင်",
+  "calendar.times.duskAdjusted": "နေဝင်မှောင်",
   "calendar.location.favorites": "သိမ်းထားသောနေရာများ",
   "calendar.location.addFavorite": "ဤနေရာကို သိမ်းရန်",
   "calendar.location.favoriteHint": "ရှာတွေ့သည့်မြို့၏ + ကိုနှိပ်၍ သိမ်းနိုင်သည်",

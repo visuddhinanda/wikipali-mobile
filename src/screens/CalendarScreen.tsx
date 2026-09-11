@@ -111,7 +111,9 @@ export function CalendarScreen() {
   const timeBoxes: { key: MessageKey; pali: string; at: Date | null }[] = [
     { key: "calendar.times.aruna", pali: PALI_TIME_NAMES.aruna, at: times.aruna },
     { key: "calendar.times.noon", pali: PALI_TIME_NAMES.noon, at: times.noon },
-    { key: "calendar.times.sunset", pali: PALI_TIME_NAMES.sunset, at: times.sunset },
+    // 第三格是**日落**（−6° 加蒙气差），不是日没（0°）：底卡这三个是律上的判据，
+    // 明相与日落必须对称 —— 一个减去蒙气差、一个加回同一份量。
+    { key: "calendar.times.duskAdjusted", pali: PALI_TIME_NAMES.dusk, at: times.dusk },
   ];
 
   return (

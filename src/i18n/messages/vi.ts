@@ -307,7 +307,7 @@ const vi: Messages = {
   "calendar.flight.offline": "Không có mạng. Hãy tự nhập sân bay và giờ bay.",
   "calendar.flight.notFound": "Không tìm thấy chuyến bay này.",
   "calendar.flight.serviceDown": "Dịch vụ tra cứu tạm thời không khả dụng.",
-  "calendar.times.duskAdjusted": "Hoàng hôn (đã hiệu chỉnh)",
+  "calendar.times.duskAdjusted": "Hoàng hôn",
   "calendar.location.favorites": "Địa điểm thường dùng",
   "calendar.location.addFavorite": "Lưu địa điểm này",
   "calendar.location.favoriteHint": "Chạm + ở kết quả tìm kiếm để lưu lại",

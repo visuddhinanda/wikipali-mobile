@@ -26,7 +26,7 @@ for (const [from, to] of [
   copyFileSync(new URL(`../${from}`, import.meta.url).pathname, target);
 }
 
-const { sunTimes } = require(`${OUT}calendar/astro.js`);
+const { sunTimes, sunAltitude } = require(`${OUT}calendar/astro.js`);
 const { buildMonth } = require(`${OUT}calendar/lunar/index.js`);
 const { unVesakDayKey } = require(`${OUT}calendar/lunar/vesak.js`);
 const { zonedNoon } = require(`${OUT}calendar/tz.js`);
@@ -81,9 +81,46 @@ const CITIES = [
       if (t.refractionMorning !== null && t.refractionMorning < 0) positive = false;
     }
   }
-  check("三时刻先后顺序（明相 < 日出 < 日中 < 日落 < 日暮）", ordered);
+  check("时刻先后顺序（明相 < 日出 < 日中 < 日没 < 日落）", ordered);
   check("蒙气差修正量不为负（负值已钳到 0）", positive);
   check("高纬度会走到兜底或极昼分支", fallbackSeen || polarSeen);
+}
+
+// 1b. 明相与日落是对称的一对，日没是另一回事（§2.2 的术语表）
+//
+// 明相 = 民用曙光 − 蒙气差、日落 = 民用日暮 + 同一份量，所以两者的太阳高度角
+// 应当几乎相等；而日没取日面上缘切地平，比它们高好几度。这条不变量一旦破了，
+// 多半是有人把 atthaṅgama 又挂回 sunset 上了。
+{
+  let symmetric = true;
+  let distinct = true;
+  let noonIsMax = true;
+  let worstSym = 0;
+  for (const [name, lat, lon, tz] of CITIES) {
+    for (let day = 1; day <= 365; day += 7) {
+      const at = new Date(Date.UTC(2026, 0, day));
+      const t = sunTimes({ lat, lon }, zonedNoon(2026, at.getUTCMonth() + 1, at.getUTCDate(), tz));
+      if (t.method !== "subtraction" || !t.aruna || !t.dusk || !t.sunset || !t.noon) continue;
+      const a = sunAltitude({ lat, lon }, t.aruna);
+      const d = sunAltitude({ lat, lon }, t.dusk);
+      const s = sunAltitude({ lat, lon }, t.sunset);
+      worstSym = Math.max(worstSym, Math.abs(a - d));
+      if (Math.abs(a - d) > 0.3) {
+        symmetric = false;
+        console.log(`  不对称 ${name} 第 ${day} 天 明相 ${a.toFixed(3)}° 日落 ${d.toFixed(3)}°`);
+      }
+      if (s - d < 5) distinct = false;
+      const noonAlt = sunAltitude({ lat, lon }, t.noon);
+      for (const dt of [-1800e3, -600e3, 600e3, 1800e3]) {
+        if (sunAltitude({ lat, lon }, new Date(t.noon.getTime() + dt)) > noonAlt + 1e-6) {
+          noonIsMax = false;
+        }
+      }
+    }
+  }
+  check(`明相与日落的太阳高度角对称（最大差 ${worstSym.toFixed(3)}°）`, symmetric);
+  check("日没比日落高 5° 以上，两者不是同一条", distinct);
+  check("日中是当天太阳高度角的极大值（上中天，不是 90°）", noonIsMax);
 }
 
 // 2. 明相夹在航海曙光与民用曙光之间，且热带的晨昏段长度合理

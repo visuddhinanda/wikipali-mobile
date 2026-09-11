@@ -27,7 +27,7 @@ export interface GeoPoint {
 
 /** 一天的太阳三时刻；极昼极夜时对应字段为 `null`。 */
 export interface SunTimes {
-  /** 明相（民用曙光补过蒙气差，§2.2）。 */
+  /** 明相（民用曙光减去蒙气差，§2.2）—— 与日落 `dusk` 对称。 */
   aruna: Date | null;
   civilDawn: Date | null;
   nauticalDawn: Date | null;
@@ -37,7 +37,7 @@ export interface SunTimes {
   sunset: Date | null;
   civilDusk: Date | null;
   nauticalDusk: Date | null;
-  /** 实际日暮（民用日暮加回日没差）。 */
+  /** 日落（民用日暮加回蒙气差修正）—— 与明相对称，律上的日落取这一条。 */
   dusk: Date | null;
   /** 早晚各自的蒙气差修正量（秒）；走兜底分支时为 `null`。 */
   refractionMorning: number | null;

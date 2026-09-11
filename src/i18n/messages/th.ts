@@ -304,7 +304,7 @@ const th: Messages = {
   "calendar.flight.offline": "ไม่มีอินเทอร์เน็ต กรอกสนามบินและเวลาเองได้",
   "calendar.flight.notFound": "ไม่พบเที่ยวบินนี้ ตรวจสอบหมายเลขและวันที่",
   "calendar.flight.serviceDown": "บริการค้นหาเที่ยวบินใช้ไม่ได้ชั่วคราว",
-  "calendar.times.duskAdjusted": "พลบค่ำ (แก้แล้ว)",
+  "calendar.times.duskAdjusted": "พลบค่ำ",
   "calendar.location.favorites": "สถานที่ที่บันทึกไว้",
   "calendar.location.addFavorite": "บันทึกสถานที่นี้",
   "calendar.location.favoriteHint": "แตะ + ที่ผลค้นหาเพื่อบันทึกไว้",

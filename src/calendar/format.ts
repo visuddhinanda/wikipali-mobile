@@ -116,11 +116,15 @@ export function deltaLabelOf(day: LunarDay | undefined): string {
  *
  * 律中判日界的是 `aruṇuggamana`（明相）、判非时食的是 `majjhanhika`（日中）、
  * `atthaṅgama` 是日落。写在中文标签上方，让读经的人对得上术语。
+ *
+ * `atthaṅgama` 挂在 **`dusk`（−6° 加蒙气差修正）** 上，不是挂在 `sunset`
+ * （0°，日面上缘切地平）上：律上的日落要与明相对称 —— 明相是民用曙光减去
+ * 蒙气差，日落就是民用日暮加回同一份量。0° 那一条是天文意义的日没，另有其名。
  */
 export const PALI_TIME_NAMES = {
   aruna: "aruṇuggamana",
   noon: "majjhanhika",
-  sunset: "atthaṅgama",
+  dusk: "atthaṅgama",
 } as const;
 
 /** 七曜的巴利星名，压在星期头下面（缅、泰、锡兰读者按星名认星期）。 */

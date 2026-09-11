@@ -320,7 +320,7 @@ const zhHans = {
   "calendar.flight.offline": "当前没有网络。可以手填起降机场与时刻，计算完全离线可用。",
   "calendar.flight.notFound": "查不到这个航班，请核对航班号与日期，或手填起降。",
   "calendar.flight.serviceDown": "航班查询服务暂时不可用，请手填起降。",
-  "calendar.times.duskAdjusted": "实际日暮",
+  "calendar.times.duskAdjusted": "日落",
   "calendar.location.favorites": "常用地点",
   "calendar.location.addFavorite": "加入常用",
   "calendar.location.favoriteHint": "搜到的城镇点右侧 + 可以加入常用",

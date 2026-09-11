@@ -300,7 +300,7 @@ const zhHant: Messages = {
   "calendar.flight.offline": "當前沒有網絡。可以手填起降機場與時刻，計算完全離線可用。",
   "calendar.flight.notFound": "查不到這個航班，請核對航班號與日期，或手填起降。",
   "calendar.flight.serviceDown": "航班查詢服務暫時不可用，請手填起降。",
-  "calendar.times.duskAdjusted": "實際日暮",
+  "calendar.times.duskAdjusted": "日落",
   "calendar.location.favorites": "常用地點",
   "calendar.location.addFavorite": "加入常用",
   "calendar.location.favoriteHint": "搜到的城鎮點右側 + 可以加入常用",
