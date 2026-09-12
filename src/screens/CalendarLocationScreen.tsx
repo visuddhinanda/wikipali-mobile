@@ -8,9 +8,19 @@
  * 道场、家人所在的城市），每次重新搜一遍太笨。
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as Clipboard from "expo-clipboard";
 import { Screen } from "../components/Screen";
 import { colors, radius, spacing, type } from "../theme";
 import { useI18n, useT } from "../i18n/I18nContext";
@@ -22,26 +32,53 @@ import {
   loadFavorites,
   removeFavorite,
 } from "../calendar/location/favorites";
+import { buildDiagnosticsReport } from "../calendar/location/diagnostics";
 import { usePlace } from "../calendar/useCalendar";
 
 export function CalendarLocationScreen() {
   const t = useT();
   const { locale } = useI18n();
   const navigation = useNavigation();
-  const { place, busy, failed, gpsAvailable, locateNow, choose } = usePlace();
+  const { place, busy, failed, retrying, gpsAvailable, locateNow, choose } = usePlace();
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState<Place[]>([]);
+  const [debugText, setDebugText] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     void loadFavorites().then(setFavorites);
   }, []);
+
+  // 自动定位失败不能静默：先问用户愿不愿意帮我们改进，愿意就把本次的
+  // 设备/系统/报错现场展开成一份可复制的调试信息。
+  const onLocate = useCallback(async () => {
+    const result = await locateNow();
+    if (result.failure) {
+      Alert.alert(t("calendar.location.helpTitle"), t("calendar.location.helpBody"), [
+        { text: t("calendar.location.helpNo"), style: "cancel" },
+        {
+          text: t("calendar.location.helpYes"),
+          onPress: () => {
+            setCopied(false);
+            setDebugText(buildDiagnosticsReport(result));
+          },
+        },
+      ]);
+    }
+  }, [locateNow, t]);
+
+  const copyDebug = useCallback(async () => {
+    if (!debugText) return;
+    await Clipboard.setStringAsync(debugText);
+    setCopied(true);
+  }, [debugText]);
 
   // 「自动定位」放标题栏：它是这一页的主操作，摆在正文里会跟常用地点、
   // 搜索结果抢位置，而且滚下去就看不见了。
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable onPress={locateNow} disabled={busy} hitSlop={8} style={styles.headerAction}>
+        <Pressable onPress={onLocate} disabled={busy} hitSlop={8} style={styles.headerAction}>
           <Ionicons
             name="locate"
             size={15}
@@ -53,7 +90,7 @@ export function CalendarLocationScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, t, locateNow, busy]);
+  }, [navigation, t, onLocate, busy]);
 
   const results = useMemo<City[]>(
     () => (query.trim().length >= 1 ? searchCities(query, 20) : []),
@@ -68,7 +105,7 @@ export function CalendarLocationScreen() {
     [choose, navigation],
   );
 
-  const currentIsSaved = favorites.some((p) => isSamePlace(p, place));
+  const currentIsSaved = place ? favorites.some((p) => isSamePlace(p, place)) : false;
 
   return (
     <Screen contentStyle={styles.content}>
@@ -85,28 +122,49 @@ export function CalendarLocationScreen() {
               : t("calendar.location.unavailable")}
           </Text>
         </View>
-      ) : place.source !== "gps" ? (
+      ) : place && place.source !== "gps" ? (
         <Text style={styles.hint}>{t("calendar.location.usingCity")}</Text>
       ) : null}
 
       <View style={styles.current}>
-        <Ionicons
-          name={place.source === "gps" ? "location" : "location-outline"}
-          size={14}
-          color={place.source === "gps" ? colors.success : colors.gold}
-        />
-        <Text style={styles.currentText} numberOfLines={1}>
-          {place.name} · {place.lat.toFixed(3)}, {place.lon.toFixed(3)}
-          {place.accuracy ? ` ±${Math.round(place.accuracy)} m` : ""} · {place.timeZone}
-        </Text>
-        {!currentIsSaved ? (
-          <Pressable
-            hitSlop={8}
-            onPress={async () => setFavorites(await addFavorite(place))}
-          >
-            <Text style={styles.link}>{t("calendar.location.addFavorite")}</Text>
-          </Pressable>
-        ) : null}
+        {place ? (
+          <>
+            <Ionicons
+              name={place.source === "gps" ? "location" : "location-outline"}
+              size={14}
+              color={place.source === "gps" ? colors.success : colors.gold}
+            />
+            <View style={styles.currentText}>
+              <Text style={styles.currentName} numberOfLines={1}>
+                {place.name}
+              </Text>
+              <Text style={styles.currentSub} numberOfLines={1}>
+                {place.subtitle ? `${place.subtitle} · ` : ""}
+                {place.lat.toFixed(3)}, {place.lon.toFixed(3)}
+                {place.accuracy ? ` ±${Math.round(place.accuracy)} m` : ""} · {place.timeZone}
+              </Text>
+            </View>
+            {!currentIsSaved ? (
+              <Pressable
+                hitSlop={8}
+                onPress={async () => setFavorites(await addFavorite(place))}
+              >
+                <Text style={styles.link}>{t("calendar.location.addFavorite")}</Text>
+              </Pressable>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <Ionicons name="locate" size={14} color={colors.gold} />
+            <Text style={styles.currentText} numberOfLines={1}>
+              {failed
+                ? t("calendar.location.failedMark")
+                : retrying
+                  ? t("calendar.location.retrying")
+                  : t("calendar.location.locating")}
+            </Text>
+          </>
+        )}
       </View>
 
       {favorites.length ? (
@@ -125,7 +183,7 @@ export function CalendarLocationScreen() {
                   {favorite.lat.toFixed(2)}, {favorite.lon.toFixed(2)} · {favorite.timeZone}
                 </Text>
               </View>
-              {isSamePlace(favorite, place) ? (
+              {place && isSamePlace(favorite, place) ? (
                 <Ionicons name="checkmark" size={16} color={colors.vermilion} />
               ) : null}
               <Pressable
@@ -195,6 +253,41 @@ export function CalendarLocationScreen() {
       <Text style={styles.hint}>
         {t("calendar.location.offlineNote", { n: (CITY_COUNT / 10000).toFixed(1) })}
       </Text>
+
+      <Modal
+        transparent
+        visible={debugText !== null}
+        animationType="fade"
+        onRequestClose={() => setDebugText(null)}
+      >
+        <View style={styles.debugBackdrop}>
+          <View style={styles.debugSheet}>
+            <View style={styles.debugHeader}>
+              <Text style={styles.debugTitle}>{t("calendar.location.debugTitle")}</Text>
+              <Pressable hitSlop={10} onPress={() => setDebugText(null)}>
+                <Ionicons name="close" size={20} color={colors.inkFaint} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.debugScroll}>
+              <Text style={styles.debugText} selectable>
+                {debugText}
+              </Text>
+            </ScrollView>
+            <Pressable style={styles.debugCopy} onPress={copyDebug}>
+              <Ionicons
+                name={copied ? "checkmark" : "copy-outline"}
+                size={16}
+                color={colors.paperRaised}
+              />
+              <Text style={styles.debugCopyText}>
+                {copied
+                  ? t("calendar.location.debugCopied")
+                  : t("calendar.location.debugCopy")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -210,7 +303,9 @@ const styles = StyleSheet.create({
   },
   noticeText: { ...type.small, color: colors.inkSoft },
   current: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  currentText: { ...type.small, color: colors.inkFaint, flex: 1 },
+  currentText: { flex: 1 },
+  currentName: { ...type.body, color: colors.ink },
+  currentSub: { ...type.small, color: colors.inkFaint, marginTop: 1 },
   link: { ...type.small, color: colors.vermilion },
   section: { gap: 2 },
   sectionTitle: { ...type.small, color: colors.inkFaint, marginBottom: spacing.xs },
@@ -240,4 +335,40 @@ const styles = StyleSheet.create({
   headerActionText: { ...type.body, color: colors.vermilion },
   headerActionBusy: { color: colors.inkFaint },
   hint: { ...type.small, color: colors.inkFaint },
+  debugBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  debugSheet: {
+    backgroundColor: colors.paperRaised,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    maxHeight: "80%",
+  },
+  debugHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  debugTitle: { ...type.heading },
+  debugScroll: { flexGrow: 0, marginBottom: spacing.md },
+  debugText: {
+    ...type.small,
+    color: colors.inkSoft,
+    fontFamily: "monospace",
+    lineHeight: 18,
+  },
+  debugCopy: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.vermilion,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  debugCopyText: { color: colors.paperRaised, fontSize: 15, fontWeight: "600" },
 });

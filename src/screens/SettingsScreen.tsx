@@ -16,7 +16,8 @@ import {
   scheduleTestNotification,
 } from "../calendar/notifications";
 import { defaultSystemFor } from "../calendar/lunar";
-import { fallbackPlace, loadSavedPlace } from "../calendar/location/place";
+import { loadSavedPlace } from "../calendar/location/place";
+import { deviceTimeZone } from "../calendar/tz";
 import { useCalendarSystem } from "../calendar/useCalendar";
 import { hasAggressivePowerManagement, openAppSettings } from "../settings/powerRestriction";
 import { LOCALE_OPTIONS } from "../i18n";
@@ -42,9 +43,9 @@ export function SettingsScreen() {
   // 只在 __DEV__ 出现，release 包里没有这个入口。
   const [testAt, setTestAt] = useState<Date | null>(null);
   const sendTest = useCallback(async () => {
-    const place = (await loadSavedPlace()) ?? fallbackPlace();
+    const timeZone = (await loadSavedPlace())?.timeZone ?? deviceTimeZone();
     setTestAt(
-      await scheduleTestNotification({ system, timeZone: place.timeZone, text: notifyTextOf(t) }),
+      await scheduleTestNotification({ system, timeZone, text: notifyTextOf(t) }),
     );
   }, [system, t]);
 
@@ -54,11 +55,11 @@ export function SettingsScreen() {
       // 先落盘再排程：万一排程过程中被杀掉，下次启动也能按用户的意愿恢复。
       await setUposathaNotify(next);
       setNotify(next);
-      const place = (await loadSavedPlace()) ?? fallbackPlace();
+      const timeZone = (await loadSavedPlace())?.timeZone ?? deviceTimeZone();
       const n = await rescheduleUposathaNotifications({
         enabled: next,
         system,
-        timeZone: place.timeZone,
+        timeZone,
         text: notifyTextOf(t),
       });
       // 开了却一条没排出去，只可能是权限被拒。

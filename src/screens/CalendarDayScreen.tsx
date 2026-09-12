@@ -28,7 +28,14 @@ import {
 import { SYSTEM_TITLE_KEYS } from "../calendar/systems";
 import { sunAltitudeGeometric } from "../calendar/astro";
 import { useCalendarSystem, usePlace, useSunTimes } from "../calendar/useCalendar";
-import { formatLocalTime, formatOffset, makeDayKey, toLocalParts, zonedNoon } from "../calendar/tz";
+import {
+  deviceTimeZone,
+  formatLocalTime,
+  formatOffset,
+  makeDayKey,
+  toLocalParts,
+  zonedNoon,
+} from "../calendar/tz";
 import { PALI_TIME_NAMES, dayLabelOf, deltaLabelOf, eraLineOf, phaseLabelOf } from "../calendar/format";
 import { nextFestival, vassaProgress } from "../calendar/festivals";
 
@@ -64,31 +71,35 @@ export function CalendarDayScreen() {
   const { locale } = useI18n();
   const route = useRoute<RouteProp<RootStackParamList, "CalendarDay">>();
   const { year, month, day } = route.params;
-  const { place } = usePlace();
+  const { place, failed, retrying } = usePlace();
   const [system] = useCalendarSystem(defaultSystemFor(locale));
   const times = useSunTimes(place, year, month, day);
   const key = makeDayKey(year, month, day);
+
+  // 还没定位成功时，月相/阴历/节日先按设备时区算（只依赖时区），
+  // 太阳高度图与三时刻则等定位成功再显示。
+  const timeZone = place?.timeZone ?? deviceTimeZone();
 
   const rows = useMemo(
     () =>
       CALENDAR_SYSTEMS.filter(isSystemAvailable).map((s) => ({
         system: s,
-        day: buildMonth(s, { year, month, timeZone: place.timeZone }).get(key),
+        day: buildMonth(s, { year, month, timeZone }).get(key),
       })),
-    [year, month, place.timeZone, key],
+    [year, month, timeZone, key],
   );
 
   const astro = rows.find((r) => r.system === "astro")?.day;
-  const noonAt = zonedNoon(year, month, day, place.timeZone);
+  const noonAt = zonedNoon(year, month, day, timeZone);
 
   // 雨安居与最近的节日按**当前选的历法**算 —— 各国安居起讫本来就差着日子。
   const vassa = useMemo(
-    () => vassaProgress(system, key, place.timeZone),
-    [system, key, place.timeZone],
+    () => vassaProgress(system, key, timeZone),
+    [system, key, timeZone],
   );
   const upcoming = useMemo(
-    () => nextFestival(system, key, place.timeZone),
-    [system, key, place.timeZone],
+    () => nextFestival(system, key, timeZone),
+    [system, key, timeZone],
   );
 
   // 一列时刻必须**按时间先后**排，哪怕明相是从民用曙光倒推出来的：
@@ -125,21 +136,23 @@ export function CalendarDayScreen() {
     { at: times.dusk, kind: "threshold" as const },
   ]
     .flatMap<SunMark>(({ at, kind, name }) => {
-      const hour = localHour(at, place.timeZone);
+      const hour = localHour(at, timeZone);
       if (hour === null) return [];
-      return [{ hour, label: formatLocalTime(at, place.timeZone), name, kind }];
+      return [{ hour, label: formatLocalTime(at, timeZone), name, kind }];
     });
 
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.card}>
-        <SunPath
-          place={{ lat: place.lat, lon: place.lon, timeZone: place.timeZone }}
-          year={year}
-          month={month}
-          day={day}
-          marks={marks}
-        />
+        {place ? (
+          <SunPath
+            place={{ lat: place.lat, lon: place.lon, timeZone: place.timeZone }}
+            year={year}
+            month={month}
+            day={day}
+            marks={marks}
+          />
+        ) : null}
 
         <View style={styles.head}>
           {astro ? <MoonIcon angle={astro.phaseAngle} size={34} /> : null}
@@ -153,43 +166,56 @@ export function CalendarDayScreen() {
           </View>
         </View>
 
-        <View style={styles.timeList}>
-          {timeRows.map(({ key: label, pali, at, strong }) => (
-            <View key={label} style={styles.timeRow}>
-              <View style={styles.timeLabelBox}>
-                {pali ? <Text style={styles.timePali}>{pali}</Text> : null}
-                <Text style={styles.timeLabel}>{t(label)}</Text>
-              </View>
-              <Text style={styles.timeAltitude}>
-                {altitudeLabel(at, place.lat, place.lon) ?? ""}
-              </Text>
-              <Text style={[styles.timeValue, strong && styles.timeValueStrong]}>
-                {formatLocalTime(at, place.timeZone)}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.note}>{t("calendar.altitudeNote")}</Text>
-
-        {times.method === "none" ? (
-          <Text style={styles.note}>{t("calendar.polar")}</Text>
-        ) : (
+        {place ? (
           <>
-            <View style={styles.timeRow}>
-              <Text style={styles.timeLabel}>{t("calendar.refraction")}</Text>
-              <Text style={styles.timeValue}>{minutesLabel(times.refractionMorning)}</Text>
+            <View style={styles.timeList}>
+              {timeRows.map(({ key: label, pali, at, strong }) => (
+                <View key={label} style={styles.timeRow}>
+                  <View style={styles.timeLabelBox}>
+                    {pali ? <Text style={styles.timePali}>{pali}</Text> : null}
+                    <Text style={styles.timeLabel}>{t(label)}</Text>
+                  </View>
+                  <Text style={styles.timeAltitude}>
+                    {altitudeLabel(at, place.lat, place.lon) ?? ""}
+                  </Text>
+                  <Text style={[styles.timeValue, strong && styles.timeValueStrong]}>
+                    {formatLocalTime(at, place.timeZone)}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <Text style={styles.note}>{t("calendar.refractionNote")}</Text>
-            {times.method === "fallback-altitude" ? (
-              <Text style={styles.noteWarn}>{t("calendar.method.fallback")}</Text>
-            ) : null}
-          </>
-        )}
+            <Text style={styles.note}>{t("calendar.altitudeNote")}</Text>
 
-        <Text style={styles.source}>
-          {place.name} · {place.lat.toFixed(2)}, {place.lon.toFixed(2)} ·{" "}
-          {formatOffset(noonAt, place.timeZone)}
-        </Text>
+            {times.method === "none" ? (
+              <Text style={styles.note}>{t("calendar.polar")}</Text>
+            ) : (
+              <>
+                <View style={styles.timeRow}>
+                  <Text style={styles.timeLabel}>{t("calendar.refraction")}</Text>
+                  <Text style={styles.timeValue}>{minutesLabel(times.refractionMorning)}</Text>
+                </View>
+                <Text style={styles.note}>{t("calendar.refractionNote")}</Text>
+                {times.method === "fallback-altitude" ? (
+                  <Text style={styles.noteWarn}>{t("calendar.method.fallback")}</Text>
+                ) : null}
+              </>
+            )}
+
+            <Text style={styles.source}>
+              {place.name}
+              {place.subtitle ? ` · ${place.subtitle}` : ""} · {place.lat.toFixed(2)},{" "}
+              {place.lon.toFixed(2)} · {formatOffset(noonAt, place.timeZone)}
+            </Text>
+          </>
+        ) : (
+          <Text style={[styles.note, failed && styles.noteFailed]}>
+            {failed
+              ? t("calendar.location.failedMark")
+              : retrying
+                ? t("calendar.location.retrying")
+                : t("calendar.location.locating")}
+          </Text>
+        )}
       </View>
 
       {vassa || upcoming ? (
@@ -298,6 +324,7 @@ const styles = StyleSheet.create({
   timeValueStrong: { color: colors.vermilion, fontWeight: "700" },
   note: { ...type.small, color: colors.inkFaint, marginTop: spacing.sm },
   noteWarn: { ...type.small, color: colors.ochre, marginTop: spacing.xs },
+  noteFailed: { ...type.small, color: colors.danger, fontWeight: "700" },
   source: { ...type.small, color: colors.inkFaint, marginTop: spacing.md },
   vassaRow: { gap: spacing.sm },
   vassaText: { ...type.small, color: colors.ink },

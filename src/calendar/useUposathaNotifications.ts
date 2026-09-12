@@ -7,14 +7,15 @@
  *
  * **不能用 `usePlace()`**：那个 hook 首次挂载时如果没有存过位置就会去问 GPS，
  * 在 App 根上等于一启动就弹定位权限框。这里只需要时区，直接读存下来的位置，
- * 没有就用兜底地点。
+ * 没有就用设备时区。
  */
 import { useEffect } from "react";
 import * as Notifications from "expo-notifications";
 import { useI18n } from "../i18n/I18nContext";
 import { getUposathaNotify } from "../settings/notifications";
 import { defaultSystemFor } from "./lunar";
-import { fallbackPlace, loadSavedPlace } from "./location/place";
+import { loadSavedPlace } from "./location/place";
+import { deviceTimeZone } from "./tz";
 import { notifyTextOf, rescheduleUposathaNotifications } from "./notifications";
 import { useCalendarSystem } from "./useCalendar";
 
@@ -38,12 +39,12 @@ export function useUposathaNotifications(): void {
     let alive = true;
     void (async () => {
       if (!(await getUposathaNotify()) || !alive) return;
-      const place = (await loadSavedPlace()) ?? fallbackPlace();
+      const timeZone = (await loadSavedPlace())?.timeZone ?? deviceTimeZone();
       if (!alive) return;
       await rescheduleUposathaNotifications({
         enabled: true,
         system,
-        timeZone: place.timeZone,
+        timeZone,
         text: notifyTextOf(t),
       });
     })();

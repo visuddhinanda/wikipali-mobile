@@ -21,7 +21,13 @@ import type { MessageKey } from "../i18n";
 import type { RootStackParamList } from "../navigation/types";
 import { defaultSystemFor, type CalendarSystem } from "../calendar/lunar";
 import { useCalendarSystem, useLunarMonth, usePlace, useSunTimes } from "../calendar/useCalendar";
-import { daysInMonth, formatLocalTime, makeDayKey, toLocalParts } from "../calendar/tz";
+import {
+  daysInMonth,
+  deviceTimeZone,
+  formatLocalTime,
+  makeDayKey,
+  toLocalParts,
+} from "../calendar/tz";
 import {
   PALI_TIME_NAMES,
   PALI_WEEKDAYS,
@@ -48,11 +54,14 @@ export function CalendarScreen() {
   const { locale } = useI18n();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const place = usePlace();
+  const placeState = usePlace();
+  const place = placeState.place;
 
-  const today = useMemo(() => toLocalParts(new Date(), place.place.timeZone), [
-    place.place.timeZone,
-  ]);
+  // 还没定位成功时，日历格子的月相/阴历先按**设备时区**算（这些只需要时区，
+  // 不依赖经纬度）；三时刻则一律占位，等定位成功再填真值。
+  const timeZone = place?.timeZone ?? deviceTimeZone();
+
+  const today = useMemo(() => toLocalParts(new Date(), timeZone), [timeZone]);
   const [system] = useCalendarSystem(defaultSystemFor(locale));
   const [cursor, setCursor] = useState({ year: today.year, month: today.month });
   const [selected, setSelected] = useState(today.day);
@@ -67,10 +76,10 @@ export function CalendarScreen() {
     return () => clearInterval(timer);
   }, [showingToday]);
 
-  const month = useLunarMonth(system, cursor.year, cursor.month, place.place.timeZone);
+  const month = useLunarMonth(system, cursor.year, cursor.month, timeZone);
   const selectedKey = makeDayKey(cursor.year, cursor.month, selected);
   const selectedDay = month.get(selectedKey);
-  const times = useSunTimes(place.place, cursor.year, cursor.month, selected);
+  const times = useSunTimes(place, cursor.year, cursor.month, selected);
 
   const step = (delta: number) => {
     const m = cursor.month + delta;
@@ -242,7 +251,7 @@ export function CalendarScreen() {
 
         <View style={styles.times}>
           {timeBoxes.map(({ key, pali, at }) => {
-            const left = showingToday ? countdownTo(at, now) : null;
+            const left = showingToday && place ? countdownTo(at, now) : null;
             return (
               <View key={key} style={styles.timeBox}>
                 <Text style={styles.timePali} numberOfLines={1}>
@@ -250,32 +259,73 @@ export function CalendarScreen() {
                 </Text>
                 <Text style={styles.timeLabel}>{t(key)}</Text>
                 <Text style={styles.timeValue}>
-                  {formatLocalTime(at, place.place.timeZone)}
+                  {place ? formatLocalTime(at, place.timeZone) : "-:-:-"}
                 </Text>
                 {left ? <Text style={styles.timeCountdown}>{left}</Text> : null}
               </View>
             );
           })}
         </View>
-
-        <Pressable
-          style={styles.sourceRow}
-          onPress={() => navigation.navigate("CalendarLocation")}
-        >
-          <Ionicons
-            name={place.place.source === "gps" ? "location" : "location-outline"}
-            size={13}
-            color={place.place.source === "gps" ? colors.success : colors.gold}
-          />
-          <Text style={styles.sourceText} numberOfLines={1}>
-            {place.busy
-              ? t("calendar.location.searching")
-              : `${place.place.name} · ${place.place.timeZone}`}
-          </Text>
-          <Ionicons name="chevron-forward" size={14} color={colors.inkFaint} />
-        </Pressable>
       </Pressable>
+
+      <LocationCard />
     </Screen>
+  );
+}
+
+/**
+ * 观察地单独成卡，放在「三时刻」卡片下面。
+ *
+ * 三种状态一句话说清：定位中给「正在定位中……」，失败给红色「定位失败」，
+ * 成功才显示地点与时区。整卡点进位置选择页（右侧 `>` 只是视觉提示）。
+ */
+function LocationCard() {
+  const t = useT();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { place, failed, retrying } = usePlace();
+
+  const icon = failed
+    ? "alert-circle"
+    : place?.source === "gps"
+      ? "location"
+      : "location-outline";
+  const iconColor = failed ? colors.danger : place ? colors.success : colors.gold;
+
+  const title = place
+    ? place.name
+    : failed
+      ? t("calendar.location.failedMark")
+      : retrying
+        ? t("calendar.location.retrying")
+        : t("calendar.location.locating");
+  const sub = place
+    ? place.subtitle
+      ? `${place.subtitle} · ${place.timeZone}`
+      : place.timeZone
+    : failed
+      ? t("calendar.location.failedMarkHint")
+      : t("calendar.location.locatingSub");
+
+  return (
+    <Pressable
+      style={styles.locationCard}
+      onPress={() => navigation.navigate("CalendarLocation")}
+    >
+      <Ionicons name={icon} size={18} color={iconColor} />
+      <View style={styles.locationText}>
+        <Text
+          style={[styles.locationName, failed && styles.locationNameFailed]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <Text style={styles.locationSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
+    </Pressable>
   );
 }
 
@@ -388,6 +438,19 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     marginTop: 1,
   },
-  sourceRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
-  sourceText: { ...type.small, color: colors.inkFaint, flex: 1 },
+  locationCard: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.paperRaised,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
+    padding: spacing.md,
+  },
+  locationText: { flex: 1, gap: 1 },
+  locationName: { ...type.body, color: colors.ink },
+  locationNameFailed: { color: colors.danger, fontWeight: "700" },
+  locationSub: { ...type.small, color: colors.inkFaint },
 });
