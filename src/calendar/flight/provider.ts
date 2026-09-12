@@ -6,7 +6,7 @@
  * 手填起降机场与时刻，计算部分完全离线。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { resolveBaseUrl } from "../../api/config";
+import { isOnline } from "../../api/connectivity";
 import { findAirport, type Airport } from "./airports";
 
 const KEY_STORAGE = "@wikipali/flight-api-key";
@@ -58,28 +58,6 @@ function parseUtc(value: string | undefined): Date | null {
   const iso = value.trim().replace(" ", "T").replace(/Z?$/, "Z");
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/**
- * 有没有网。
- *
- * 不引 `expo-network`（又一个原生依赖，还要重新出包）：拿一个极短超时的
- * HEAD 请求探一下就够了，反正紧接着就要发真正的查询。
- */
-async function isOnline(): Promise<boolean> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
-  try {
-    // 探本 App 自己的后端，不探航班服务商：那个域名被墙或被 DNS 污染时
-    // 会把「有网但查不了航班」误报成「没网」，用户就白等一次手填。
-    // 只要有响应就算通，404 也算 —— 我们要的是「包能出去」。
-    await fetch(await resolveBaseUrl(), { method: "HEAD", signal: controller.signal });
-    return true;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**

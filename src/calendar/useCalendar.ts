@@ -7,24 +7,23 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CALENDAR_SYSTEMS, buildMonth, type CalendarSystem, type LunarMonth } from "./lunar";
-import { locate, isGpsAvailable } from "./location/gps";
-import {
-  fallbackPlace,
-  loadSavedPlace,
-  savePlace,
-  type Place,
-} from "./location/place";
-import { sunTimes, type SunTimes } from "./astro";
+import { locate, isGpsAvailable, type GpsResult } from "./location/gps";
+import { loadSavedPlace, savePlace, type Place } from "./location/place";
+import { emptySunTimes, sunTimes, type SunTimes } from "./astro";
 import { zonedNoon } from "./tz";
 
 export interface PlaceState {
-  place: Place;
-  /** 首次读取偏好 / 正在定位。 */
+  /** 观察地；**没有兜底地点** —— 定位成功 / 手选城镇之前是 `null`。 */
+  place: Place | null;
+  /** 首次读取偏好 / 正在定位（含重试阶段）。 */
   busy: boolean;
-  /** 定位失败过（UI 据此显示降级提示条）。 */
+  /** 正在自动重试（第一次定位失败且无缓存）。 */
+  retrying: boolean;
+  /** 定位最终失败过（UI 据此显示「定位失败」）。 */
   failed: boolean;
   gpsAvailable: boolean;
-  locateNow: () => Promise<void>;
+  /** 手动触发一次定位，返回结果供调用方弹窗。 */
+  locateNow: () => Promise<GpsResult>;
   choose: (place: Place) => Promise<void>;
 }
 
@@ -36,12 +35,13 @@ export interface PlaceState {
  * 屏幕通过 `useSyncExternalStore` 订阅。
  */
 interface Store {
-  place: Place;
+  place: Place | null;
   busy: boolean;
+  retrying: boolean;
   failed: boolean;
 }
 
-let store: Store = { place: fallbackPlace(), busy: true, failed: false };
+let store: Store = { place: null, busy: true, retrying: false, failed: false };
 const listeners = new Set<() => void>();
 let bootstrapped = false;
 
@@ -57,15 +57,19 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-async function locateNow(): Promise<void> {
-  setStore({ busy: true });
-  const result = await locate();
+async function locateNow(): Promise<GpsResult> {
+  setStore({ busy: true, retrying: false, failed: false });
+  const result = await locate({
+    onRetry: () => setStore({ retrying: true }),
+  });
   if (result.place) {
-    setStore({ place: result.place, failed: false, busy: false });
-    await savePlace(result.place);
+    setStore({ place: result.place, failed: false, busy: false, retrying: false });
+    // 注意：GPS 结果**不落盘** —— 只有手工选城镇才算「用户的选择」，
+    // 下次启动如果没有手工选过，就重新定位。
   } else {
-    setStore({ failed: true, busy: false });
+    setStore({ failed: true, busy: false, retrying: false });
   }
+  return result;
 }
 
 async function choose(next: Place): Promise<void> {
@@ -73,7 +77,7 @@ async function choose(next: Place): Promise<void> {
   await savePlace(next);
 }
 
-/** 首次挂载时读一次偏好；存过就不再问 GPS。 */
+/** 首次挂载时读一次偏好；只有手工选过城镇才复用，否则一律定位。 */
 async function bootstrap(): Promise<void> {
   if (bootstrapped) return;
   bootstrapped = true;
@@ -85,7 +89,7 @@ async function bootstrap(): Promise<void> {
   if (isGpsAvailable()) {
     await locateNow();
   } else {
-    setStore({ failed: true, busy: false });
+    setStore({ failed: true, busy: false, retrying: false });
   }
 }
 
@@ -97,6 +101,7 @@ export function usePlace(): PlaceState {
   return {
     place: snapshot.place,
     busy: snapshot.busy,
+    retrying: snapshot.retrying,
     failed: snapshot.failed,
     gpsAvailable: isGpsAvailable(),
     locateNow,
@@ -164,19 +169,18 @@ export function useLunarMonth(
   );
 }
 
-/** 某地某日的三时刻。 */
+/** 某地某日的三时刻；`place` 为空时返回全空结果（UI 显示占位符）。 */
 export function useSunTimes(
-  place: Place,
+  place: Place | null,
   year: number,
   month: number,
   day: number,
 ): SunTimes {
-  return useMemo(
-    () =>
-      sunTimes(
-        { lat: place.lat, lon: place.lon },
-        zonedNoon(year, month, day, place.timeZone),
-      ),
-    [place.lat, place.lon, place.timeZone, year, month, day],
-  );
+  return useMemo(() => {
+    if (!place) return emptySunTimes();
+    return sunTimes(
+      { lat: place.lat, lon: place.lon },
+      zonedNoon(year, month, day, place.timeZone),
+    );
+  }, [place?.lat, place?.lon, place?.timeZone, year, month, day]);
 }

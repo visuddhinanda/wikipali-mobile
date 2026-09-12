@@ -1,16 +1,20 @@
 /**
  * 观察地 —— 日历页所有时刻都按它算。
  *
- * 来源有三种，UI 要能分辨：GPS 定位、用户手选的城镇、以及都没有时的兜底。
- * 选择持久化，选过之后不再每次问。
+ * 来源有两种，UI 要能分辨：GPS 定位、用户手选的城镇。**没有兜底地点**：
+ * 定位成功之前不显示任何时刻（占位 `-:-:-`），定位失败就明说「定位失败」，
+ * 不拿一个替代地点冒充。只有用户**手工选择**的城镇才持久化，下次启动直接复用；
+ * GPS 结果不落盘，下次启动重新定位。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { City } from "./cities";
 
-export type PlaceSource = "gps" | "city" | "fallback";
+export type PlaceSource = "gps" | "city";
 
 export interface Place {
   name: string;
+  /** 反向地理编码给出的上一级行政区（如「Badulla District」）；离线兜底时没有。 */
+  subtitle?: string;
   lat: number;
   lon: number;
   timeZone: string;
@@ -20,15 +24,6 @@ export interface Place {
 }
 
 const STORAGE_KEY = "@wikipali/calendar-place";
-
-/** 都没有时的兜底：菩提伽耶。至少给出一组能自洽的时刻，而不是空页面。 */
-export const FALLBACK_PLACE: Place = {
-  name: "Bodh Gayā",
-  lat: 24.6959,
-  lon: 84.9866,
-  timeZone: "Asia/Kolkata",
-  source: "fallback",
-};
 
 export function placeFromCity(city: City): Place {
   return {
@@ -58,14 +53,4 @@ export async function savePlace(place: Place): Promise<void> {
   } catch {
     // 存不下不影响本次使用
   }
-}
-
-/**
- * 兜底地点。
- *
- * 坐标与时区必须是同一个地方的 —— 用设备时区配菩提伽耶的经纬度会得到一组
- * 谁都对不上的时刻，还不如老老实实说「这是菩提伽耶的时间」。
- */
-export function fallbackPlace(): Place {
-  return { ...FALLBACK_PLACE };
 }

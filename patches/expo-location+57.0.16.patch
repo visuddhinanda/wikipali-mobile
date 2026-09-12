@@ -1,0 +1,12 @@
+diff --git a/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt b/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
+--- a/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
++++ b/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
+@@ -212,7 +212,7 @@
+   @Field var country: String?,
+   @Field var postalCode: String?,
+   @Field var name: String?,
+-  @Field var isoCountryCode: String,
++  @Field var isoCountryCode: String?,
+   @Field var timezone: String?,
+   @Field var formattedAddress: String?
+ )

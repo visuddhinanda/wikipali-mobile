@@ -79,6 +79,24 @@ function riseSetTime(p: GeoPoint, start: AstroTime, direction: 1 | -1): Date | n
 
 const SECOND = 1000;
 
+/** 一组的空结果 —— 还没定位成功时，UI 用 `-:-:-` 占位，而不是假装有值。 */
+export function emptySunTimes(): SunTimes {
+  return {
+    aruna: null,
+    civilDawn: null,
+    nauticalDawn: null,
+    sunrise: null,
+    noon: null,
+    sunset: null,
+    civilDusk: null,
+    nauticalDusk: null,
+    dusk: null,
+    refractionMorning: null,
+    refractionEvening: null,
+    method: "none",
+  };
+}
+
 /**
  * 求某地某个太阳日的三时刻。
  *
@@ -93,20 +111,7 @@ const SECOND = 1000;
  * 退回按 −6.833° 单次搜索。
  */
 export function sunTimes(p: GeoPoint, anyInstantOfDay: Date): SunTimes {
-  const empty: SunTimes = {
-    aruna: null,
-    civilDawn: null,
-    nauticalDawn: null,
-    sunrise: null,
-    noon: null,
-    sunset: null,
-    civilDusk: null,
-    nauticalDusk: null,
-    dusk: null,
-    refractionMorning: null,
-    refractionEvening: null,
-    method: "none",
-  };
+  const empty = emptySunTimes();
 
   const transit = transitOf(p, anyInstantOfDay);
   if (!transit) return empty;
