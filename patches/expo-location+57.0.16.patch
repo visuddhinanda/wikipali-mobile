@@ -1,3 +1,159 @@
+diff --git a/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationHelpers.kt b/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationHelpers.kt
+--- a/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationHelpers.kt
++++ b/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationHelpers.kt
+@@ -2,8 +2,14 @@
+ 
+ import android.content.Context
+ import android.location.Location
++import android.location.LocationListener
+ import android.location.LocationManager
+ import android.os.Bundle
++import android.os.Handler
++import android.os.Looper
++import android.util.Log
++import com.google.android.gms.common.ConnectionResult
++import com.google.android.gms.common.GoogleApiAvailability
+ import com.google.android.gms.location.CurrentLocationRequest
+ import com.google.android.gms.location.FusedLocationProviderClient
+ import com.google.android.gms.location.Granularity
+@@ -64,7 +70,16 @@
+       }.build()
+     }
+ 
+-    fun requestSingleLocation(locationProvider: FusedLocationProviderClient, locationRequest: CurrentLocationRequest, promise: Promise) {
++    fun requestSingleLocation(context: Context, locationProvider: FusedLocationProviderClient, locationRequest: CurrentLocationRequest, promise: Promise) {
++      // Devices without Google Play Services (e.g. Huawei with HMS only) cannot use the
++      // FusedLocationProviderClient: getCurrentLocation() fails immediately with
++      // "LocationServices.API is not available" (SERVICE_INVALID). Fall back to the raw
++      // platform LocationManager in that case so single-shot location still works.
++      if (!isGooglePlayServicesAvailable(context)) {
++        requestSingleLocationFromManager(context, promise)
++        return
++      }
++
+       try {
+         locationProvider.getCurrentLocation(locationRequest, null)
+           .addOnSuccessListener { location: Location? ->
+@@ -86,6 +101,99 @@
+       }
+     }
+ 
++    private const val FALLBACK_PROVIDER_TIMEOUT_MS = 40_000L
++
++    private fun isGooglePlayServicesAvailable(context: Context): Boolean {
++      return try {
++        GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
++      } catch (e: Exception) {
++        false
++      }
++    }
++
++    /**
++     * GMS-less fallback: request a single fresh location from the platform `LocationManager`,
++     * trying each enabled provider in turn (GPS -> network -> fused -> passive -> any custom
++     * provider such as Huawei's `local_database`) until one reports a fix.
++     */
++    private fun requestSingleLocationFromManager(context: Context, promise: Promise) {
++      val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
++      if (locationManager == null) {
++        promise.reject(LocationUnavailableException())
++        return
++      }
++
++      val preferred = listOf(
++        LocationManager.GPS_PROVIDER,
++        LocationManager.NETWORK_PROVIDER,
++        LocationManager.FUSED_PROVIDER,
++        LocationManager.PASSIVE_PROVIDER
++      )
++      val others = locationManager.allProviders.filter { it !in preferred }
++      val candidates = (preferred + others)
++        .filter { locationManager.isProviderEnabled(it) }
++        .distinct()
++
++      if (candidates.isEmpty()) {
++        promise.reject(LocationUnavailableException())
++        return
++      }
++
++      Log.d("ExpoLocation", "GMS unavailable, falling back to LocationManager providers=$candidates")
++      requestSingleFromProvider(locationManager, candidates, 0, promise)
++    }
++
++    private fun requestSingleFromProvider(
++      locationManager: LocationManager,
++      providers: List<String>,
++      index: Int,
++      promise: Promise
++    ) {
++      if (index >= providers.size) {
++        promise.reject(LocationUnavailableException())
++        return
++      }
++
++      val provider = providers[index]
++      var settled = false
++      val listener = object : LocationListener {
++        override fun onLocationChanged(location: Location) {
++          if (settled) return
++          settled = true
++          locationManager.removeUpdates(this)
++          Log.d("ExpoLocation", "fallback location from provider=$provider accuracy=${location.accuracy}")
++          promise.resolve(LocationResponse(location))
++        }
++
++        override fun onProviderDisabled(p: String) {}
++        override fun onProviderEnabled(p: String) {}
++
++        @Deprecated("Deprecated in Java")
++        override fun onStatusChanged(p: String?, status: Int, extras: Bundle?) {}
++      }
++
++      try {
++        locationManager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
++      } catch (e: SecurityException) {
++        promise.reject(LocationRequestRejectedException(e))
++        return
++      } catch (e: Exception) {
++        Log.w("ExpoLocation", "requestSingleUpdate($provider) failed: ${e.message}")
++        requestSingleFromProvider(locationManager, providers, index + 1, promise)
++        return
++      }
++
++      // If this provider never delivers (e.g. mock GNSS on a GMS-less device), move on.
++      Handler(Looper.getMainLooper()).postDelayed({
++        if (!settled) {
++          settled = true
++          locationManager.removeUpdates(listener)
++          Log.w("ExpoLocation", "fallback provider=$provider timed out after ${FALLBACK_PROVIDER_TIMEOUT_MS}ms")
++          requestSingleFromProvider(locationManager, providers, index + 1, promise)
++        }
++      }, FALLBACK_PROVIDER_TIMEOUT_MS)
++    }
++
+     fun requestContinuousUpdates(locationModule: LocationModule, locationRequest: LocationRequest, watchId: Int, promise: Promise) {
+       locationModule.requestLocationUpdates(
+         locationRequest,
+diff --git a/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationModule.kt b/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationModule.kt
+--- a/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationModule.kt
++++ b/node_modules/expo-location/android/src/main/java/expo/modules/location/LocationModule.kt
+@@ -487,14 +487,14 @@
+       return
+     }
+     if (LocationHelpers.hasNetworkProviderEnabled(mContext) || !showUserSettingsDialog) {
+-      LocationHelpers.requestSingleLocation(mLocationProvider, currentLocationRequest, promise)
++      LocationHelpers.requestSingleLocation(mContext, mLocationProvider, currentLocationRequest, promise)
+     } else {
+       addPendingLocationRequest(
+         locationRequest,
+         object : LocationActivityResultListener {
+           override fun onResult(resultCode: Int) {
+             if (resultCode == Activity.RESULT_OK) {
+-              LocationHelpers.requestSingleLocation(mLocationProvider, currentLocationRequest, promise)
++              LocationHelpers.requestSingleLocation(mContext, mLocationProvider, currentLocationRequest, promise)
+             } else {
+               promise.reject(LocationSettingsUnsatisfiedException())
+             }
 diff --git a/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt b/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
 --- a/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
 +++ b/node_modules/expo-location/android/src/main/java/expo/modules/location/records/LocationResults.kt
@@ -9,4 +165,4 @@ diff --git a/node_modules/expo-location/android/src/main/java/expo/modules/locat
 +  @Field var isoCountryCode: String?,
    @Field var timezone: String?,
    @Field var formattedAddress: String?
- )
+ ) : Record, Serializable {
