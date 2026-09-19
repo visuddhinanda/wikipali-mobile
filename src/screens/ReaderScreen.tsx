@@ -158,6 +158,51 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const c = readerColors(settings.theme === "dark");
 
+  // <cite> 跳转：切到义注/复注对应层、定位到该段，并高亮目标句（data-sid）。
+  const [highlightSid, setHighlightSid] = useState<string | null>(null);
+
+  // 公共：把目标层定位到该段并标记高亮；返回目标层下标（找不到返回 -1）。
+  const locateAndHighlight = useCallback(
+    (book: number, para: number, start: number, end: number): number => {
+      const idx = pages.findIndex((p) => p.book === book);
+      if (idx < 0) return -1;
+      setPages((prev) => {
+        const cur = prev[idx];
+        if (!cur || cur.paragraph === para) return prev;
+        const next = [...prev];
+        next[idx] = { ...cur, paragraph: para };
+        return next;
+      });
+      setVisited((prev) => (prev.has(idx) ? prev : new Set(prev).add(idx)));
+      setHighlightSid(`${book}-${para}-${start}-${end}`);
+      return idx;
+    },
+    [pages],
+  );
+
+  const handleAnnoJump = useCallback(
+    (book: number, para: number, start: number, end: number) => {
+      const idx = locateAndHighlight(book, para, start, end);
+      if (idx < 0) return;
+      setActiveIndex(idx);
+      setDualAnchor((anchor) => {
+        if (idx >= anchor && idx <= anchor + 1) return anchor;
+        return idx < anchor ? idx : idx - 1;
+      });
+      pagerRef.current?.setPageWithoutAnimation(idx);
+    },
+    [locateAndHighlight],
+  );
+
+  const handleCrossHighlight = useCallback(
+    (book: number, para: number, start: number, end: number) => {
+      // 平板双栏：只定位 + 高亮另一栏，不切换当前层。
+      locateAndHighlight(book, para, start, end);
+    },
+    [locateAndHighlight],
+  );
+
+
   const handleChapterAnchor = useCallback(
     (index: number, b: number, para: number, toc: string | null) => {
       if (index !== selfIndexRef.current) {
@@ -323,6 +368,13 @@ export function ReaderScreen({ route, navigation }: Props) {
         onChannelChange={handleChannelChange}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
+        onAnnoJump={handleAnnoJump}
+        onCrossHighlight={handleCrossHighlight}
+        highlightSid={
+          highlightSid && p.book === Number(highlightSid.split("-")[0])
+            ? highlightSid
+            : null
+        }
         navigation={navigation}
       />
     );
@@ -530,6 +582,59 @@ function SettingsSheet({
           c={c}
           onChange={(paliScript) => onChange({ ...settings, paliScript })}
         />
+
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.annoCollapsedLines")}
+        </Text>
+        <View style={styles.fontRow}>
+          {[1, 2, 3, 5].map((n) => {
+            const active = settings.annotationCollapsedLines === n;
+            return (
+              <Pressable
+                key={n}
+                style={[
+                  styles.fontPill,
+                  { backgroundColor: active ? c.vermilion : c.paperSunken },
+                ]}
+                onPress={() =>
+                  onChange({ ...settings, annotationCollapsedLines: n })
+                }
+              >
+                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>{n}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.annoMode")}
+        </Text>
+        <View style={styles.fontRow}>
+          {(
+            [
+              { id: "inline", labelKey: "reader.annoMode.inline" },
+              { id: "footnote", labelKey: "reader.annoMode.footnote" },
+            ] as const
+          ).map((opt) => {
+            const active = settings.annotationMode === opt.id;
+            return (
+              <Pressable
+                key={opt.id}
+                style={[
+                  styles.fontPill,
+                  { backgroundColor: active ? c.vermilion : c.paperSunken },
+                ]}
+                onPress={() =>
+                  onChange({ ...settings, annotationMode: opt.id })
+                }
+              >
+                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
+                  {t(opt.labelKey)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </Modal>
   );

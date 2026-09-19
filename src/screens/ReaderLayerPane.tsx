@@ -9,7 +9,7 @@
  * 字号 / 主题（`settings`）是全局偏好，由外层统一加载、下发，三个面板共享；
  * 章节位置、频道、目录展开状态等其余状态都是面板自己的。
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -96,6 +96,12 @@ export interface ReaderLayerPaneProps {
     channelUid: string | undefined,
     channelName: string | undefined,
   ) => void;
+  /** 用户点击 <cite> 跳转锚点：外层切到义注/复注对应层并定位到该句。 */
+  onAnnoJump: (book: number, para: number, start: number, end: number) => void;
+  /** 用户点击角标（平板双栏）：定位到另一栏对应句并高亮，但不切换层。 */
+  onCrossHighlight: (book: number, para: number, start: number, end: number) => void;
+  /** 需要滚动到并高亮的句子 data-sid（如 "101-507-2-23"）；仅命中的那一层有值。 */
+  highlightSid?: string | null;
   navigation: ReaderNavigation;
 }
 
@@ -107,13 +113,15 @@ function buildReaderHtml(
     contentWidth: number;
     measure: number;
     sidenote: "inline" | "margin";
+    annoClamp: number;
+    annotationMode: "inline" | "footnote";
   },
 ): string {
   const vars = opts.dark
     ? "--paper:#211d17;--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
     : "--paper:#f7f3ea;--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
   return `<!DOCTYPE html>
-<html lang="zh" data-sidenote="${opts.sidenote}" data-content-width="${opts.contentWidth}">
+<html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -123,6 +131,7 @@ function buildReaderHtml(
     --base:${opts.fontSizePx}px;
     --measure:${opts.measure}px;
     --sidenote-w:${SIDENOTE_WIDTH}px;
+    --anno-clamp:${opts.annoClamp};
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -168,11 +177,13 @@ function buildReaderHtml(
    * 段号用绝对定位挂在左槽里，不能用 float —— 段落正文若以有序列表
    * （「150.」这类）开头，浮动的段号会和列表序号叠在一起。
    */
-  [data-para] {
+  /* 只匹配段落外壳 div[data-para]：角标 <label> / <cite> 也带 data-para（跳转目标段号），
+     不能一起命中，否则它们的 ::before 会把 507 之类的段号当角标前缀显示出来。 */
+  div[data-para] {
     position: relative;
     padding-left: 2.3em;
   }
-  [data-para]::before {
+  div[data-para]::before {
     content: attr(data-para);
     position: absolute;
     left: 0;
@@ -186,7 +197,7 @@ function buildReaderHtml(
     font-family: ui-monospace, Menlo, Consolas, monospace;
   }
   /* 列表自己的序号也要留在左槽之内，别再往外顶。 */
-  [data-para] ol, [data-para] ul { margin: 0; padding-left: 1.4em; }
+  div[data-para] ol, div[data-para] ul { margin: 0; padding-left: 1.4em; }
   .sentence { display: inline; }
   .sentence + .sentence::before { content: " "; }
   strong { font-weight: 700; }
@@ -200,8 +211,9 @@ function buildReaderHtml(
     cursor: pointer;
   }
 
-  .margin-toggle { display: none; }
+  input.margin-toggle { display: none; }
   .sidenote-number {
+    display: inline-block;
     color: var(--vermilion);
     cursor: pointer;
     vertical-align: super;
@@ -209,7 +221,7 @@ function buildReaderHtml(
     margin-left: 2px;
   }
   .sidenote {
-    display: block;
+    display: none;            /* 行内模式默认收起，点角标再展开 */
     font-size: 0.85rem;
     line-height: 1.6;
     color: var(--ink-soft);
@@ -217,7 +229,11 @@ function buildReaderHtml(
     padding-left: 10px;
     margin: 4px 0 18px;
   }
+  .margin-toggle:checked + .sidenote {
+    display: block;
+  }
   [data-sidenote="margin"] .sidenote {
+    display: block;           /* 边注模式常驻右侧栏 */
     float: right;
     clear: right;
     width: var(--sidenote-w);
@@ -227,7 +243,137 @@ function buildReaderHtml(
     border-top: 2px solid var(--hairline);
     padding: 4px 0 0;
   }
+  .anno-jump {
+    cursor: pointer;
+    color: var(--vermilion);
+    font-style: normal;
+    margin-left: 0.4em;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  .anno-highlight {
+    background: rgba(140, 59, 46, 0.16);
+    border-radius: 3px;
+    transition: background 0.5s;
+  }
+  .anno-footnotes {
+    margin: 12px 0 0;
+  }
+  .anno-footnote {
+    margin: 6px 0;
+    font-size: 0.85em;               /* 比正文小一点，跟着 --base 字号设置走 */
+    line-height: 1.6;
+    color: var(--ink-soft);
+    border: 1px solid var(--hairline); /* 灰色边框 */
+    border-radius: 4px;
+    padding: 6px 8px;
+  }
+  .anno-fn-toggle { display: none; }
+  .anno-fn-label {
+    display: flex;
+    align-items: flex-start;
+  }
+  .anno-fn-num {
+    color: var(--vermilion);
+    flex: none;
+    margin-right: 0.45em;
+    cursor: pointer;
+  }
+  .anno-fn-body {
+    flex: 1;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: var(--anno-clamp, 1);
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .anno-fn-toggle:checked + .anno-fn-label .anno-fn-body {
+    -webkit-line-clamp: unset;
+    display: block;
+    overflow: visible;
+  }
+  /* 段后脚注的 <cite> 跳转链接：收起时隐藏，展开才显示 */
+  .anno-footnote .anno-jump {
+    display: none;
+    margin-left: 0.4em;
+  }
+  .anno-fn-toggle:checked ~ .anno-jump {
+    display: inline;
+  }
+  /* 手机注释模式：行内 = 只留角标边注；段后 = 显示正文角标 + 段后脚注列表 */
+  [data-annotation-mode="inline"] .anno-footnotes { display: none; }
+  [data-annotation-mode="footnote"] .sidenote { display: none !important; }
 </style>
+<script>
+  // 高亮辅助：给目标短暂加上 .anno-highlight（2.2s 后移除，与 RN 侧一致）。
+  function flashAnno(el) {
+    if (!el) return;
+    el.classList.add("anno-highlight");
+    setTimeout(function () { el.classList.remove("anno-highlight"); }, 2200);
+  }
+  // 在同一段（段落外壳 div[data-para]）内按 data-idx 找目标，避免跨段误命中同名编号。
+  function annoTargetInPara(origin, selector, idx) {
+    var para = origin && origin.closest ? origin.closest("div[data-para]") : null;
+    if (!para) return null;
+    return para.querySelector(selector + '[data-idx="' + idx + '"]');
+  }
+  // <cite class="anno-jump"> 点击 → 通知 RN 跳到义注/复注对应句
+  // <label class="sidenote-number"> 点击 → 通知 RN 跨栏高亮对应句（同时仍会展开本行边注）
+  document.addEventListener("click", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".anno-jump") : null;
+    if (t) {
+      e.preventDefault();
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "anno-jump",
+          book: t.getAttribute("data-book"),
+          para: t.getAttribute("data-para"),
+          start: t.getAttribute("data-start"),
+          end: t.getAttribute("data-end")
+        }));
+      }
+      return;
+    }
+
+    // 点脚注编号 [N] → 滚回正文角标并高亮（preventDefault 避免触发脚注展开/收起）
+    var fnNum = e.target && e.target.closest ? e.target.closest(".anno-fn-num") : null;
+    if (fnNum) {
+      e.preventDefault();
+      var fi = fnNum.getAttribute("data-idx");
+      var mark = annoTargetInPara(fnNum, ".sidenote-number", fi);
+      if (mark) {
+        mark.scrollIntoView({ block: "center", behavior: "smooth" });
+        flashAnno(mark);
+      }
+      return;
+    }
+
+    // 点正文角标 → 段后脚注模式下滚到对应脚注并高亮（行内模式仍展开边注）
+    var n = e.target && e.target.closest ? e.target.closest(".sidenote-number") : null;
+    if (n) {
+      var mi = n.getAttribute("data-idx");
+      if (mi && document.documentElement.getAttribute("data-annotation-mode") === "footnote") {
+        var fn = annoTargetInPara(n, ".anno-footnote", mi);
+        if (fn) {
+          e.preventDefault();
+          fn.scrollIntoView({ block: "center", behavior: "smooth" });
+          flashAnno(fn);
+        }
+      }
+      if (n.getAttribute("data-book") &&
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "cross-highlight",
+          book: n.getAttribute("data-book"),
+          para: n.getAttribute("data-para"),
+          start: n.getAttribute("data-start"),
+          end: n.getAttribute("data-end")
+        }));
+      }
+    }
+  });
+</script>
 </head>
 <body>
   <div class="paper">
@@ -235,6 +381,34 @@ function buildReaderHtml(
     ${doc.subtitle ? `<div class="doc-subtitle">${doc.subtitle}</div>` : ""}
     ${doc.body}
   </div>
+  <script>
+    // 角标和段后脚注的编号：按「段」分组、按文档顺序编号，两者一一对应。
+    // 用 JS 显式编号，不依赖 CSS counter —— 部分 WebView 里 counter-reset 在
+    // 嵌套结构下不按预期作用域重置，会出现正文角标全是 [1] 的情况。
+    (function () {
+      var paras = document.querySelectorAll("div[data-para]");
+      for (var p = 0; p < paras.length; p++) {
+        var para = paras[p];
+        var markers = para.querySelectorAll(".sidenote-number");
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].textContent = "[" + (i + 1) + "]";
+          markers[i].setAttribute("data-idx", i + 1);
+        }
+        var fns = para.querySelectorAll(".anno-footnote");
+        for (var j = 0; j < fns.length; j++) {
+          fns[j].setAttribute("data-idx", j + 1);
+          var label = fns[j].querySelector(".anno-fn-label");
+          if (label && !label.querySelector(".anno-fn-num")) {
+            var num = document.createElement("span");
+            num.className = "anno-fn-num";
+            num.textContent = "[" + (j + 1) + "]";
+            num.setAttribute("data-idx", j + 1);
+            label.insertBefore(num, label.firstChild);
+          }
+        }
+      }
+    })();
+  </script>
 </body>
 </html>`;
 }
@@ -297,6 +471,9 @@ export function ReaderLayerPane({
   settings,
   onChapterAnchor,
   onChannelChange,
+  onAnnoJump,
+  onCrossHighlight,
+  highlightSid,
   navigation,
 }: ReaderLayerPaneProps) {
   const t = useT();
@@ -401,6 +578,14 @@ export function ReaderLayerPane({
           const fallback = list.find((c) => c.name === FALLBACK_CHANNEL_NAME);
           const picked = preferred ?? fallback;
           if (!picked) {
+            // 列表为空但明确知道上一层用的版本（义注/复注层沿用原文层的版本 uid）：
+            // 部分后端/测试库缺「版本列表」接口数据时，仍直接沿用该 uid 取正文，
+            // 而不是报「无版本」。正文接口（tipitaka-read-para）按 channel 直接可用。
+            if (preferredChannelUid) {
+              setChannelId(preferredChannelUid);
+              setChannelName(preferredChannelName ?? undefined);
+              return;
+            }
             setError(t("reader.noVersions"));
             return;
           }
@@ -523,6 +708,8 @@ export function ReaderLayerPane({
               contentWidth: readerWidth,
               measure,
               sidenote: sidenoteMode,
+              annoClamp: settings.annotationCollapsedLines,
+              annotationMode: settings.annotationMode,
             },
           )
         : "",
@@ -530,6 +717,8 @@ export function ReaderLayerPane({
       shown,
       headerSubtitle,
       settings.fontSize,
+      settings.annotationCollapsedLines,
+      settings.annotationMode,
       isDark,
       readerWidth,
       measure,
@@ -637,6 +826,58 @@ export function ReaderLayerPane({
     }
   };
 
+  // <cite> 跳转 + 角标跨栏高亮：WebView 点击 .anno-jump / .sidenote-number 时 postMessage。
+  // 目标层在加载完成（onLoadEnd）或已加载（highlightSid 变化）时注入 JS 滚动并高亮。
+  const webViewRef = useRef<WebView>(null);
+  const pendingHighlightRef = useRef<string | null>(null);
+
+  const injectHighlight = (sid: string) => {
+    const js = `
+      (function () {
+        var el = document.querySelector('[data-sid="${sid}"]');
+        if (el) {
+          el.scrollIntoView({ block: "center" });
+          el.classList.add("anno-highlight");
+          setTimeout(function () { el.classList.remove("anno-highlight"); }, 2200);
+        }
+      })();
+      true;
+    `;
+    webViewRef.current?.injectJavaScript(js);
+  };
+
+  useEffect(() => {
+    if (!highlightSid) return;
+    pendingHighlightRef.current = highlightSid;
+    injectHighlight(highlightSid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightSid, doc]);
+
+  const handleAnnoMessage = (e: { nativeEvent: { data: string } }) => {
+    try {
+      const msg = JSON.parse(e.nativeEvent.data);
+      if (!msg) return;
+      const book = Number(msg.book);
+      const para = Number(msg.para);
+      const start = Number(msg.start);
+      const end = Number(msg.end);
+      if (msg.type === "anno-jump") {
+        onAnnoJump(book, para, start, end);
+      } else if (msg.type === "cross-highlight") {
+        onCrossHighlight(book, para, start, end);
+      }
+    } catch {
+      // 忽略非 JSON / 非跳转消息
+    }
+  };
+
+  const handleAnnoLoadEnd = () => {
+    const sid = pendingHighlightRef.current;
+    if (!sid) return;
+    pendingHighlightRef.current = null;
+    injectHighlight(sid);
+  };
+
   return (
     <View style={[styles.pane, { backgroundColor: c.paper }]}>
       {/* 导航条：目录 / 上一章 / 下一章 / 版本切换 / 离线下载（这一层自己的书） */}
@@ -739,12 +980,15 @@ export function ReaderLayerPane({
             </View>
           ) : (
             <WebView
+              ref={webViewRef}
               source={{ html }}
               originWhitelist={["*"]}
               style={[styles.web, { backgroundColor: c.paper }]}
               setSupportMultipleWindows={false}
               menuItems={menuItems}
               onCustomMenuSelection={(e) => void onMenuSelection(e)}
+              onMessage={handleAnnoMessage}
+              onLoadEnd={handleAnnoLoadEnd}
             />
           )}
         </View>

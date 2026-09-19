@@ -58,7 +58,7 @@ export const SIDEBAR_WIDTH = 280;
 export const LIST_PANE_WIDTH = 320;
 
 /** 阅读区净宽达到该值才允许双列并排对照（每栏 ≥ 420）（§4.7）。 */
-export const DUAL_COLUMN_MIN_WIDTH = 880;
+export const DUAL_COLUMN_MIN_WIDTH = 1000;
 
 /** 阅读区净宽达到该值，边注从行内折叠升级为右侧 Tufte 边注栏（§4.7）。 */
 export const SIDENOTE_MARGIN_MIN_WIDTH = 840;

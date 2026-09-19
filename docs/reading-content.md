@@ -14,6 +14,8 @@
 ```
 
 
+> 本文只管「正文」这一条链路。阅读页把**注释书（义注/复注）对应段落**段级内嵌进正文的设计见 [`docs/reading-annotations.md`](./reading-annotations.md) —— 它复用本文的 `tipitaka-read-para` 接口与 `para_html` 缓存，不另建取数链路。
+
 ## 1. 背景
 
 ### 1.1 要解决的问题

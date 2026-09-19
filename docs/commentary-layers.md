@@ -122,3 +122,5 @@ paragraph=6  level=100 (正文)                          cs_para=1   ← 真正�
   Node 端校验脚本用内置 `node:sqlite`）
 
 校验脚本：`node scripts/check-commentary.mjs [book] [paragraph]`
+
+> 章级对应之上，阅读页还把下一层注释书内容**段级内嵌**进段落（不收敛到章节行），见 [`docs/reading-annotations.md`](./reading-annotations.md)。

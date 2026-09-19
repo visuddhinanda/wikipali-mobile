@@ -13,6 +13,8 @@ import {
 
 export type ReaderTheme = "light" | "dark";
 export type ReaderFontSize = "sm" | "md" | "lg" | "xl";
+/** 手机注释呈现方式：行内（角标 + 行内展开）或 段后（段落脚注列表）。 */
+export type AnnotationMode = "inline" | "footnote";
 
 export interface ReaderFontOption {
   id: ReaderFontSize;
@@ -41,12 +43,18 @@ export interface ReaderSettings {
   fontSize: ReaderFontSize;
   /** 巴利原文用哪种字体显示；`auto` = 跟随界面语言（见 `src/pali/script`）。 */
   paliScript: PaliScriptPreference;
+  /** 段落脚注默认收起行数（≥1）。 */
+  annotationCollapsedLines: number;
+  /** 手机注释呈现方式：行内 / 段后。 */
+  annotationMode: AnnotationMode;
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   theme: "light",
   fontSize: "md",
   paliScript: "auto",
+  annotationCollapsedLines: 1,
+  annotationMode: "inline",
 };
 
 const KEY = "@wikipali/reader-settings";
@@ -68,6 +76,13 @@ export async function loadReaderSettings(): Promise<ReaderSettings> {
         ? (parsed.fontSize as ReaderFontSize)
         : "md",
       paliScript: isPaliScript(parsed.paliScript) ? parsed.paliScript : "auto",
+      annotationCollapsedLines:
+        typeof parsed.annotationCollapsedLines === "number" &&
+        parsed.annotationCollapsedLines >= 1
+          ? Math.round(parsed.annotationCollapsedLines)
+          : 1,
+      annotationMode:
+        parsed.annotationMode === "footnote" ? "footnote" : "inline",
     };
   } catch {
     return DEFAULT_READER_SETTINGS;
