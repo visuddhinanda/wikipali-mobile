@@ -1,15 +1,16 @@
 /**
  * CopilotKit Runtime 可达性探测。
  *
- * Runtime 还没上线，发行包里内联的是开发机地址，手机上必然连不上。
- * 「探索」和「就此段落提问」在进入前先探一次，不可达就弹窗告知，
- * 而不是让用户进到一个永远转圈的对话页。
+ * 线上 Runtime 已上线（https://agent.wikipali.cc/api/copilotkit）。
+ * 「探索」和「就此段落提问」进入前先探一次 `/info`，不可达（断网/服务故障）就
+ * 弹窗告知，而不是让用户进到一个永远转圈的对话页。
  */
 import { Alert } from "react-native";
 import type { MessageKey } from "../i18n/messages/zh-Hans";
 
 const RUNTIME_URL = (
-  process.env.EXPO_PUBLIC_RUNTIME_URL || "http://localhost:3001/api/copilotkit"
+  process.env.EXPO_PUBLIC_RUNTIME_URL ||
+  "https://agent.wikipali.cc/api/copilotkit"
 ).replace(/\/+$/, "");
 
 const PROBE_TIMEOUT_MS = 3000;

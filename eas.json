@@ -9,10 +9,16 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_RUNTIME_URL": "https://agent.wikipali.cc/api/copilotkit"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_RUNTIME_URL": "https://agent.wikipali.cc/api/copilotkit"
+      }
     }
   },
   "submit": {

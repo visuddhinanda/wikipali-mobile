@@ -8,9 +8,10 @@ import { I18nProvider } from './src/i18n/I18nContext';
 import { useUposathaNotifications } from './src/calendar/useUposathaNotifications';
 
 // Runtime 地址：EXPO_PUBLIC_* 会在 `npx expo start` 时从 .env 内联进 bundle。
-// 真机（development build，本项目不能用 Expo Go）必须用电脑的局域网 IP，不能用 localhost。
+// 未设置时回退到线上 CopilotKit Runtime（本地联调 runtime 可在 .env 里覆盖成局域网地址）。
 const runtimeUrl =
-  process.env.EXPO_PUBLIC_RUNTIME_URL || 'http://localhost:3001/api/copilotkit';
+  process.env.EXPO_PUBLIC_RUNTIME_URL ||
+  'https://agent.wikipali.cc/api/copilotkit';
 
 /**
  * 布萨日通知的重排要在 I18nProvider **之内**（要拿 t 与 locale 写通知文案），
