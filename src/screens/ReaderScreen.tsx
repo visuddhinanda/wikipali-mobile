@@ -240,9 +240,6 @@ export function ReaderScreen({ route, navigation }: Props) {
       // 当前层真的换章了。
       const selfLayer = bookLayerAt(b, para) ?? "mula";
       const prevLayer = pages[selfIndexRef.current]?.layer;
-      console.log(
-        `[anchor] index=${index} selfIdx=${selfIndexRef.current} b=${b} para=${para} toc="${toc}" selfLayer=${selfLayer} prevLayer=${prevLayer} pagesLen=${pages.length}`,
-      );
 
       if (selfLayer !== prevLayer) {
         // 层变了（跳进义注/复注或另一本书）：收成单层、跳回它，再重新算各层。
@@ -386,15 +383,6 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
-
-  // 诊断：顶部标题 / 层标签变化时打点，观察是否来回跳。
-  useEffect(() => {
-    console.log(
-      `[title] header="${headerTitle}" activeIndex=${activeIndex} pagesLen=${pages.length} layers=[${pages
-        .map((p) => p.layer)
-        .join(",")}]`,
-    );
-  }, [headerTitle, activeIndex, pages]);
 
   const renderPane = (i: number) => {
     const p = pages[i];

@@ -1009,9 +1009,6 @@ export function ReaderLayerPane({
         const html = renderParaHtml(p, map.get(p), headings);
         if (html) parts.push(html);
       }
-      console.log(
-        `[wl] init book=${book} window=[${win.from}..${win.to}] paras=${win.to - win.from + 1} non-empty=${parts.length}`,
-      );
       const titleText = unitRef.current?.chapter?.toc ?? initialToc ?? title;
       setDoc({ title: titleText, body: parts.join("\n") });
     })().catch((err) => {
@@ -1285,15 +1282,8 @@ export function ReaderLayerPane({
       if (range[0] > range[1]) return;
 
       // 在途去重：快速滚动会连发 wl-need，同一方向还没取完就跳过，避免重复请求/写库。
-      if (loadingRef.current[dir]) {
-        console.log(`[wl] need ${dir}: skipped (already in-flight)`);
-        return;
-      }
+      if (loadingRef.current[dir]) return;
       loadingRef.current[dir] = true;
-
-      console.log(
-        `[wl] need ${dir}: window=[${win.from}..${win.to}] dom=[${domFirst}..${domLast}] → load paras=[${range[0]}..${range[1]}]`,
-      );
 
       // 先亮起「加载方向」指示，再取数 —— 防止快速滑到底看到一片空白。
       webViewRef.current?.injectJavaScript(
@@ -1327,19 +1317,12 @@ export function ReaderLayerPane({
             return;
           }
           const fn = dir === "down" ? "__wlAppend" : "__wlPrepend";
-          console.log(
-            `[wl] ${dir} done: appended ${parts.length} paras (${htmlStr.length} html chars)`,
-          );
           // __wlAppend / __wlPrepend 内部会先 __wlHideLoading(dir) 再插入正文。
           webViewRef.current?.injectJavaScript(
             `window.${fn}(${JSON.stringify(htmlStr)}); true;`,
           );
         })
-        .catch((err) => {
-          console.warn(
-            `[wl] ${dir} failed:`,
-            err instanceof Error ? err.message : err,
-          );
+        .catch(() => {
           hideLoading();
         })
         .finally(() => {
@@ -1374,9 +1357,6 @@ export function ReaderLayerPane({
           if (cur && cur.book === nu.book && cur.from === nu.from) return;
           unitRef.current = nu;
           setUnit(nu);
-          console.log(
-            `[wl] anchor para=${para} → unit book=${book} [${nu.from}..${nu.to}] "${nu.chapter?.toc ?? ""}"`,
-          );
         });
       }, 250);
     },
@@ -1403,10 +1383,6 @@ export function ReaderLayerPane({
         return;
       }
       if (msg.type === "wl-unload" && (msg.dir === "up" || msg.dir === "down")) {
-        console.log(
-          `[wl] unload ${msg.dir}: paras=[${msg.from}..${msg.to}] count=${msg.count}` +
-            ` | domFirst=${msg.domFirst} domCount=${msg.domCount} scrollTop=${msg.scrollTop}`,
-        );
         return;
       }
       const book = Number(msg.book);
@@ -1424,8 +1400,6 @@ export function ReaderLayerPane({
   };
 
   const handleAnnoLoadEnd = () => {
-    // 诊断：每次 WebView loadEnd 都打点，用于判断滚动中是否发生整页重载。
-    console.log("[wl] webview loadEnd");
     const sid = pendingHighlightRef.current;
     if (!sid) return;
     pendingHighlightRef.current = null;

@@ -76,13 +76,6 @@ async function fetchAndStore(
     }
   });
 
-  const total = to - from + 1;
-  const empty = total - items.length;
-  console.log(
-    `[wl-db] write book=${book} ch=${channelId.slice(0, 8)} paras=[${from}..${to}] ` +
-      `total=${total} content=${items.length} empty=${empty}`,
-  );
-
   return byPara;
 }
 
@@ -116,12 +109,6 @@ export async function loadParasMap(
   const missing: number[] = [];
   for (let p = from; p <= to; p++) {
     if (!byPara.has(p)) missing.push(p);
-  }
-
-  if (missing.length > 0) {
-    console.log(
-      `[wl-cache] book=${book} [${from}..${to}] valid-cache=${byPara.size} missing=${missing.length}`,
-    );
   }
 
   // 按巴利文字符数分批（见 batch.ts）：段落大小差两个数量级，按固定段数分会超时
