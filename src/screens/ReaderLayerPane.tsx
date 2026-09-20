@@ -28,6 +28,7 @@ import {
   WINDOW_STRLEN,
   bookBounds,
   extendWindow,
+  getBookHeadingRows,
   getChapterUnitAt,
   getNextUnit,
   getPrevUnit,
@@ -39,6 +40,7 @@ import {
   rememberChannelName,
   resolveStartParagraph,
   tipitakaRunner,
+  type HeadingRow,
   type ParaWindow,
   type ReadingUnit,
 } from "../reading";
@@ -90,6 +92,34 @@ function headingTocFor(book: number, para: number): string | null {
     if (h.paragraph <= para) toc = h.toc;
   }
   return toc;
+}
+
+/** HTML 转义（目录标题当作文本塞进 HTML 前用）。 */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * 空标题段回退渲染：频道没返回标题行正文时，用目录库的 toc 补一个标题。
+ *
+ * 服务端会跳过 `display` 为空的段落（含章节标题行），译文频道尤其常见——
+ * 于是正文里看不到章节分界。这里对「level ≤ 7 且无正文」的段，用目录里的
+ * toc 渲染一个 `<h4>` 标题（class='original' 让巴利字体转换照常作用于标题）。
+ */
+function renderParaHtml(
+  para: number,
+  html: string | undefined,
+  headings: Map<number, HeadingRow> | undefined,
+): string {
+  if (html) return html;
+  const h = headings?.get(para);
+  if (h && h.toc) {
+    return `<div class='original' data-para='${para}'><h4>${escapeHtml(h.toc)}</h4></div>`;
+  }
+  return "";
 }
 
 export interface ReaderLayerPaneProps {
@@ -753,6 +783,8 @@ export function ReaderLayerPane({
   const boundsRef = useRef<{ lo: number; hi: number } | null>(null);
   /** 本书段落号 → 巴利文字符数。 */
   const lengthsRef = useRef<Map<number, number>>(new Map());
+  /** 本书标题行（level ≤ 7）：段落号 → {level, toc}，用于空标题段回退渲染。 */
+  const headingsRef = useRef<Map<number, HeadingRow> | undefined>(undefined);
   /** 视口顶部当前所在的段（WebView 上报，滚动中持续更新）。 */
   const topParaRef = useRef<number>(0);
   /** 各方向是否有在途的增量取数 —— 防止快速滚动连发 wl-need 重复请求同一区间。 */
@@ -954,9 +986,10 @@ export function ReaderLayerPane({
     setHeadingToc(null);
     (async () => {
       const sql = await tipitakaRunner();
-      const [bounds, lengths] = await Promise.all([
+      const [bounds, lengths, headings] = await Promise.all([
         bookBounds(sql, book),
         paragraphLengths(sql, book),
+        getBookHeadingRows(book),
       ]);
       if (!alive || token !== loadTokenRef.current) return;
       if (!bounds) throw new Error(t("common.loadFailed"));
@@ -967,13 +1000,14 @@ export function ReaderLayerPane({
 
       boundsRef.current = bounds;
       lengthsRef.current = lengths;
+      headingsRef.current = headings;
       winRef.current = win;
       topParaRef.current = target;
 
       const parts: string[] = [];
       for (let p = win.from; p <= win.to; p++) {
-        const h = map.get(p);
-        if (h) parts.push(h);
+        const html = renderParaHtml(p, map.get(p), headings);
+        if (html) parts.push(html);
       }
       console.log(
         `[wl] init book=${book} window=[${win.from}..${win.to}] paras=${win.to - win.from + 1} non-empty=${parts.length}`,
@@ -1279,8 +1313,8 @@ export function ReaderLayerPane({
           }
           const parts: string[] = [];
           for (let p = range[0]; p <= range[1]; p++) {
-            const h = map.get(p);
-            if (h) parts.push(convertFragment(h));
+            const html = renderParaHtml(p, map.get(p), headingsRef.current);
+            if (html) parts.push(convertFragment(html));
           }
           // 逻辑窗口只向前扩：backfill 被卸载的洞时不回退边界。
           winRef.current =

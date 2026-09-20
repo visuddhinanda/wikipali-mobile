@@ -8,16 +8,18 @@ import { loadParaHtml, loadParasMap } from "./cache";
 import { tipitakaRunner } from "./db";
 import {
   allReadingUnits,
+  bookHeadingRows,
   chapterUnitContaining,
   firstReadingParagraph,
   nextReadingUnit,
   prevReadingUnit,
   readingUnit,
   readingUnitContaining,
+  type HeadingRow,
   type ReadingUnit,
 } from "./unit";
 
-export type { ReadingUnit, ReadingUnitMode } from "./unit";
+export type { HeadingRow, ReadingUnit, ReadingUnitMode } from "./unit";
 export { getCompanionLayers, getChapterLayers } from "./companion";
 export {
   channelNames,
@@ -105,6 +107,13 @@ export async function getChapterUnitAt(
   paragraph: number,
 ): Promise<ReadingUnit | null> {
   return chapterUnitContaining(await tipitakaRunner(), book, paragraph);
+}
+
+/** 一本书的标题行（level ≤ 7）：paragraph → {level, toc}。 */
+export async function getBookHeadingRows(
+  book: number,
+): Promise<Map<number, HeadingRow>> {
+  return bookHeadingRows(await tipitakaRunner(), book);
 }
 
 /** 上一个 / 下一个阅读单元。到头返回 null。 */

@@ -376,3 +376,25 @@ export async function chapterUnitContaining(
     bookUnits(idx, book).find((u) => u.from <= paragraph && paragraph <= u.to) ?? null
   );
 }
+
+export interface HeadingRow {
+  level: number;
+  toc: string | null;
+}
+
+/**
+ * 一本书的标题行（level ≤ 7）：paragraph → {level, toc}。
+ *
+ * 用于「空标题段回退渲染」——译文频道常不返回章节标题行的正文（服务端跳过），
+ * 但目录库里有这些标题的 toc，客户端可据此补渲染一个标题，正文里也能看到章节分界。
+ */
+export async function bookHeadingRows(
+  sql: SqlRunner,
+  book: number,
+): Promise<Map<number, HeadingRow>> {
+  const idx = await bookIndex(sql, book);
+  if (!idx) return new Map();
+  return new Map(
+    idx.chapters.map((c) => [c.paragraph, { level: c.level, toc: c.toc }]),
+  );
+}
