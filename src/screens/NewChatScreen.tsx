@@ -11,12 +11,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import type {
-  NativeStackNavigationProp,
-  NativeStackScreenProps,
-} from "@react-navigation/native-stack";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   CopilotChat,
   useCopilotChatContext,
@@ -29,13 +25,12 @@ import { colors, radius, spacing, type } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+import { CitationSheet, type CitationTarget } from "../components/CitationSheet";
 
 /**
  * 从 wikipali 阅读器链接解析 book/paragraph/channel。
  * 例：`…/library/tipitaka/188-459/read?channel=translation`
- *   - `channel=translation`：特殊标记，表示「列出该章节全部版本」
+ *   - `channel=translation`：特殊标记，表示「该段有译文」（点击时优先展示译文）
  *   - `channel=<uuid>`：具体频道 id，直接按该版本请求经文
  */
 function parsePassage(url: string): {
@@ -80,8 +75,65 @@ const TOOL_LABELS: Record<string, MessageKey> = {
   wikipali_anthology: "tool.wikipali_anthology",
 };
 
+/**
+ * AI 回答内 markdown 标题层级（h1–h6）。
+ * 相对库默认值整体下调（h1 30 → 20），正文 16 起步，层级靠字号 + 字重拉开；
+ * 颜色统一暖墨色，h4 及以下用 inkSoft 弱化。上边距留白、下边距收紧，让标题贴合下文。
+ */
+const markdownHeadingStyle = {
+  h1: {
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 28,
+    color: colors.ink,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  h2: {
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 26,
+    color: colors.ink,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  h3: {
+    fontSize: 17,
+    fontWeight: "600",
+    lineHeight: 24,
+    color: colors.ink,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  h4: {
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 24,
+    color: colors.inkSoft,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  h5: {
+    fontSize: 15,
+    fontWeight: "600",
+    lineHeight: 20,
+    color: colors.inkSoft,
+    marginTop: spacing.sm,
+    marginBottom: 0,
+  },
+  h6: {
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 18,
+    color: colors.inkSoft,
+    marginTop: spacing.xs,
+    marginBottom: 0,
+  },
+};
+
 /** 引用链接的 tag 样式（按 URL 模式匹配 wikipali 阅读器链接）。 */
 const markdownStyle = {
+  ...markdownHeadingStyle,
   link: {
     color: colors.vermilion,
     underline: false as const,
@@ -137,11 +189,11 @@ function ChatUI({
   systemPrompt?: string;
   passageRef?: { book: number; paragraph: number; title: string };
 }) {
-  const navigation = useNavigation<Nav>();
   const t = useT();
   const { agent, messages, isRunning, submitMessage } = useCopilotChatContext();
   const renderToolCall = useRenderToolCall();
   const [input, setInput] = React.useState(draftText ?? "");
+  const [citation, setCitation] = React.useState<CitationTarget | null>(null);
   const listRef = useRef<FlatList>(null);
   const headerHeight = useHeaderHeight();
 
@@ -193,27 +245,14 @@ function ChatUI({
     [],
   );
 
+  // 引用链接点击：改为从下方拉出面板展示原文/译文，不再跳转阅读器。
   const handleLinkPress = (event: { url: string }) => {
     const parsed = parsePassage(event.url);
     if (!parsed) return;
-    const title = `${parsed.book}-${parsed.paragraph}`;
-
-    // channel=translation：先查询该章节全部版本，列出让用户选择后再读经文；
-    // channel=<uuid>：直接按该版本请求经文；无 channel：走旧 chapter-content 接口。
-    if (parsed.channel === "translation") {
-      navigation.navigate("BookChannels", {
-        book: parsed.book,
-        paragraph: parsed.paragraph,
-        title,
-      });
-      return;
-    }
-
-    navigation.navigate("Reader", {
+    setCitation({
       book: parsed.book,
       paragraph: parsed.paragraph,
-      title,
-      channelId: parsed.channel,
+      channel: parsed.channel,
     });
   };
 
@@ -262,61 +301,64 @@ function ChatUI({
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={headerHeight}
-    >
-      <FlatList
-        ref={listRef}
-        data={messages ?? []}
-        keyExtractor={(m: any) => m.id}
-        renderItem={renderItem}
-        onContentSizeChange={() =>
-          listRef.current?.scrollToEnd({ animated: true })
-        }
-        contentContainerStyle={styles.listContent}
-        style={styles.list}
-        ListFooterComponent={
-          showThinking ? (
-            <View style={styles.thinkingBubble}>
-              <ActivityIndicator size="small" color={colors.vermilion} />
-              <Text style={styles.thinkingText}>{t("chat.thinking")}</Text>
+    <>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={headerHeight}
+      >
+        <FlatList
+          ref={listRef}
+          data={messages ?? []}
+          keyExtractor={(m: any) => m.id}
+          renderItem={renderItem}
+          onContentSizeChange={() =>
+            listRef.current?.scrollToEnd({ animated: true })
+          }
+          contentContainerStyle={styles.listContent}
+          style={styles.list}
+          ListFooterComponent={
+            showThinking ? (
+              <View style={styles.thinkingBubble}>
+                <ActivityIndicator size="small" color={colors.vermilion} />
+                <Text style={styles.thinkingText}>{t("chat.thinking")}</Text>
+              </View>
+            ) : null
+          }
+        />
+        <View style={styles.composer}>
+          {passageRef ? (
+            <View style={styles.aboutBubble}>
+              <Ionicons name="book-outline" size={15} color={colors.ochre} />
+              <Text style={styles.aboutBubbleText} numberOfLines={2}>
+                {t("chat.aboutPassage", { title: passageRef.title })}
+              </Text>
             </View>
-          ) : null
-        }
-      />
-      <View style={styles.composer}>
-        {passageRef ? (
-          <View style={styles.aboutBubble}>
-            <Ionicons name="book-outline" size={15} color={colors.ochre} />
-            <Text style={styles.aboutBubbleText} numberOfLines={2}>
-              {t("chat.aboutPassage", { title: passageRef.title })}
-            </Text>
+          ) : null}
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder={t("chat.followUp")}
+              placeholderTextColor={colors.inkFaint}
+              multiline
+              onSubmitEditing={send}
+            />
+            {isRunning ? (
+              <Pressable style={styles.stopBtn} onPress={() => agent?.stop?.()}>
+                <View style={styles.stopSquare} />
+              </Pressable>
+            ) : (
+              <Pressable style={styles.sendBtn} onPress={send}>
+                <Text style={styles.sendIcon}>↑</Text>
+              </Pressable>
+            )}
           </View>
-        ) : null}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder={t("chat.followUp")}
-            placeholderTextColor={colors.inkFaint}
-            multiline
-            onSubmitEditing={send}
-          />
-          {isRunning ? (
-            <Pressable style={styles.stopBtn} onPress={() => agent?.stop?.()}>
-              <View style={styles.stopSquare} />
-            </Pressable>
-          ) : (
-            <Pressable style={styles.sendBtn} onPress={send}>
-              <Text style={styles.sendIcon}>↑</Text>
-            </Pressable>
-          )}
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+      <CitationSheet target={citation} onClose={() => setCitation(null)} />
+    </>
   );
 }
 
@@ -368,13 +410,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   assistantBubble: {
+    // AI 回答不用卡片样式：无背景、无边框，正文直接铺在纸面底色上，
+    // 与列表内容区的水平留白（listContent.padding）对齐。
     maxWidth: "100%",
-    backgroundColor: colors.paperRaised,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
   },
   toolBubble: {
     flexDirection: "row",
