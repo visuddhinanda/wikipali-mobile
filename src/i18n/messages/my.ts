@@ -69,6 +69,7 @@ const my: Messages = {
   "bookshelf.tab.reading": "ဖတ်နေဆဲ",
   "bookshelf.tab.downloaded": "ဒေါင်းလုဒ်ပြီး",
   "bookshelf.tab.starred": "သိမ်းဆည်းထား",
+  "bookshelf.tab.bookmarks": "စာမှတ်များ",
   "bookshelf.empty.reading.title": "ဖတ်ရှုမှတ်တမ်း မရှိသေးပါ",
   "bookshelf.empty.reading.sub":
     "「အမျိုးအစား」မှ စာပေကို ဖွင့်၍ စတင်ဖတ်ပါ။ တိုးတက်မှုကို ဤနေရာတွင် တွေ့ရပါမည်။",
@@ -78,6 +79,9 @@ const my: Messages = {
   "bookshelf.empty.starred.title": "သိမ်းဆည်းထားသည် မရှိပါ",
   "bookshelf.empty.starred.sub":
     "သိမ်းဆည်းထားသော စာပေများ ဤနေရာတွင် ပေါ်လာပါမည်။",
+  "bookshelf.empty.bookmarks.title": "စာမှတ်မရှိပါ",
+  "bookshelf.empty.bookmarks.sub":
+    "စာပိုဒ်များတွင် ထည့်ထားသော စာမှတ်များ ဤနေရာတွင် ပေါ်လာမည်။",
 
   "tools.dict.title": "အဘိဓာန်",
   "tools.dict.desc": "တစ်လုံးချင်း ရှာဖွေခြင်း · မှတ်တမ်း",
@@ -95,6 +99,7 @@ const my: Messages = {
   "chat.toolRunning": "လုပ်ဆောင်နေသည်…",
   "chat.toolDone": "ပြီးပါပြီ",
   "chat.toolStatusDesc": "ကိရိယာ ခေါ်ယူမှု အခြေအနေ ပြရန်",
+  "chat.paliOriginal": "မူလပါဠိ",
 
   "tool.wikipali_forms": "ပုဒ်ပုံစံများ ဖြန့်ရန်",
   "tool.wikipali_search": "စာပေ ရှာဖွေရန်",
@@ -119,6 +124,8 @@ const my: Messages = {
   "reader.nextChapter": "နောက်အခန်း",
   "reader.version": "ဗားရှင်း",
   "reader.more": "နောက်ထပ်",
+  "reader.favorite": "သိမ်းဆည်း",
+  "reader.bookmark": "စာမှတ်",
   "reader.askAboutPassage": "ဤစာပိုဒ်အကြောင်း မေးရန်",
   "reader.menu.copy": "ကူးယူ",
   "reader.menu.lookup": "အဓိပ္ပာယ်ရှာ",

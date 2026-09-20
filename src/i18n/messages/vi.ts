@@ -69,6 +69,7 @@ const vi: Messages = {
   "bookshelf.tab.reading": "Đang đọc",
   "bookshelf.tab.downloaded": "Đã tải",
   "bookshelf.tab.starred": "Đã lưu",
+  "bookshelf.tab.bookmarks": "Đánh dấu",
   "bookshelf.empty.reading.title": "Chưa có lịch sử đọc",
   "bookshelf.empty.reading.sub":
     "Mở kinh văn từ mục Phân loại để bắt đầu đọc; tiến độ sẽ hiện ở đây.",
@@ -77,6 +78,8 @@ const vi: Messages = {
     "Nội dung đã tải sẽ hiện ở đây và có thể đọc ngoại tuyến.",
   "bookshelf.empty.starred.title": "Chưa lưu nội dung nào",
   "bookshelf.empty.starred.sub": "Nội dung bạn lưu sẽ hiện ở đây.",
+  "bookshelf.empty.bookmarks.title": "Chưa có đánh dấu",
+  "bookshelf.empty.bookmarks.sub": "Dấu trang bạn thêm vào đoạn văn sẽ hiện ở đây.",
 
   "tools.dict.title": "Từ điển",
   "tools.dict.desc": "Tra từng từ · Lịch sử gần đây",
@@ -94,6 +97,7 @@ const vi: Messages = {
   "chat.toolRunning": "đang chạy…",
   "chat.toolDone": "xong",
   "chat.toolStatusDesc": "Hiện trạng thái gọi công cụ",
+  "chat.paliOriginal": "Pali gốc",
 
   "tool.wikipali_forms": "Mở rộng dạng từ",
   "tool.wikipali_search": "Tìm trong kinh văn",
@@ -118,6 +122,8 @@ const vi: Messages = {
   "reader.nextChapter": "Chương sau",
   "reader.version": "Bản",
   "reader.more": "Thêm",
+  "reader.favorite": "Lưu",
+  "reader.bookmark": "Đánh dấu",
   "reader.askAboutPassage": "Hỏi về đoạn này",
   "reader.menu.copy": "Sao chép",
   "reader.menu.lookup": "Tra từ",

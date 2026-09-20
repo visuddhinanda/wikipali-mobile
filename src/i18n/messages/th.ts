@@ -68,6 +68,7 @@ const th: Messages = {
   "bookshelf.tab.reading": "กำลังอ่าน",
   "bookshelf.tab.downloaded": "ดาวน์โหลดแล้ว",
   "bookshelf.tab.starred": "รายการโปรด",
+  "bookshelf.tab.bookmarks": "บุ๊กมาร์ก",
   "bookshelf.empty.reading.title": "ยังไม่มีประวัติการอ่าน",
   "bookshelf.empty.reading.sub":
     "เปิดพระไตรปิฎกจากหมวดหมู่เพื่อเริ่มอ่าน ความคืบหน้าจะปรากฏที่นี่",
@@ -76,6 +77,8 @@ const th: Messages = {
     "เนื้อหาที่ดาวน์โหลดจะปรากฏที่นี่และอ่านแบบออฟไลน์ได้",
   "bookshelf.empty.starred.title": "ยังไม่มีรายการโปรด",
   "bookshelf.empty.starred.sub": "เนื้อหาที่บันทึกไว้จะปรากฏที่นี่",
+  "bookshelf.empty.bookmarks.title": "ยังไม่มีบุ๊กมาร์ก",
+  "bookshelf.empty.bookmarks.sub": "บุ๊กมาร์กที่เพิ่มในข้อความจะปรากฏที่นี่",
 
   "tools.dict.title": "พจนานุกรม",
   "tools.dict.desc": "ค้นหาทีละคำ · ประวัติล่าสุด",
@@ -93,6 +96,7 @@ const th: Messages = {
   "chat.toolRunning": "กำลังทำงาน…",
   "chat.toolDone": "เสร็จสิ้น",
   "chat.toolStatusDesc": "แสดงสถานะการเรียกใช้เครื่องมือ",
+  "chat.paliOriginal": "ภาษาบาลีต้นฉบับ",
 
   "tool.wikipali_forms": "ขยายรูปคำ",
   "tool.wikipali_search": "ค้นหาในพระไตรปิฎก",
@@ -117,6 +121,8 @@ const th: Messages = {
   "reader.nextChapter": "บทถัดไป",
   "reader.version": "ฉบับ",
   "reader.more": "เพิ่มเติม",
+  "reader.favorite": "รายการโปรด",
+  "reader.bookmark": "บุ๊กมาร์ก",
   "reader.askAboutPassage": "ถามเกี่ยวกับข้อความนี้",
   "reader.menu.copy": "คัดลอก",
   "reader.menu.lookup": "ค้นศัพท์",

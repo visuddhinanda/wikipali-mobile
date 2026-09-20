@@ -9,6 +9,8 @@ import { bookEntryAt, bookLayerAt } from "../catalog";
 import { channelNames, listDownloads } from "../reading";
 import { fetchChannel, type ChannelSummary } from "../api/channels";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
+import { loadStarred, type StarredBook } from "../data/starred";
+import { loadBookmarks, type Bookmark } from "../data/bookmarks";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useT } from "../i18n/I18nContext";
@@ -17,13 +19,14 @@ import type { MessageKey } from "../i18n";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /** Tab 的稳定 id（不再用中文当键，文案交给 i18n）。 */
-const TABS = ["reading", "downloaded", "starred"] as const;
+const TABS = ["reading", "downloaded", "starred", "bookmarks"] as const;
 type TabId = (typeof TABS)[number];
 
 const TAB_LABEL: Record<TabId, MessageKey> = {
   reading: "bookshelf.tab.reading",
   downloaded: "bookshelf.tab.downloaded",
   starred: "bookshelf.tab.starred",
+  bookmarks: "bookshelf.tab.bookmarks",
 };
 
 const EMPTY: Record<TabId, { title: MessageKey; sub: MessageKey }> = {
@@ -38,6 +41,10 @@ const EMPTY: Record<TabId, { title: MessageKey; sub: MessageKey }> = {
   starred: {
     title: "bookshelf.empty.starred.title",
     sub: "bookshelf.empty.starred.sub",
+  },
+  bookmarks: {
+    title: "bookshelf.empty.bookmarks.title",
+    sub: "bookshelf.empty.bookmarks.sub",
   },
 };
 
@@ -60,11 +67,26 @@ function formatRelative(
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
+/** 在读 / 收藏 / 书签三类列表共用的展示结构。 */
+interface ShelfItem {
+  key: string;
+  book: number;
+  paragraph: number;
+  title: string;
+  heading?: string;
+  channelId?: string;
+  /** 旧记录里的版本名快照，只用于名字查不到时回退。 */
+  channelName?: string;
+  updatedAt: number;
+}
+
 export function BookshelfScreen() {
   const navigation = useNavigation<Nav>();
   const t = useT();
   const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
+  const [starredList, setStarredList] = useState<StarredBook[] | null>(null);
+  const [bookmarkList, setBookmarkList] = useState<Bookmark[] | null>(null);
   // 「已下载」按频道归拢：一个频道一张卡，点进去就是批量下载那张详情页。
   const [channels, setChannels] = useState<DownloadedChannel[] | null>(null);
   // 版本名不存在记录里 —— uid → name 现查，服务端改了名这里立刻跟上。
@@ -77,12 +99,27 @@ export function BookshelfScreen() {
       loadReadingHistory().then((r) => {
         if (!alive) return;
         setRecords(r);
-        channelNames(r.map((x) => x.channelId ?? "")).then((m) => {
-          if (alive) setNames(m);
-        });
+      });
+      loadStarred().then((s) => {
+        if (alive) setStarredList(s);
+      });
+      loadBookmarks().then((b) => {
+        if (alive) setBookmarkList(b);
       });
       loadDownloadedChannels().then((c) => {
         if (alive) setChannels(c);
+      });
+      // 在读 / 收藏 / 书签三类记录的版本名统一现查（uid → name）。
+      Promise.all([
+        loadReadingHistory(),
+        loadStarred(),
+        loadBookmarks(),
+      ]).then(([r, s, b]) => {
+        if (!alive) return;
+        const uids = [...r, ...s, ...b].map((x) => x.channelId ?? "");
+        channelNames(uids).then((m) => {
+          if (alive) setNames(m);
+        });
       });
       return () => {
         alive = false;
@@ -91,6 +128,8 @@ export function BookshelfScreen() {
   );
 
   const readingList = records ?? [];
+  const starred = starredList ?? [];
+  const bookmarks = bookmarkList ?? [];
   const channelList = channels ?? [];
 
   /**
@@ -114,6 +153,72 @@ export function BookshelfScreen() {
     // 「原文」在对读标签栏里叫原文，在书架这里按书的性质叫「根本」。
     return t(
       layer === "mula" ? "layer.root" : (`layer.${layer}` as MessageKey),
+    );
+  };
+
+  const readingItems: ShelfItem[] = readingList.map((r) => ({
+    key: `reading-${r.book}`,
+    book: r.book,
+    paragraph: r.paragraph,
+    title: r.title,
+    heading: r.heading,
+    channelId: r.channelId,
+    channelName: r.channelName,
+    updatedAt: r.updatedAt,
+  }));
+  const starredItems: ShelfItem[] = starred.map((s) => ({
+    key: `starred-${s.book}`,
+    book: s.book,
+    paragraph: s.paragraph ?? 0,
+    title: s.title,
+    channelId: s.channelId,
+    updatedAt: s.updatedAt,
+  }));
+  const bookmarkItems: ShelfItem[] = bookmarks.map((b) => ({
+    key: `bookmark-${b.book}-${b.paragraph}`,
+    book: b.book,
+    paragraph: b.paragraph,
+    title: b.title,
+    heading: b.heading,
+    channelId: b.channelId,
+    updatedAt: b.updatedAt,
+  }));
+
+  const renderRow = (item: ShelfItem) => {
+    const title = workTitle(item.book, item.paragraph, item.title);
+    const sub = [
+      layerTag(item.book, item.paragraph),
+      item.heading && item.heading !== title ? item.heading : null,
+      channelLabel(item.channelId, item.channelName),
+      `${item.book}-${item.paragraph}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <Pressable
+        key={item.key}
+        style={styles.row}
+        onPress={() =>
+          navigation.navigate("Reader", {
+            book: item.book,
+            paragraph: item.paragraph,
+            title,
+            channelId: item.channelId,
+            channelName: channelLabel(item.channelId, item.channelName),
+          })
+        }
+      >
+        <View style={styles.rowBody}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={styles.rowSub} numberOfLines={1}>
+            {sub}
+          </Text>
+        </View>
+        <Text style={styles.rowTime}>{formatRelative(item.updatedAt, t)}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.vermilion} />
+      </Pressable>
     );
   };
 
@@ -142,52 +247,8 @@ export function BookshelfScreen() {
         ))}
       </View>
 
-      {active === "reading" && readingList.length > 0 ? (
-        <View>
-          {readingList.map((r) => {
-            const title = workTitle(r.book, r.paragraph, r.title);
-            const sub = [
-              layerTag(r.book, r.paragraph),
-              r.heading && r.heading !== title ? r.heading : null,
-              channelLabel(r.channelId, r.channelName),
-              `${r.book}-${r.paragraph}`,
-            ]
-              .filter(Boolean)
-              .join(" · ");
-            return (
-              <Pressable
-                key={String(r.book)}
-                style={styles.row}
-                onPress={() =>
-                  navigation.navigate("Reader", {
-                    book: r.book,
-                    paragraph: r.paragraph,
-                    title,
-                    channelId: r.channelId,
-                    channelName: channelLabel(r.channelId, r.channelName),
-                  })
-                }
-              >
-                <View style={styles.rowBody}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>
-                    {sub}
-                  </Text>
-                </View>
-                <Text style={styles.rowTime}>
-                  {formatRelative(r.updatedAt, t)}
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.vermilion}
-                />
-              </Pressable>
-            );
-          })}
-        </View>
+      {active === "reading" && readingItems.length > 0 ? (
+        <View>{readingItems.map(renderRow)}</View>
       ) : active === "downloaded" && channelList.length > 0 ? (
         <View>
           {channelList.map((c) => (
@@ -205,6 +266,10 @@ export function BookshelfScreen() {
             />
           ))}
         </View>
+      ) : active === "starred" && starredItems.length > 0 ? (
+        <View>{starredItems.map(renderRow)}</View>
+      ) : active === "bookmarks" && bookmarkItems.length > 0 ? (
+        <View>{bookmarkItems.map(renderRow)}</View>
       ) : (
         <View style={styles.empty}>
           <Ionicons name="book-outline" size={44} color={colors.inkFaint} />

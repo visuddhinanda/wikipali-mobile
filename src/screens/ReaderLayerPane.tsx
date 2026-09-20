@@ -49,6 +49,16 @@ import {
 import type { ChapterChannel } from "../catalog";
 import { getBookHeadings } from "../catalog/headings";
 import { saveReadingRecord } from "../data/history";
+import {
+  isStarred,
+  removeStarred,
+  saveStarred,
+} from "../data/starred";
+import {
+  isBookmarked,
+  removeBookmark,
+  saveBookmark,
+} from "../data/bookmarks";
 import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
@@ -157,6 +167,8 @@ export interface ReaderLayerPaneProps {
   highlightSid?: string | null;
   /** 打开阅读设置（底部导航「设置」触发，由外层控制 SettingsSheet）。 */
   onOpenSettings: () => void;
+  /** 分享当前章节链接（「更多」里的分享，复用外层的 shareCurrent）。 */
+  onShare: () => void;
   navigation: ReaderNavigation;
 }
 
@@ -746,6 +758,7 @@ export function ReaderLayerPane({
   onCrossHighlight,
   highlightSid,
   onOpenSettings,
+  onShare,
   navigation,
 }: ReaderLayerPaneProps) {
   const t = useT();
@@ -774,6 +787,11 @@ export function ReaderLayerPane({
   const [versionVisible, setVersionVisible] = useState(false);
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
   const [channelsError, setChannelsError] = useState<string | null>(null);
+
+  // 「更多」菜单：分享 / 收藏 / 书签。
+  const [moreVisible, setMoreVisible] = useState(false);
+  const [starred, setStarred] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
 
   // ---- 窗口化懒加载状态 ----
   // 正文不再「一次加载整个阅读单元」，而是维护一个按巴利文字符数滑动的段落
@@ -1158,6 +1176,57 @@ export function ReaderLayerPane({
     setVersionVisible(false);
   };
 
+  // 「更多」：打开前先读当前收藏/书签状态，好让菜单项显示正确的图标。
+  const openMore = async () => {
+    setMoreVisible(true);
+    const para = topParaRef.current || p;
+    const [s, b] = await Promise.all([
+      isStarred(book),
+      isBookmarked(book, para),
+    ]);
+    setStarred(s);
+    setBookmarked(b);
+  };
+
+  const toggleFavorite = async () => {
+    if (starred) {
+      await removeStarred(book);
+      setStarred(false);
+    } else {
+      await saveStarred({
+        book,
+        paragraph: topParaRef.current || p,
+        title,
+        channelId,
+        updatedAt: Date.now(),
+      });
+      setStarred(true);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    const para = topParaRef.current || p;
+    if (bookmarked) {
+      await removeBookmark(book, para);
+      setBookmarked(false);
+    } else {
+      await saveBookmark({
+        book,
+        paragraph: para,
+        title,
+        heading: toc,
+        channelId,
+        updatedAt: Date.now(),
+      });
+      setBookmarked(true);
+    }
+  };
+
+  const shareFromMenu = () => {
+    setMoreVisible(false);
+    onShare();
+  };
+
   const askAboutParagraph = async () => {
     if (!(await ensureAiAvailable(t))) return;
     const para = topParaRef.current || p;
@@ -1528,12 +1597,11 @@ export function ReaderLayerPane({
             c={c}
             onPress={onOpenSettings}
           />
-          {/* 「更多」暂为占位，无动作（后续再指定）。 */}
           <NavBtn
             icon="ellipsis-horizontal"
             label={t("reader.more")}
             c={c}
-            onPress={() => {}}
+            onPress={() => void openMore()}
           />
         </View>
       </View>
@@ -1558,6 +1626,17 @@ export function ReaderLayerPane({
         c={c}
         onClose={() => setVersionVisible(false)}
         onPick={pickChannel}
+      />
+
+      <MoreSheet
+        visible={moreVisible}
+        starred={starred}
+        bookmarked={bookmarked}
+        c={c}
+        onClose={() => setMoreVisible(false)}
+        onShare={shareFromMenu}
+        onFavorite={() => void toggleFavorite()}
+        onBookmark={() => void toggleBookmark()}
       />
     </View>
   );
@@ -1684,6 +1763,100 @@ function VersionSheet({
         </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+function MoreSheet({
+  visible,
+  starred,
+  bookmarked,
+  c,
+  onClose,
+  onShare,
+  onFavorite,
+  onBookmark,
+}: {
+  visible: boolean;
+  starred: boolean;
+  bookmarked: boolean;
+  c: ReaderChrome;
+  onClose: () => void;
+  onShare: () => void;
+  onFavorite: () => void;
+  onBookmark: () => void;
+}) {
+  const t = useT();
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={[styles.moreBackdrop, { backgroundColor: c.backdrop }]}
+        onPress={onClose}
+      />
+      <View
+        style={[
+          styles.moreSheet,
+          { backgroundColor: c.paperRaised, borderTopColor: c.border },
+        ]}
+      >
+        <MoreRow
+          icon="share-outline"
+          label={t("reader.share")}
+          c={c}
+          onPress={onShare}
+        />
+        <MoreRow
+          icon={starred ? "star" : "star-outline"}
+          label={t("reader.favorite")}
+          active={starred}
+          c={c}
+          onPress={onFavorite}
+        />
+        <MoreRow
+          icon={bookmarked ? "bookmark" : "bookmark-outline"}
+          label={t("reader.bookmark")}
+          active={bookmarked}
+          c={c}
+          onPress={onBookmark}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+function MoreRow({
+  icon,
+  label,
+  active,
+  c,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  active?: boolean;
+  c: ReaderChrome;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.moreRow, pressed && { opacity: 0.6 }]}
+      onPress={onPress}
+    >
+      <Ionicons name={icon} size={22} color={active ? c.vermilion : c.ink} />
+      <Text
+        style={[
+          styles.moreRowLabel,
+          { color: active ? c.vermilion : c.ink },
+          active && styles.moreRowLabelActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1818,5 +1991,29 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     paddingRight: 12,
+  },
+  moreBackdrop: {
+    flex: 1,
+  },
+  moreSheet: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    padding: 8,
+    paddingBottom: 28,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
+  moreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  moreRowLabel: {
+    flex: 1,
+    fontSize: 16,
+  },
+  moreRowLabelActive: {
+    fontWeight: "600",
   },
 });

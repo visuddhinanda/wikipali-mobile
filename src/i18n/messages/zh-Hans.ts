@@ -78,6 +78,7 @@ const zhHans = {
   "bookshelf.tab.reading": "在读",
   "bookshelf.tab.downloaded": "已下载",
   "bookshelf.tab.starred": "收藏",
+  "bookshelf.tab.bookmarks": "书签",
   "bookshelf.empty.reading.title": "还没有阅读记录",
   "bookshelf.empty.reading.sub":
     "从「分类」进入经文开始阅读，进度会自动出现在这里。",
@@ -85,6 +86,8 @@ const zhHans = {
   "bookshelf.empty.downloaded.sub": "下载的经文会出现在这里，可离线阅读。",
   "bookshelf.empty.starred.title": "暂无收藏",
   "bookshelf.empty.starred.sub": "收藏的经文会出现在这里。",
+  "bookshelf.empty.bookmarks.title": "暂无书签",
+  "bookshelf.empty.bookmarks.sub": "给经文段落加的书签会出现在这里。",
 
   // 工具
   "tools.dict.title": "字典",
@@ -104,6 +107,7 @@ const zhHans = {
   "chat.toolRunning": "进行中…",
   "chat.toolDone": "完成",
   "chat.toolStatusDesc": "显示工具调用状态",
+  "chat.paliOriginal": "巴利原文",
 
   // AI 工具名
   "tool.wikipali_forms": "展开词形",
@@ -130,6 +134,8 @@ const zhHans = {
   "reader.nextChapter": "下一章",
   "reader.version": "版本",
   "reader.more": "更多",
+  "reader.favorite": "收藏",
+  "reader.bookmark": "书签",
   "reader.askAboutPassage": "提问",
   "reader.menu.copy": "复制",
   "reader.menu.lookup": "查词",

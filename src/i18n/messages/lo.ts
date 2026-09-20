@@ -69,6 +69,7 @@ const lo: Messages = {
   "bookshelf.tab.reading": "ກຳລັງອ່ານ",
   "bookshelf.tab.downloaded": "ດາວໂຫຼດແລ້ວ",
   "bookshelf.tab.starred": "ບັນທຶກໄວ້",
+  "bookshelf.tab.bookmarks": "ໝາຍໜ້າ",
   "bookshelf.empty.reading.title": "ຍັງບໍ່ມີປະຫວັດການອ່ານ",
   "bookshelf.empty.reading.sub":
     "ເປີດພຣະໄຕປິດົກຈາກໝວດໝູ່ເພື່ອເລີ່ມອ່ານ ຄວາມຄືບໜ້າຈະປາກົດຢູ່ນີ້.",
@@ -77,6 +78,8 @@ const lo: Messages = {
     "ເນື້ອຫາທີ່ດາວໂຫຼດຈະປາກົດຢູ່ນີ້ ແລະ ອ່ານແບບອອບໄລນ໌ໄດ້.",
   "bookshelf.empty.starred.title": "ຍັງບໍ່ມີລາຍການທີ່ບັນທຶກ",
   "bookshelf.empty.starred.sub": "ເນື້ອຫາທີ່ທ່ານບັນທຶກຈະປາກົດຢູ່ນີ້.",
+  "bookshelf.empty.bookmarks.title": "ຍັງບໍ່ມີໝາຍໜ້າ",
+  "bookshelf.empty.bookmarks.sub": "ໝາຍໜ້າທີ່ທ່ານເພີ່ມໃສ່ຂໍ້ຄວາມຈະປາກົດຢູ່ນີ້.",
 
   "tools.dict.title": "ວັດຈະນານຸກົມ",
   "tools.dict.desc": "ຄົ້ນຫາເທື່ອລະຄຳ · ປະຫວັດຫຼ້າສຸດ",
@@ -94,6 +97,7 @@ const lo: Messages = {
   "chat.toolRunning": "ກຳລັງເຮັດວຽກ…",
   "chat.toolDone": "ສຳເລັດ",
   "chat.toolStatusDesc": "ສະແດງສະຖານະການເອີ້ນໃຊ້ເຄື່ອງມື",
+  "chat.paliOriginal": "ພາສາບາລີຕົ້ນສະບັບ",
 
   "tool.wikipali_forms": "ຂະຫຍາຍຮູບຄຳ",
   "tool.wikipali_search": "ຄົ້ນຫາໃນພຣະໄຕປິດົກ",
@@ -118,6 +122,8 @@ const lo: Messages = {
   "reader.nextChapter": "ບົດຕໍ່ໄປ",
   "reader.version": "ສະບັບ",
   "reader.more": "ເພີ່ມເຕີມ",
+  "reader.favorite": "ບັນທຶກ",
+  "reader.bookmark": "ໝາຍໜ້າ",
   "reader.askAboutPassage": "ຖາມກ່ຽວກັບຂໍ້ຄວາມນີ້",
   "reader.menu.copy": "ຄັດລອກ",
   "reader.menu.lookup": "ຄົ້ນຄຳ",

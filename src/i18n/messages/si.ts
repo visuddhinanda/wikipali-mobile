@@ -68,6 +68,7 @@ const si: Messages = {
   "bookshelf.tab.reading": "කියවමින්",
   "bookshelf.tab.downloaded": "බාගත කළ",
   "bookshelf.tab.starred": "සුරැකි",
+  "bookshelf.tab.bookmarks": "පිටු සලකුණු",
   "bookshelf.empty.reading.title": "කියවීම් වාර්තා නොමැත",
   "bookshelf.empty.reading.sub":
     "කියවීම ඇරඹීමට වර්ග තුළින් සූත්‍රයක් විවෘත කරන්න; ප්‍රගතිය මෙහි දිස්වේ.",
@@ -76,6 +77,8 @@ const si: Messages = {
     "බාගත කළ පෙළ මෙහි දිස්වන අතර නොබැඳිව කියවිය හැක.",
   "bookshelf.empty.starred.title": "සුරැකි අයිතම නොමැත",
   "bookshelf.empty.starred.sub": "ඔබ සුරකින පෙළ මෙහි දිස්වේ.",
+  "bookshelf.empty.bookmarks.title": "පිටු සලකුණු නොමැත",
+  "bookshelf.empty.bookmarks.sub": "ඡේදවලට එක් කරන පිටු සලකුණු මෙහි දිස්වේ.",
 
   "tools.dict.title": "ශබ්දකෝෂය",
   "tools.dict.desc": "පද අනුව සෙවීම · මෑත ඉතිහාසය",
@@ -93,6 +96,7 @@ const si: Messages = {
   "chat.toolRunning": "ක්‍රියාත්මකයි…",
   "chat.toolDone": "අවසන්",
   "chat.toolStatusDesc": "මෙවලම් ඇමතුම් තත්ත්වය පෙන්වන්න",
+  "chat.paliOriginal": "මුල් පාලි",
 
   "tool.wikipali_forms": "පද රූප විහිදන්න",
   "tool.wikipali_search": "පෙළ සොයන්න",
@@ -117,6 +121,8 @@ const si: Messages = {
   "reader.nextChapter": "ඊළඟ පරිච්ඡේදය",
   "reader.version": "සංස්කරණය",
   "reader.more": "තවත්",
+  "reader.favorite": "සුරකින්න",
+  "reader.bookmark": "පිටු සලකුණ",
   "reader.askAboutPassage": "මෙම ඡේදය ගැන අසන්න",
   "reader.menu.copy": "පිටපත්",
   "reader.menu.lookup": "වචනය සොයන්න",

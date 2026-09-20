@@ -69,6 +69,7 @@ const en: Messages = {
   "bookshelf.tab.reading": "Reading",
   "bookshelf.tab.downloaded": "Downloaded",
   "bookshelf.tab.starred": "Starred",
+  "bookshelf.tab.bookmarks": "Bookmarks",
   "bookshelf.empty.reading.title": "No reading history yet",
   "bookshelf.empty.reading.sub":
     "Open a text from Browse to start reading — your progress will show up here.",
@@ -77,6 +78,8 @@ const en: Messages = {
     "Downloaded texts appear here and can be read offline.",
   "bookshelf.empty.starred.title": "Nothing starred",
   "bookshelf.empty.starred.sub": "Texts you star will appear here.",
+  "bookshelf.empty.bookmarks.title": "No bookmarks",
+  "bookshelf.empty.bookmarks.sub": "Bookmarks you add to passages will appear here.",
 
   "tools.dict.title": "Dictionary",
   "tools.dict.desc": "Word lookup · Recent history",
@@ -94,6 +97,7 @@ const en: Messages = {
   "chat.toolRunning": "running…",
   "chat.toolDone": "done",
   "chat.toolStatusDesc": "Show tool call status",
+  "chat.paliOriginal": "Pali original",
 
   "tool.wikipali_forms": "Expand word forms",
   "tool.wikipali_search": "Search texts",
@@ -118,6 +122,8 @@ const en: Messages = {
   "reader.nextChapter": "Next",
   "reader.version": "Version",
   "reader.more": "More",
+  "reader.favorite": "Favorite",
+  "reader.bookmark": "Bookmark",
   "reader.askAboutPassage": "Ask about this passage",
   "reader.menu.copy": "Copy",
   "reader.menu.lookup": "Look up",

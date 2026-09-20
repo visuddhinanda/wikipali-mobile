@@ -443,6 +443,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         preferredChannelName={preferredChannelRef.current.name}
         onChannelChange={(uid, name) => handleChannelChange(i, uid, name)}
         onOpenSettings={() => setSettingsVisible(true)}
+        onShare={() => void shareCurrent()}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
         onAnnoJump={handleAnnoJump}

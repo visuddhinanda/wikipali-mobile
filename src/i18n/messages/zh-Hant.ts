@@ -68,6 +68,7 @@ const zhHant: Messages = {
   "bookshelf.tab.reading": "在讀",
   "bookshelf.tab.downloaded": "已下載",
   "bookshelf.tab.starred": "收藏",
+  "bookshelf.tab.bookmarks": "書籤",
   "bookshelf.empty.reading.title": "還沒有閱讀紀錄",
   "bookshelf.empty.reading.sub":
     "從「分類」進入經文開始閱讀，進度會自動出現在這裡。",
@@ -75,6 +76,8 @@ const zhHant: Messages = {
   "bookshelf.empty.downloaded.sub": "下載的經文會出現在這裡，可離線閱讀。",
   "bookshelf.empty.starred.title": "暫無收藏",
   "bookshelf.empty.starred.sub": "收藏的經文會出現在這裡。",
+  "bookshelf.empty.bookmarks.title": "暫無書籤",
+  "bookshelf.empty.bookmarks.sub": "為經文段落加的書籤會出現在這裡。",
 
   "tools.dict.title": "字典",
   "tools.dict.desc": "逐詞查詢 · 最近紀錄",
@@ -92,6 +95,7 @@ const zhHant: Messages = {
   "chat.toolRunning": "進行中…",
   "chat.toolDone": "完成",
   "chat.toolStatusDesc": "顯示工具呼叫狀態",
+  "chat.paliOriginal": "巴利原文",
 
   "tool.wikipali_forms": "展開詞形",
   "tool.wikipali_search": "檢索經文",
@@ -116,6 +120,8 @@ const zhHant: Messages = {
   "reader.nextChapter": "下一章",
   "reader.version": "版本",
   "reader.more": "更多",
+  "reader.favorite": "收藏",
+  "reader.bookmark": "書籤",
   "reader.askAboutPassage": "提問",
   "reader.menu.copy": "複製",
   "reader.menu.lookup": "查詞",
