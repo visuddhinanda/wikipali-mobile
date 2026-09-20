@@ -114,7 +114,7 @@ const zhHant: Messages = {
   "reader.prevChapter": "上一章",
   "reader.nextChapter": "下一章",
   "reader.version": "版本",
-  "reader.askAboutPassage": "就此段落提問",
+  "reader.askAboutPassage": "提問",
   "reader.menu.copy": "複製",
   "reader.menu.lookup": "查詞",
   "reader.menu.ask": "提問",

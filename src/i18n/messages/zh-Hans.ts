@@ -128,7 +128,7 @@ const zhHans = {
   "reader.prevChapter": "上一章",
   "reader.nextChapter": "下一章",
   "reader.version": "版本",
-  "reader.askAboutPassage": "就此段落提问",
+  "reader.askAboutPassage": "提问",
   "reader.menu.copy": "复制",
   "reader.menu.lookup": "查词",
   "reader.menu.ask": "提问",
