@@ -121,6 +121,7 @@ const lo: Messages = {
   "reader.menu.lookup": "ຄົ້ນຄຳ",
   "reader.menu.ask": "ຖາມ",
   "reader.copied": "ຄັດລອກແລ້ວ",
+  "reader.share": "ແບ່ງປັນ",
   "chat.lookupSeed": "ອະທິບາຍຄຳວ່າ “{text}”: ຮູບຄຳ, ຮາກຄຳ, ການວິເຄາະໄວຍາກອນ ແລະ ຄວາມໝາຍໃນນີ້.",
   "chat.askDraft": "ກ່ຽວກັບ “{text}”, ",
   "reader.settings": "ຕັ້ງຄ່າການອ່ານ",

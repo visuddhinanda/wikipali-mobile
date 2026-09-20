@@ -120,6 +120,7 @@ const si: Messages = {
   "reader.menu.lookup": "වචනය සොයන්න",
   "reader.menu.ask": "අසන්න",
   "reader.copied": "පිටපත් කළා",
+  "reader.share": "බෙදාගන්න",
   "chat.lookupSeed": "“{text}” යන වචනය පැහැදිලි කරන්න: රූපය, ධාතුව, ව්‍යාකරණ විග්‍රහය සහ මෙහි අර්ථය.",
   "chat.askDraft": "“{text}” ගැන ",
   "reader.settings": "කියවීම් සැකසුම්",

@@ -119,6 +119,7 @@ const zhHant: Messages = {
   "reader.menu.lookup": "查詞",
   "reader.menu.ask": "提問",
   "reader.copied": "已複製",
+  "reader.share": "分享",
   "chat.lookupSeed": "請解釋「{text}」這個詞：詞形、詞根、語法分析和在此處的含義。",
   "chat.askDraft": "關於「{text}」，",
   "reader.settings": "閱讀設定",

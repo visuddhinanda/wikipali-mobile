@@ -122,6 +122,7 @@ const my: Messages = {
   "reader.menu.lookup": "အဓိပ္ပာယ်ရှာ",
   "reader.menu.ask": "မေးရန်",
   "reader.copied": "ကူးယူပြီး",
+  "reader.share": "မျှဝေ",
   "chat.lookupSeed": "「{text}」ဟူသောစကားလုံးကို ရှင်းပြပါ — ပုံစံ၊ ဓာတ်၊ သဒ္ဒါခွဲခြမ်းစိတ်ဖြာချက်နှင့် ဤနေရာတွင် အဓိပ္ပာယ်။",
   "chat.askDraft": "「{text}」နှင့်ပတ်သက်၍ ",
   "reader.settings": "ဖတ်ရှုမှု ဆက်တင်",

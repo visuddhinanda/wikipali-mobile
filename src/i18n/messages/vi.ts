@@ -121,6 +121,7 @@ const vi: Messages = {
   "reader.menu.lookup": "Tra từ",
   "reader.menu.ask": "Hỏi",
   "reader.copied": "Đã sao chép",
+  "reader.share": "Chia sẻ",
   "chat.lookupSeed": "Giải thích từ “{text}”: dạng từ, gốc từ, phân tích ngữ pháp và nghĩa ở đây.",
   "chat.askDraft": "Về “{text}”, ",
   "reader.settings": "Cài đặt đọc",

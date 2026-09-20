@@ -4,6 +4,7 @@ import {
   Modal,
   PanResponder,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -37,6 +38,8 @@ import {
   type ReaderSettings,
 } from "../settings/reader";
 import type { RootStackParamList } from "../navigation/types";
+import { resolveBaseUrl } from "../api/config";
+import { buildWikipaliUrl, webOriginFromBaseUrl } from "../linking/wikipali-url";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Reader">;
 
@@ -384,6 +387,27 @@ export function ReaderScreen({ route, navigation }: Props) {
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
 
+  // 分享当前章节：生成一条 WikiPali 网页链接，直接打开系统分享抽屉
+  // （其中自带「复制」）。定位取「用户自己这一层」当前章节锚点，
+  // 刚进还没报锚点时退回路由参数。
+  const shareCurrent = useCallback(async () => {
+    const pos = selfAnchorRef.current ?? { book, paragraph };
+    const para = pos.paragraph ?? paragraph;
+    if (para == null) return;
+    const base = await resolveBaseUrl();
+    const url = buildWikipaliUrl(webOriginFromBaseUrl(base), {
+      kind: "reader",
+      book: pos.book,
+      paragraph: para,
+      channelId: preferredChannelRef.current.uid,
+    });
+    try {
+      await Share.share({ title: headerTitle, message: url });
+    } catch {
+      // 用户取消分享会 reject，忽略即可。
+    }
+  }, [book, paragraph, headerTitle]);
+
   const renderPane = (i: number) => {
     const p = pages[i];
     if (!visited.has(i)) {
@@ -477,6 +501,13 @@ export function ReaderScreen({ route, navigation }: Props) {
             })}
           </View>
         </View>
+        <Pressable
+          onPress={() => void shareCurrent()}
+          hitSlop={8}
+          accessibilityLabel={t("reader.share")}
+        >
+          <Ionicons name="share-outline" size={22} color={c.ink} />
+        </Pressable>
         {/* 阅读设置（字号/主题/离线下载）是全局的，不属于某一层，放标题栏共享一份。 */}
         <Pressable onPress={() => setSettingsVisible(true)} hitSlop={8}>
           <Ionicons name="settings-outline" size={22} color={c.ink} />

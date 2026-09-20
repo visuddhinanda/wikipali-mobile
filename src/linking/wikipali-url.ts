@@ -121,3 +121,24 @@ export function readerRouteParams(target: ReaderTarget) {
     channelId: target.channelId,
   };
 }
+
+/**
+ * 从 API base URL 推出网页根地址。
+ * `https://next.wikipali.org/api/v2` → `https://next.wikipali.org`；
+ * `http://127.0.0.1:8000/api/v2` → `http://127.0.0.1:8000`。
+ */
+export function webOriginFromBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/api\/v\d+\/?$/, "").replace(/\/+$/, "");
+}
+
+/**
+ * 生成一条可分享 / 复制的 WikiPali 网页链接。
+ * `origin` 取 `webOriginFromBaseUrl(await resolveBaseUrl())`，
+ * 即「域名按照用户设置」—— 官方域名或自建实例的 host 都由设置决定。
+ */
+export function buildWikipaliUrl(origin: string, target: ReaderTarget): string {
+  const qs = target.channelId
+    ? `?channel=${encodeURIComponent(target.channelId)}`
+    : "";
+  return `${origin}/library/tipitaka/${target.book}-${target.paragraph}/read${qs}`;
+}

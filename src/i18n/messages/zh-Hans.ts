@@ -133,6 +133,7 @@ const zhHans = {
   "reader.menu.lookup": "查词",
   "reader.menu.ask": "提问",
   "reader.copied": "已复制",
+  "reader.share": "分享",
   "chat.lookupSeed": "请解释「{text}」这个词：词形、词根、语法分析和在此处的含义。",
   "chat.askDraft": "关于「{text}」，",
   "reader.settings": "阅读设置",

@@ -120,6 +120,7 @@ const th: Messages = {
   "reader.menu.lookup": "ค้นศัพท์",
   "reader.menu.ask": "ถาม",
   "reader.copied": "คัดลอกแล้ว",
+  "reader.share": "แชร์",
   "chat.lookupSeed": "อธิบายคำว่า “{text}”: รูปศัพท์ รากศัพท์ การวิเคราะห์ไวยากรณ์ และความหมายในที่นี้",
   "chat.askDraft": "เกี่ยวกับ “{text}” ",
   "reader.settings": "ตั้งค่าการอ่าน",

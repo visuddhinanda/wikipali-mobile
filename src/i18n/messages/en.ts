@@ -121,6 +121,7 @@ const en: Messages = {
   "reader.menu.lookup": "Look up",
   "reader.menu.ask": "Ask",
   "reader.copied": "Copied",
+  "reader.share": "Share",
   "chat.lookupSeed": "Explain the word \u201c{text}\u201d: its form, root, grammatical analysis and meaning here.",
   "chat.askDraft": "About \u201c{text}\u201d: ",
   "reader.settings": "Reading settings",
