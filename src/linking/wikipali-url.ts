@@ -6,13 +6,13 @@
  *
  * 目前认得：
  *   https://next.wikipali.org/library/tipitaka/104-282/read?channel=<uuid>
- *   （语言前缀如 /zh-Hans/library/... 也认；channel 可缺省）
+ *   http://127.0.0.1:8000/library/tipitaka/169-893/read?channel=<uuid>
+ *   （自建实例可跑在任意 host / IP / 端口 —— localhost、局域网 IP、自定义域名；
+ *     靠 `/library/tipitaka/…` 路径判定，host 不限。语言前缀如 /zh-Hans/library/...
+ *     也认；channel 可缺省）
  *   wikipali://library/tipitaka/104-282/read?channel=<uuid>
  */
 import { bookEntryAt } from "../catalog";
-
-/** 认得的站点域名（含子域）。 */
-const HOSTS = ["wikipali.org", "wikipali.cc"];
 
 /** 自定义 scheme（app.json 的 `expo.scheme`）。 */
 const SCHEME = "wikipali";
@@ -45,11 +45,14 @@ function splitUrl(raw: string): ParsedUrl | null {
   const [, scheme, host, path = "", search = ""] = m;
 
   const lowerScheme = scheme.toLowerCase();
-  const lowerHost = host.toLowerCase();
-  if (lowerScheme === "http" || lowerScheme === "https") {
-    const bare = lowerHost.split(":")[0];
-    if (!HOSTS.some((h) => bare === h || bare.endsWith(`.${h}`))) return null;
-  } else if (lowerScheme !== SCHEME) {
+  // 只认 http(s) 与自定义 scheme；host 不限 —— 自建实例可能跑在
+  // localhost / 127.0.0.1 / 局域网 IP / 自定义域名，是否 WikiPali 链接
+  // 由下面 `parseWikipaliUrl` 的 `/library/tipitaka/…` 路径结构判定。
+  if (
+    lowerScheme !== SCHEME &&
+    lowerScheme !== "http" &&
+    lowerScheme !== "https"
+  ) {
     return null;
   }
 
