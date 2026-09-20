@@ -28,6 +28,7 @@ import {
   WINDOW_STRLEN,
   bookBounds,
   extendWindow,
+  getChapterUnitAt,
   getNextUnit,
   getPrevUnit,
   getReadingUnitAt,
@@ -729,6 +730,8 @@ export function ReaderLayerPane({
   /** 当前滚动位置所在的最深层章节标题（随滚动更新，供顶部标题跟随）。 */
   const [headingToc, setHeadingToc] = useState<string | null>(null);
   const headingTocRef = useRef<string | null>(null);
+  /** 锚点防抖定时器：滚动补偿的 ±1px 抖动会让顶部段在章节边界来回跳，稍等再提交。 */
+  const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const { listDetail } = useLayout();
@@ -819,14 +822,24 @@ export function ReaderLayerPane({
     unitRef.current = unit;
   }, [unit]);
 
+  // 卸载时清掉锚点防抖定时器，避免泄漏。
+  useEffect(
+    () => () => {
+      if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
+    },
+    [],
+  );
+
   // 上报当前阅读单元的锚点：外层用它算 / 重算义注复注对应章节（仅原文层
   // 触发重算，见 `ReaderScreen.tsx`），也用它刷新标签页顶部的章节标题。
-  // 标题跟随「最深层标题」：同一单元内滚动时 headingToc 变化也会触发，但
-  // para（unit.from）不变，外层只做便宜的标题刷新、不重算伴读层。
+  // 锚点 para 用「章节标题的段号」（unit.chapter.paragraph）而非 unit.from：
+  // 硬切单元（如 [464..475]）的 from 是正文段，findRelatedChapters 对正文段
+  // 查不到义注/复注，会在标题段↔正文段之间让伴读层时有时无、标签栏闪。
   useEffect(() => {
     if (unit) {
-      reportedAnchorRef.current = { book, paragraph: unit.from };
-      onChapterAnchor(book, unit.from, headingToc ?? unit.chapter?.toc ?? null);
+      const anchorPara = unit.chapter?.paragraph ?? unit.from;
+      reportedAnchorRef.current = { book, paragraph: anchorPara };
+      onChapterAnchor(book, anchorPara, headingToc ?? unit.chapter?.toc ?? null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit, headingToc, book]);
@@ -1309,24 +1322,29 @@ export function ReaderLayerPane({
   const handleWlAnchor = useCallback(
     (para: number) => {
       topParaRef.current = para;
-      // 标题跟随当前位置的最深层章节（经名），而非阅读单元标题（品名）。
-      const ht = headingTocFor(book, para);
-      if (ht !== headingTocRef.current) {
-        headingTocRef.current = ht;
-        setHeadingToc(ht);
-      }
-      const u = unitRef.current;
-      if (u && para >= u.from && para <= u.to) return; // 仍在同一单元内
-      getReadingUnitAt(book, para).then((nu) => {
-        if (!nu) return;
-        const cur = unitRef.current;
-        if (cur && cur.book === nu.book && cur.from === nu.from) return;
-        unitRef.current = nu;
-        setUnit(nu);
-        console.log(
-          `[wl] anchor para=${para} → unit book=${book} [${nu.from}..${nu.to}] "${nu.chapter?.toc ?? ""}"`,
-        );
-      });
+      // 防抖提交：滚动补偿的 ±1px 抖动会让顶部段在章节边界（尤其空标题段，如
+      // 435↔437 中间隔着空段 436）来回跳，直接跟会连锁触发标题/伴读层反复刷新。
+      if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
+      anchorTimerRef.current = setTimeout(() => {
+        const ht = headingTocFor(book, para);
+        if (ht !== headingTocRef.current) {
+          headingTocRef.current = ht;
+          setHeadingToc(ht);
+        }
+        const u = unitRef.current;
+        if (u && para >= u.from && para <= u.to) return; // 仍在同一章节单元内
+        // 锚点用「章节」单元（正文段归其所属章节），不用续读单元。
+        getChapterUnitAt(book, para).then((nu) => {
+          if (!nu) return;
+          const cur = unitRef.current;
+          if (cur && cur.book === nu.book && cur.from === nu.from) return;
+          unitRef.current = nu;
+          setUnit(nu);
+          console.log(
+            `[wl] anchor para=${para} → unit book=${book} [${nu.from}..${nu.to}] "${nu.chapter?.toc ?? ""}"`,
+          );
+        });
+      }, 250);
     },
     [book],
   );

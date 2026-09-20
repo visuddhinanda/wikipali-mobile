@@ -8,6 +8,7 @@ import { loadParaHtml, loadParasMap } from "./cache";
 import { tipitakaRunner } from "./db";
 import {
   allReadingUnits,
+  chapterUnitContaining,
   firstReadingParagraph,
   nextReadingUnit,
   prevReadingUnit,
@@ -96,6 +97,14 @@ export async function getReadingUnitAt(
   paragraph: number,
 ): Promise<ReadingUnit | null> {
   return readingUnitContaining(await tipitakaRunner(), book, paragraph);
+}
+
+/** 包含指定段落的「章节」阅读单元（滚动锚点用，正文段归其所属章节）。 */
+export async function getChapterUnitAt(
+  book: number,
+  paragraph: number,
+): Promise<ReadingUnit | null> {
+  return chapterUnitContaining(await tipitakaRunner(), book, paragraph);
 }
 
 /** 上一个 / 下一个阅读单元。到头返回 null。 */

@@ -237,35 +237,81 @@ export function ReaderScreen({ route, navigation }: Props) {
         return;
       }
 
-      // 当前层真的换章了：先收成单层、跳回它，再重新算各层对应章节。
+      // 当前层真的换章了。
       const selfLayer = bookLayerAt(b, para) ?? "mula";
-      setPages([
-        {
-          layer: selfLayer,
-          book: b,
-          paragraph: para,
-          title: bookTitleOf(b, para),
-          toc,
-        },
-      ]);
-      selfIndexRef.current = 0;
-      setVisited(new Set([0]));
-      setActiveIndex(0);
-      setDualAnchor(0);
-      pagerRef.current?.setPageWithoutAnimation(0);
+      const prevLayer = pages[selfIndexRef.current]?.layer;
+      console.log(
+        `[anchor] index=${index} selfIdx=${selfIndexRef.current} b=${b} para=${para} toc="${toc}" selfLayer=${selfLayer} prevLayer=${prevLayer} pagesLen=${pages.length}`,
+      );
 
+      if (selfLayer !== prevLayer) {
+        // 层变了（跳进义注/复注或另一本书）：收成单层、跳回它，再重新算各层。
+        setPages([
+          {
+            layer: selfLayer,
+            book: b,
+            paragraph: para,
+            title: bookTitleOf(b, para),
+            toc,
+          },
+        ]);
+        selfIndexRef.current = 0;
+        setVisited(new Set([0]));
+        setActiveIndex(0);
+        setDualAnchor(0);
+        pagerRef.current?.setPageWithoutAnimation(0);
+
+        getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
+          // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
+          if (
+            selfAnchorRef.current?.book !== b ||
+            selfAnchorRef.current?.paragraph !== para
+          )
+            return;
+          if (chapters.length === 0) return;
+          setPages(
+            chapters.map((ch, i) =>
+              i === selfIndex
+                ? {
+                    layer: ch.layer,
+                    book: b,
+                    paragraph: para,
+                    title: bookTitleOf(b, para),
+                    toc,
+                  }
+                : {
+                    layer: ch.layer,
+                    book: ch.book,
+                    paragraph: ch.paragraph,
+                    title: bookTitleOf(ch.book, ch.paragraph),
+                    toc: ch.toc,
+                  },
+            ),
+          );
+          selfIndexRef.current = selfIndex;
+          setVisited(new Set([selfIndex]));
+          setActiveIndex(selfIndex);
+          setDualAnchor(Math.max(0, Math.min(selfIndex, chapters.length - 2)));
+          pagerRef.current?.setPageWithoutAnimation(selfIndex);
+        });
+        return;
+      }
+
+      // 同一层连续滚动跨章：不 collapse、不重置 visited/activeIndex/pager，
+      // 只原地刷新各层坐标与标题，避免标签栏「原文 ↔ 原文/义注/复注」来回闪。
       getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
-        // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
         if (
           selfAnchorRef.current?.book !== b ||
           selfAnchorRef.current?.paragraph !== para
         )
           return;
         if (chapters.length === 0) return;
-        setPages(
-          chapters.map((ch, i) =>
-            i === selfIndex
+        setPages((prev) =>
+          chapters.map((ch, i) => {
+            const existing = prev.find((p) => p.layer === ch.layer);
+            return i === selfIndex
               ? {
+                  ...(existing ?? { layer: ch.layer }),
                   layer: ch.layer,
                   book: b,
                   paragraph: para,
@@ -273,19 +319,16 @@ export function ReaderScreen({ route, navigation }: Props) {
                   toc,
                 }
               : {
+                  ...(existing ?? { layer: ch.layer }),
                   layer: ch.layer,
                   book: ch.book,
                   paragraph: ch.paragraph,
                   title: bookTitleOf(ch.book, ch.paragraph),
                   toc: ch.toc,
-                },
-          ),
+                };
+          }),
         );
         selfIndexRef.current = selfIndex;
-        setVisited(new Set([selfIndex]));
-        setActiveIndex(selfIndex);
-        setDualAnchor(Math.max(0, Math.min(selfIndex, chapters.length - 2)));
-        pagerRef.current?.setPageWithoutAnimation(selfIndex);
       });
     },
     [],
@@ -343,6 +386,15 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
+
+  // 诊断：顶部标题 / 层标签变化时打点，观察是否来回跳。
+  useEffect(() => {
+    console.log(
+      `[title] header="${headerTitle}" activeIndex=${activeIndex} pagesLen=${pages.length} layers=[${pages
+        .map((p) => p.layer)
+        .join(",")}]`,
+    );
+  }, [headerTitle, activeIndex, pages]);
 
   const renderPane = (i: number) => {
     const p = pages[i];

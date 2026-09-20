@@ -356,3 +356,23 @@ export async function readingUnitContaining(
   if (direct) return direct;
   return bookUnits(idx, book).find((u) => u.from <= paragraph && paragraph <= u.to) ?? null;
 }
+
+/**
+ * 包含指定段落的「章节」阅读单元：始终从书首切分的单元里找。
+ *
+ * 与 `readingUnitContaining` 的区别：后者对正文段（level=100）会走「续读单元」
+ * 分支、把每段正文都算成一个新单元（如 `[475..475]`）；本函数只查书首切分的
+ * 章节单元，正文段归到其所属章节。滚动锚点/标题应该跟章节走，用它才能避免
+ * 每滚一段就触发一次「换章」。
+ */
+export async function chapterUnitContaining(
+  sql: SqlRunner,
+  book: number,
+  paragraph: number,
+): Promise<ReadingUnit | null> {
+  const idx = await bookIndex(sql, book);
+  if (!idx) return null;
+  return (
+    bookUnits(idx, book).find((u) => u.from <= paragraph && paragraph <= u.to) ?? null
+  );
+}
