@@ -11,12 +11,21 @@ import { openReadingDb, tipitakaRunner, withReadingTransaction } from "./db";
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
 export const CACHE_QUOTA_BYTES = 200 * 1024 * 1024;
 
+/**
+ * 空段占位的过期时间：服务端「本次没返回」的段落写空记录时，只缓存 48 小时。
+ * 过期后若联网则重新请求（该版本可能后来补上了内容）；未过期则不重复请求。
+ */
+export const EMPTY_PARA_TTL_MS = 48 * 60 * 60 * 1000;
+
 export interface CachedPara {
   para: number;
-  html: string;
+  /** 服务端没返回的段为 null；非空正文存 HTML。 */
+  html: string | null;
+  /** 空段占位的过期时间（epoch ms）；非空正文为 null（永不过期）。 */
+  expires_at: number | null;
 }
 
-/** 查缓存：返回该区间已缓存的段（含 `html = ''` 的空段记录）。 */
+/** 查缓存：返回该区间已缓存的段（含 `html IS NULL` 的空段记录）。 */
 export async function readCachedParas(
   channelId: string,
   book: number,
@@ -25,7 +34,7 @@ export async function readCachedParas(
 ): Promise<CachedPara[]> {
   const db = await openReadingDb();
   return db.getAllAsync<CachedPara>(
-    `SELECT para, html FROM para_html
+    `SELECT para, html, expires_at FROM para_html
       WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
       ORDER BY para`,
     [channelId, book, from, to],
@@ -35,8 +44,9 @@ export async function readCachedParas(
 /**
  * 拉取并写回一个区间。
  *
- * 「请求了但服务端没返回」的段落写 `html = ''`，标记为「已确认为空」——
- * 否则含空段的章节每次进入都会重新请求，永远命中不了缓存。
+ * 「请求了但服务端没返回」的段落写 `html = NULL`，并记 `expires_at = now + 48h`
+ * —— 否则含空段的章节每次进入都会重新请求；过期后再联网重新请求，避免把
+ * 「暂时缺失」当成「永远没有」。服务端确实返回的段 `expires_at = NULL` 永不过期。
  */
 async function fetchAndStore(
   channelId: string,
@@ -53,34 +63,65 @@ async function fetchAndStore(
   const now = Date.now();
   await withReadingTransaction(async (db) => {
     for (let p = from; p <= to; p++) {
+      // 服务端没返回的段写 NULL（确认无内容）；返回的段写 HTML。
+      const html = byPara.get(p) ?? null;
+      // 空段占位才带过期时间；真实正文永不过期。
+      const expiresAt = html ? null : now + EMPTY_PARA_TTL_MS;
       await db.runAsync(
-        `INSERT OR REPLACE INTO para_html (channel, book, para, html, fetched_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [channelId, book, p, byPara.get(p) ?? "", now],
+        `INSERT OR REPLACE INTO para_html
+           (channel, book, para, html, fetched_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [channelId, book, p, html, now, expiresAt],
       );
     }
   });
+
+  const total = to - from + 1;
+  const empty = total - items.length;
+  console.log(
+    `[wl-db] write book=${book} ch=${channelId.slice(0, 8)} paras=[${from}..${to}] ` +
+      `total=${total} content=${items.length} empty=${empty}`,
+  );
 
   return byPara;
 }
 
 /**
- * 取一个阅读单元的正文 HTML：查缓存 → 只补缺口 → 按段落号升序拼接。
+ * 取一个区间的正文：查缓存 → 只补缺口，返回 `para → html` 的 Map。
  *
- * 空段（`html = ''`）不参与拼接。
+ * 命中规则（`html IS NULL` 的空段占位）：
+ * - 非空正文 → 永不过期，直接命中；
+ * - 空段占位且在 48 小时过期时间内 → 命中，不重复请求；
+ * - 空段占位且已过期（或旧数据无过期时间）→ 视为缺失，重新走网络。
+ *
+ * 空段在返回的 Map 里值为空串，拼接时由调用方跳过。
+ * 窗口化懒加载用它按段取回、逐段插入 DOM。
  */
-export async function loadParaHtml(
+export async function loadParasMap(
   channelId: string,
   book: number,
   from: number,
   to: number,
-): Promise<string> {
+): Promise<Map<number, string>> {
   const cached = await readCachedParas(channelId, book, from, to);
-  const byPara = new Map(cached.map((r) => [r.para, r.html]));
+  const now = Date.now();
+  const byPara = new Map<number, string>();
+  for (const r of cached) {
+    // 非空正文直接命中；空段占位（html IS NULL）只在过期时间内算「已确认」，
+    // 过期后当作缺失重取。
+    const valid = r.html != null || (r.expires_at != null && r.expires_at > now);
+    if (valid) byPara.set(r.para, r.html ?? "");
+  }
 
   const missing: number[] = [];
   for (let p = from; p <= to; p++) {
     if (!byPara.has(p)) missing.push(p);
+  }
+
+  if (missing.length > 0) {
+    console.log(
+      `[wl-cache] book=${book} [${from}..${to}] valid-cache=${byPara.size} missing=${missing.length}`,
+    );
   }
 
   // 按巴利文字符数分批（见 batch.ts）：段落大小差两个数量级，按固定段数分会超时
@@ -89,6 +130,21 @@ export async function loadParaHtml(
     for (let p = a; p <= b; p++) byPara.set(p, fetched.get(p) ?? "");
   }
 
+  return byPara;
+}
+
+/**
+ * 取一个阅读单元的正文 HTML：查缓存 → 只补缺口 → 按段落号升序拼接。
+ *
+ * 空段（`html IS NULL`）不参与拼接。
+ */
+export async function loadParaHtml(
+  channelId: string,
+  book: number,
+  from: number,
+  to: number,
+): Promise<string> {
+  const byPara = await loadParasMap(channelId, book, from, to);
   const parts: string[] = [];
   for (let p = from; p <= to; p++) {
     const html = byPara.get(p);

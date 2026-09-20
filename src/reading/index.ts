@@ -4,7 +4,7 @@
  *   用户点书名 → 算阅读单元区间 → 查缓存 → 补缺口 → 拼 HTML
  */
 import { loadReadingHistory } from "../data/history";
-import { loadParaHtml } from "./cache";
+import { loadParaHtml, loadParasMap } from "./cache";
 import { tipitakaRunner } from "./db";
 import {
   allReadingUnits,
@@ -20,10 +20,21 @@ export type { ReadingUnit, ReadingUnitMode } from "./unit";
 export { getCompanionLayers, getChapterLayers } from "./companion";
 export {
   channelNames,
+  loadParasMap,
   localChannelsFor,
   rememberChannelName,
   type LocalChannel,
 } from "./cache";
+export {
+  WINDOW_STRLEN,
+  bookBounds,
+  extendWindow,
+  initialWindow,
+  windowStrlen,
+  type ParaWindow,
+} from "./window";
+export { paragraphLengths } from "./batch";
+export { tipitakaRunner } from "./db";
 export type { ChapterLayers, LayerChapter } from "./companion";
 export type { CompanionChapter, CompanionLayers } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";
@@ -41,6 +52,7 @@ export {
   clearBookCache,
   enforceCacheQuota,
   CACHE_QUOTA_BYTES,
+  EMPTY_PARA_TTL_MS,
 } from "./cache";
 
 export interface ReadingUnitContent extends ReadingUnit {

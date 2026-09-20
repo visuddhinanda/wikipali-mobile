@@ -9,7 +9,7 @@
  * 字号 / 主题（`settings`）是全局偏好，由外层统一加载、下发，三个面板共享；
  * 章节位置、频道、目录展开状态等其余状态都是面板自己的。
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -25,16 +25,24 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getBookChannels } from "../api";
 import {
+  WINDOW_STRLEN,
+  bookBounds,
+  extendWindow,
   getNextUnit,
   getPrevUnit,
-  localChannelsFor,
-  rememberChannelName,
   getReadingUnitAt,
-  getReadingUnitContent,
+  initialWindow,
+  loadParasMap,
+  localChannelsFor,
+  paragraphLengths,
+  rememberChannelName,
   resolveStartParagraph,
+  tipitakaRunner,
+  type ParaWindow,
   type ReadingUnit,
 } from "../reading";
 import type { ChapterChannel } from "../catalog";
+import { getBookHeadings } from "../catalog/headings";
 import { saveReadingRecord } from "../data/history";
 import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
 import { DownloadIconButton } from "../components/DownloadIconButton";
@@ -68,6 +76,19 @@ interface ReaderDoc {
   title: string;
   subtitle?: string;
   body: string;
+}
+
+/**
+ * 覆盖某个段落的最深层章节标题（品 → 经 → 子标题），用于滚动时让顶部标题跟随
+ * 当前位置，而不是停留在「阅读单元」那一级的标题（如整个品名）。
+ */
+function headingTocFor(book: number, para: number): string | null {
+  const headings = getBookHeadings(book);
+  let toc: string | null = null;
+  for (const h of headings) {
+    if (h.paragraph <= para) toc = h.toc;
+  }
+  return toc;
 }
 
 export interface ReaderLayerPaneProps {
@@ -304,6 +325,36 @@ function buildReaderHtml(
   /* 手机注释模式：行内 = 只留角标边注；段后 = 显示正文角标 + 段后脚注列表 */
   [data-annotation-mode="inline"] .anno-footnotes { display: none; }
   [data-annotation-mode="footnote"] .sidenote { display: none !important; }
+
+  /* 懒加载方向指示：固定在视口上/下沿，不参与文档流（不影响 scrollHeight）。 */
+  .wl-loading {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--paper);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.14);
+    color: var(--ink-soft);
+    font-size: 0.75em;
+  }
+  .wl-loading[data-dir="up"] { top: 12px; }
+  .wl-loading[data-dir="down"] { bottom: 12px; }
+  .wl-loading::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--hairline);
+    border-top-color: var(--vermilion);
+    border-radius: 50%;
+    animation: wl-spin 0.8s linear infinite;
+  }
+  @keyframes wl-spin { to { transform: rotate(360deg); } }
 </style>
 <script>
   // 高亮辅助：给目标短暂加上 .anno-highlight（2.2s 后移除，与 RN 侧一致）。
@@ -382,31 +433,217 @@ function buildReaderHtml(
     ${doc.body}
   </div>
   <script>
+    // ---- 段号 / 脚注编号 ----
     // 角标和段后脚注的编号：按「段」分组、按文档顺序编号，两者一一对应。
     // 用 JS 显式编号，不依赖 CSS counter —— 部分 WebView 里 counter-reset 在
     // 嵌套结构下不按预期作用域重置，会出现正文角标全是 [1] 的情况。
-    (function () {
-      var paras = document.querySelectorAll("div[data-para]");
-      for (var p = 0; p < paras.length; p++) {
-        var para = paras[p];
-        var markers = para.querySelectorAll(".sidenote-number");
-        for (var i = 0; i < markers.length; i++) {
-          markers[i].textContent = "[" + (i + 1) + "]";
-          markers[i].setAttribute("data-idx", i + 1);
+    // 抽成全局函数：懒加载向上/向下追加的新段也要过一遍同样的编号。
+    function numberPara(para) {
+      var markers = para.querySelectorAll(".sidenote-number");
+      for (var i = 0; i < markers.length; i++) {
+        markers[i].textContent = "[" + (i + 1) + "]";
+        markers[i].setAttribute("data-idx", i + 1);
+      }
+      var fns = para.querySelectorAll(".anno-footnote");
+      for (var j = 0; j < fns.length; j++) {
+        fns[j].setAttribute("data-idx", j + 1);
+        var label = fns[j].querySelector(".anno-fn-label");
+        if (label && !label.querySelector(".anno-fn-num")) {
+          var num = document.createElement("span");
+          num.className = "anno-fn-num";
+          num.textContent = "[" + (j + 1) + "]";
+          num.setAttribute("data-idx", j + 1);
+          label.insertBefore(num, label.firstChild);
         }
-        var fns = para.querySelectorAll(".anno-footnote");
-        for (var j = 0; j < fns.length; j++) {
-          fns[j].setAttribute("data-idx", j + 1);
-          var label = fns[j].querySelector(".anno-fn-label");
-          if (label && !label.querySelector(".anno-fn-num")) {
-            var num = document.createElement("span");
-            num.className = "anno-fn-num";
-            num.textContent = "[" + (j + 1) + "]";
-            num.setAttribute("data-idx", j + 1);
-            label.insertBefore(num, label.firstChild);
+      }
+    }
+    window.__wlNumberParas = function (root) {
+      var paras = root.querySelectorAll("div[data-para]");
+      for (var p = 0; p < paras.length; p++) numberPara(paras[p]);
+    };
+
+    // ---- 窗口化懒加载（配合 RN 的 handleWlNeed / handleWlAnchor） ----
+    (function () {
+      var paper = document.querySelector(".paper");
+      var scroller = document.scrollingElement || document.documentElement;
+
+      function post(msg) {
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+        }
+      }
+
+      // 距边缘 1.5 屏就请求加载；移出屏幕超过 3 屏才卸载（留足缓冲，避免抖动）。
+      var NEED_EDGE_SCREENS = 1.5;
+      var UNLOAD_MARGIN_SCREENS = 3;
+
+      var needDown = false;
+      var needUp = false;
+
+      function checkEdges() {
+        var st = scroller.scrollTop;
+        var vh = window.innerHeight;
+        var sh = scroller.scrollHeight;
+        var ps = paper.querySelectorAll("div[data-para]");
+        var domFirst = ps.length ? Number(ps[0].getAttribute("data-para")) : 0;
+        var domLast = ps.length ? Number(ps[ps.length - 1].getAttribute("data-para")) : 0;
+        var nearBottom = sh - (st + vh) < vh * NEED_EDGE_SCREENS;
+        if (nearBottom && !needDown) {
+          needDown = true;
+          post({ type: "wl-need", dir: "down", domFirst: domFirst, domLast: domLast });
+        }
+        if (!nearBottom) needDown = false;
+        var nearTop = st < vh * NEED_EDGE_SCREENS;
+        if (nearTop && !needUp) {
+          needUp = true;
+          post({ type: "wl-need", dir: "up", domFirst: domFirst, domLast: domLast });
+        }
+        if (!nearTop) needUp = false;
+      }
+
+      // 按滚动方向只卸载「正在离开」的那一侧：
+      // 向下滚 → 只卸顶部（底部马上要滚到，不能删，否则留下 56 直接接 66 的洞）；
+      // 向上滚 → 只卸底部。这样 DOM 始终是连续区间，need down/up 才能正确回填。
+      function unloadFar(scrollDir) {
+        var ps = paper.querySelectorAll("div[data-para]");
+        if (ps.length <= 1) return;
+        var vh = window.innerHeight;
+        var margin = vh * UNLOAD_MARGIN_SCREENS;
+
+        if (scrollDir === "down") {
+          var beforeScroll = scroller.scrollTop;
+          var beforeH = scroller.scrollHeight;
+          var topRemove = [];
+          for (var i = 0; i < ps.length; i++) {
+            var r = ps[i].getBoundingClientRect();
+            if (r.bottom < -margin) topRemove.push(ps[i]);
+            else break;
+          }
+          if (topRemove.length >= ps.length) topRemove.length = 0; // 至少留一段
+          for (var t = 0; t < topRemove.length; t++) topRemove[t].remove();
+          if (topRemove.length > 0) {
+            post({
+              type: "wl-unload",
+              dir: "up",
+              from: Number(topRemove[0].getAttribute("data-para")),
+              to: Number(topRemove[topRemove.length - 1].getAttribute("data-para")),
+              count: topRemove.length,
+              domCount: ps.length,
+              domFirst: Number(ps[0].getAttribute("data-para")),
+              scrollTop: Math.round(scroller.scrollTop)
+            });
+          }
+          // 顶部卸载后补偿滚动，保持视口内容不动
+          var removedTopH = beforeH - scroller.scrollHeight;
+          if (removedTopH > 0) scroller.scrollTop = beforeScroll - removedTopH;
+        } else {
+          var bottomRemove = [];
+          for (var b = ps.length - 1; b >= 0; b--) {
+            var rb = ps[b].getBoundingClientRect();
+            if (rb.top > vh + margin) bottomRemove.push(ps[b]);
+            else break;
+          }
+          if (bottomRemove.length >= ps.length) bottomRemove.length = 0;
+          for (var u = 0; u < bottomRemove.length; u++) bottomRemove[u].remove();
+          if (bottomRemove.length > 0) {
+            var bFrom = Infinity, bTo = -Infinity;
+            for (var u2 = 0; u2 < bottomRemove.length; u2++) {
+              var bp = Number(bottomRemove[u2].getAttribute("data-para"));
+              if (bp < bFrom) bFrom = bp;
+              if (bp > bTo) bTo = bp;
+            }
+            post({ type: "wl-unload", dir: "down", from: bFrom, to: bTo, count: bottomRemove.length });
           }
         }
       }
+
+      var lastAnchor = -1;
+      // 滚动方向：由「视口顶部段号」的增减判断，但加累积滞回——段号连续移动
+      // ≥2 段才换向。顶部卸载的滚动补偿有 ±1px 抖动，会让顶部段号在相邻两段间
+      // 跳一下（40↔41），若不滞回就会被误判成反向，从而误卸载另一侧、挖出洞。
+      var scrollDir = "down";
+      var dirAccum = 0;
+      function reportAnchor() {
+        var ps = paper.querySelectorAll("div[data-para]");
+        for (var i = 0; i < ps.length; i++) {
+          var r = ps[i].getBoundingClientRect();
+          if (r.bottom > 0) {
+            var p = Number(ps[i].getAttribute("data-para"));
+            if (p !== lastAnchor && isFinite(p)) {
+              if (lastAnchor > 0) {
+                dirAccum += p - lastAnchor;
+                if (dirAccum >= 2) { scrollDir = "down"; dirAccum = 0; }
+                else if (dirAccum <= -2) { scrollDir = "up"; dirAccum = 0; }
+              }
+              lastAnchor = p;
+              post({ type: "wl-anchor", para: p });
+            }
+            break;
+          }
+        }
+      }
+
+      // 加载方向指示：固定在视口上/下沿的转圈，防止滑到底发现没内容。
+      function loadingEl(dir) {
+        return paper.querySelector('.wl-loading[data-dir="' + dir + '"]');
+      }
+      window.__wlShowLoading = function (dir) {
+        if (loadingEl(dir)) return;
+        var el = document.createElement("div");
+        el.className = "wl-loading";
+        el.setAttribute("data-dir", dir);
+        // position: fixed 不参与文档流，插哪都行；放 paper 里随页面一起被替换。
+        paper.appendChild(el);
+      };
+      window.__wlHideLoading = function (dir) {
+        var el = loadingEl(dir);
+        if (el) el.remove();
+      };
+
+      // 向下追加段落（RN 已按巴利字体转换、已剔除空段）
+      window.__wlAppend = function (html) {
+        window.__wlHideLoading("down");
+        paper.insertAdjacentHTML("beforeend", html);
+        window.__wlNumberParas(paper);
+        needDown = false; // 追加后重新评估：若仍贴底则继续请求下一批
+        checkEdges();
+      };
+
+      // 向上追加段落并补偿滚动，让视口不跳
+      window.__wlPrepend = function (html) {
+        window.__wlHideLoading("up");
+        var beforeH = scroller.scrollHeight;
+        var beforeScroll = scroller.scrollTop;
+        var marker = paper.querySelector("div[data-para]");
+        var tpl = document.createElement("template");
+        tpl.innerHTML = html;
+        paper.insertBefore(tpl.content, marker);
+        window.__wlNumberParas(paper);
+        var addedH = scroller.scrollHeight - beforeH;
+        if (addedH > 0) scroller.scrollTop = beforeScroll + addedH;
+        needUp = false; // 同 down：补齐后仍贴顶则继续请求上一批
+        checkEdges();
+      };
+
+      var rafPending = false;
+      function onScroll() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(function () {
+          rafPending = false;
+          checkEdges();
+          reportAnchor();       // 先据顶部段号更新滚动方向
+          unloadFar(scrollDir); // 再按方向只卸载离开的那一侧
+        });
+      }
+
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+
+      // 首屏：编号 → 上报锚点 → 检查边缘（首屏不足 1.5 屏时立即补加载）
+      window.__wlNumberParas(paper);
+      reportAnchor();
+      checkEdges();
     })();
   </script>
 </body>
@@ -489,6 +726,9 @@ export function ReaderLayerPane({
   const [error, setError] = useState<string | null>(null);
   const [hasPrev, setHasPrev] = useState(false);
   const [hasNext, setHasNext] = useState(false);
+  /** 当前滚动位置所在的最深层章节标题（随滚动更新，供顶部标题跟随）。 */
+  const [headingToc, setHeadingToc] = useState<string | null>(null);
+  const headingTocRef = useRef<string | null>(null);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const { listDetail } = useLayout();
@@ -498,22 +738,67 @@ export function ReaderLayerPane({
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
   const [channelsError, setChannelsError] = useState<string | null>(null);
 
+  // ---- 窗口化懒加载状态 ----
+  // 正文不再「一次加载整个阅读单元」，而是维护一个按巴利文字符数滑动的段落
+  // 窗口 [win.from, win.to]，滚动到边缘再扩、移出屏幕过远就卸载（见 window.ts）。
+  const [jumpNonce, setJumpNonce] = useState(0);
+  /** 下一次（重）载入窗口时以哪一段为锚点（初始进入 / 目录跳转 / 上一下一章）。 */
+  const jumpTargetRef = useRef<number | null>(null);
+  /** 当前已加载进 DOM 的段落窗口。 */
+  const winRef = useRef<ParaWindow | null>(null);
+  /** 本书段落范围（lo..hi）。 */
+  const boundsRef = useRef<{ lo: number; hi: number } | null>(null);
+  /** 本书段落号 → 巴利文字符数。 */
+  const lengthsRef = useRef<Map<number, number>>(new Map());
+  /** 视口顶部当前所在的段（WebView 上报，滚动中持续更新）。 */
+  const topParaRef = useRef<number>(0);
+  /** 各方向是否有在途的增量取数 —— 防止快速滚动连发 wl-need 重复请求同一区间。 */
+  const loadingRef = useRef<{ up: boolean; down: boolean }>({
+    up: false,
+    down: false,
+  });
+  /** 内容（重）载入的代际号：跳转/换版后丢弃在途的增量注入。 */
+  const loadTokenRef = useRef(0);
+  /** 与 `unit` 状态同步的一份 ref，供回调里读最新值。 */
+  const unitRef = useRef<ReadingUnit | null>(null);
+  /** 本层最后上报给外层的锚点（book+paragraph），用于识别「外层回显」跳过重载。 */
+  const reportedAnchorRef = useRef<{ book: number; paragraph: number } | null>(
+    null,
+  );
+
   const c = readerColors(settings.theme === "dark");
   const isDark = settings.theme === "dark";
 
   // 进入 / 换章：定位阅读单元。paragraph 有值（义注/复注层恒有值，原文层
   // 是目录点击或深链接）就直接用；原文层未指定则续读上次位置或本书第一章。
+  //
+  // 连续滚动后，外层会把本层刚上报的锚点回写进 `paragraph`（自回显）——
+  // 那只是标题/伴读层坐标刷新，不是真的要跳到新位置，这里跳过，避免把
+  // 已经滚到的窗口重置回章节顶部。
   useEffect(() => {
+    if (
+      reportedAnchorRef.current &&
+      reportedAnchorRef.current.book === book &&
+      reportedAnchorRef.current.paragraph === paragraph
+    ) {
+      return;
+    }
     let alive = true;
     setUnit(null);
     setError(null);
     (async () => {
       const start = await resolveStartParagraph(book, paragraph);
       if (start === null) throw new Error(t("common.loadFailed"));
-      return getReadingUnitAt(book, start);
+      const u = await getReadingUnitAt(book, start);
+      return { u, start };
     })()
-      .then((u) => {
-        if (alive) setUnit(u);
+      .then(({ u, start }) => {
+        if (!alive || !u) return;
+        unitRef.current = u;
+        setUnit(u);
+        // 以「请求的段」为窗口锚点，保证深链接/角标跳转的目标段一定在首屏窗口内。
+        jumpTargetRef.current = start;
+        setJumpNonce((n) => n + 1);
       })
       .catch((err) => {
         if (alive) {
@@ -527,14 +812,24 @@ export function ReaderLayerPane({
   }, [book, paragraph]);
 
   const p = unit?.from ?? paragraph ?? 0;
-  const toc = unit?.chapter?.toc ?? initialToc ?? title;
+  const toc = headingToc ?? unit?.chapter?.toc ?? initialToc ?? title;
+
+  // 与 `unit` 状态同步的 ref（回调里读最新值，避免闭包读到旧章节）。
+  useEffect(() => {
+    unitRef.current = unit;
+  }, [unit]);
 
   // 上报当前阅读单元的锚点：外层用它算 / 重算义注复注对应章节（仅原文层
   // 触发重算，见 `ReaderScreen.tsx`），也用它刷新标签页顶部的章节标题。
+  // 标题跟随「最深层标题」：同一单元内滚动时 headingToc 变化也会触发，但
+  // para（unit.from）不变，外层只做便宜的标题刷新、不重算伴读层。
   useEffect(() => {
-    if (unit) onChapterAnchor(book, unit.from, unit.chapter?.toc ?? null);
+    if (unit) {
+      reportedAnchorRef.current = { book, paragraph: unit.from };
+      onChapterAnchor(book, unit.from, headingToc ?? unit.chapter?.toc ?? null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unit, book]);
+  }, [unit, headingToc, book]);
 
   // 没指定版本时自动选版本 —— 新接口必须带 channel。
   //
@@ -618,7 +913,8 @@ export function ReaderLayerPane({
     // 只存版本 uid，不存名字：名字查 channels 表（见 history.ts 注释）。
     saveReadingRecord({
       book,
-      paragraph: unit.from,
+      // 连续滚动时存「视口顶部段」而非章节起点，恢复阅读位置更精确。
+      paragraph: topParaRef.current || unit.from,
       title,
       heading: toc,
       channelId,
@@ -626,28 +922,61 @@ export function ReaderLayerPane({
     });
   }, [book, unit, title, toc, channelId]);
 
-  const rangeLabel = unit ? `段落 ${unit.from}–${unit.to}` : "";
-  const headerSubtitle = [channelName, rangeLabel].filter(Boolean).join(" · ");
+  // 副标题只放版本名，不放「段落 from–to」——连续滚动下锚点单元(unit)随时在变，
+  // 若把 unit 依赖带进 WebView source，跨章时会让整个 WebView 重载、窗口被重置回
+  // 初始段（表现为段被反复卸载、滚动位置跳回）。
+  const headerSubtitle = channelName ?? "";
 
-  // 载入正文：查本地缓存 → 只补缺口 → 拼段落 HTML（docs/reading-content.md §4.3）
+  // 载入正文窗口：先取本书段落范围与字符数，按锚点算初始窗口，再查缓存→补缺口
+  // → 只把窗口内的段落拼进首屏 HTML。窗口之外的段随滚动增量加载（wl-need）。
   useEffect(() => {
-    if (!unit || !channelId) return;
+    const target = jumpTargetRef.current;
+    if (!channelId || target == null) return;
     let alive = true;
+    const token = ++loadTokenRef.current;
     setDoc(null);
     setError(null);
-    getReadingUnitContent(unit, channelId)
-      .then((d) => {
-        if (alive) setDoc({ title: toc, body: d.html });
-      })
-      .catch((err) => {
-        if (alive) {
-          setError(err instanceof Error ? err.message : t("common.loadFailed"));
-        }
-      });
+    // 重载/跳转时清掉旧标题，等新窗口的 wl-anchor 再更新（否则会残留上一本书的经名）。
+    headingTocRef.current = null;
+    setHeadingToc(null);
+    (async () => {
+      const sql = await tipitakaRunner();
+      const [bounds, lengths] = await Promise.all([
+        bookBounds(sql, book),
+        paragraphLengths(sql, book),
+      ]);
+      if (!alive || token !== loadTokenRef.current) return;
+      if (!bounds) throw new Error(t("common.loadFailed"));
+
+      const win = initialWindow(lengths, bounds, target, WINDOW_STRLEN);
+      const map = await loadParasMap(channelId, book, win.from, win.to);
+      if (!alive || token !== loadTokenRef.current) return;
+
+      boundsRef.current = bounds;
+      lengthsRef.current = lengths;
+      winRef.current = win;
+      topParaRef.current = target;
+
+      const parts: string[] = [];
+      for (let p = win.from; p <= win.to; p++) {
+        const h = map.get(p);
+        if (h) parts.push(h);
+      }
+      console.log(
+        `[wl] init book=${book} window=[${win.from}..${win.to}] paras=${win.to - win.from + 1} non-empty=${parts.length}`,
+      );
+      const titleText = unitRef.current?.chapter?.toc ?? initialToc ?? title;
+      setDoc({ title: titleText, body: parts.join("\n") });
+    })().catch((err) => {
+      if (alive && token === loadTokenRef.current) {
+        setError(err instanceof Error ? err.message : t("common.loadFailed"));
+      }
+    });
     return () => {
       alive = false;
     };
-  }, [unit, channelId, toc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, channelId, jumpNonce]);
 
   // 上一 / 下一单元是否存在（异步算，用于禁用导航按钮）
   useEffect(() => {
@@ -726,24 +1055,36 @@ export function ReaderLayerPane({
     ],
   );
 
+  // 目录跳转 / 上一章 / 下一章：更新锚点单元 + 把窗口移到目标段重新载入。
+  // 连续滚动下「章节」只是锚点概念，正文窗口跨章节无缝衔接。
+  const jumpTo = useCallback(
+    (u: ReadingUnit, para: number) => {
+      unitRef.current = u;
+      setUnit(u);
+      jumpTargetRef.current = para;
+      setJumpNonce((n) => n + 1);
+    },
+    [],
+  );
+
   const navigateTo = (b: number, para: number) => {
     if (b !== book) return;
     getReadingUnitAt(b, para).then((u) => {
-      if (u) setUnit(u);
+      if (u) jumpTo(u, para);
     });
   };
 
   const goNext = () => {
     if (!unit) return;
     getNextUnit(unit).then((n) => {
-      if (n) setUnit(n);
+      if (n) jumpTo(n, n.from);
     });
   };
 
   const goPrev = () => {
     if (!unit) return;
     getPrevUnit(unit).then((prev) => {
-      if (prev) setUnit(prev);
+      if (prev) jumpTo(prev, prev.from);
     });
   };
 
@@ -761,6 +1102,9 @@ export function ReaderLayerPane({
   };
 
   const pickChannel = (ch: ChapterChannel) => {
+    // 换版本要保持当前阅读位置：以视口顶部段（或锚点单元起点）为窗口锚点。
+    jumpTargetRef.current =
+      topParaRef.current || unitRef.current?.from || paragraph || 0;
     setChannelId(ch.channel_id);
     setChannelName(ch.name);
     setVersionVisible(false);
@@ -768,9 +1112,10 @@ export function ReaderLayerPane({
 
   const askAboutParagraph = async () => {
     if (!(await ensureAiAvailable(t))) return;
+    const para = topParaRef.current || p;
     navigation.navigate("NewChat", {
-      passageRef: { book, paragraph: p, title: toc },
-      systemPrompt: passageSystemPrompt(book, p, channelId),
+      passageRef: { book, paragraph: para, title: toc },
+      systemPrompt: passageSystemPrompt(book, para, channelId),
       seedText: `关于《${title}》「${toc}」这一段落，请讲解大意。`,
     });
   };
@@ -807,9 +1152,10 @@ export function ReaderLayerPane({
     // 看到的样子，查词问的是词本身。
     const pali = scriptToRoman(text, paliScript);
     if (!(await ensureAiAvailable(t))) return;
+    const para = topParaRef.current || p;
     const common = {
-      passageRef: { book, paragraph: p, title: toc },
-      systemPrompt: passageSystemPrompt(book, p, channelId),
+      passageRef: { book, paragraph: para, title: toc },
+      systemPrompt: passageSystemPrompt(book, para, channelId),
     } as const;
     if (key === "lookup") {
       // 查词是个完整的问题，直接替用户发出去。
@@ -846,6 +1192,145 @@ export function ReaderLayerPane({
     webViewRef.current?.injectJavaScript(js);
   };
 
+  // 增量加载的段落同样要过一遍巴利字体转换（与首屏 `shown` 一致）。
+  const convertFragment = useCallback(
+    (fragment: string): string =>
+      paliScript === "roman"
+        ? fragment
+        : convertPaliHtml(fragment, { to: paliScript }),
+    [paliScript],
+  );
+
+  /**
+   * WebView 滚动到边缘（上/下）请求更多段落：按 `WINDOW_STRLEN` 巴利文字符
+   * 扩窗口，只取新增段 → 注入 `__wlAppend` / `__wlPrepend`（见 buildReaderHtml）。
+   */
+  const handleWlNeed = useCallback(
+    (dir: "down" | "up", domFirst?: number, domLast?: number) => {
+      const win = winRef.current;
+      const bounds = boundsRef.current;
+      const lengths = lengthsRef.current;
+      const cid = channelId;
+      if (!win || !bounds || !lengths || !cid) return;
+
+      // 加载起点以 DOM 实际边缘为准：底部/顶部卸载会让 DOM 边缘比 winRef 逻辑
+      // 边缘更靠里，若按逻辑边缘取数会在被卸载处留下「洞」（如 56 直接接 66）。
+      // WebView 未上报或上报值越界（如旧 WebView 的过期消息）时回退到逻辑边缘。
+      const base =
+        dir === "down"
+          ? domLast != null && domLast >= win.from && domLast <= win.to
+            ? domLast
+            : win.to
+          : domFirst != null && domFirst >= win.from && domFirst <= win.to
+            ? domFirst
+            : win.from;
+
+      if (dir === "down" && base >= bounds.hi) return;
+      if (dir === "up" && base <= bounds.lo) return;
+
+      const baseWin =
+        dir === "down"
+          ? { from: win.from, to: base }
+          : { from: base, to: win.to };
+      const next = extendWindow(lengths, bounds, baseWin, dir, WINDOW_STRLEN);
+      const range: [number, number] =
+        dir === "down" ? [base + 1, next.to] : [next.from, base - 1];
+      if (range[0] > range[1]) return;
+
+      // 在途去重：快速滚动会连发 wl-need，同一方向还没取完就跳过，避免重复请求/写库。
+      if (loadingRef.current[dir]) {
+        console.log(`[wl] need ${dir}: skipped (already in-flight)`);
+        return;
+      }
+      loadingRef.current[dir] = true;
+
+      console.log(
+        `[wl] need ${dir}: window=[${win.from}..${win.to}] dom=[${domFirst}..${domLast}] → load paras=[${range[0]}..${range[1]}]`,
+      );
+
+      // 先亮起「加载方向」指示，再取数 —— 防止快速滑到底看到一片空白。
+      webViewRef.current?.injectJavaScript(
+        `window.__wlShowLoading(${JSON.stringify(dir)}); true;`,
+      );
+      const hideLoading = () =>
+        webViewRef.current?.injectJavaScript(
+          `window.__wlHideLoading(${JSON.stringify(dir)}); true;`,
+        );
+
+      void loadParasMap(cid, book, range[0], range[1])
+        .then((map) => {
+          // 期间发生了跳转/换版 → 窗口已重置，丢弃这次增量注入。
+          if (winRef.current !== win) {
+            hideLoading();
+            return;
+          }
+          const parts: string[] = [];
+          for (let p = range[0]; p <= range[1]; p++) {
+            const h = map.get(p);
+            if (h) parts.push(convertFragment(h));
+          }
+          // 逻辑窗口只向前扩：backfill 被卸载的洞时不回退边界。
+          winRef.current =
+            dir === "down"
+              ? { from: win.from, to: Math.max(win.to, next.to) }
+              : { from: Math.min(win.from, next.from), to: win.to };
+          const htmlStr = parts.join("\n");
+          if (!htmlStr) {
+            hideLoading();
+            return;
+          }
+          const fn = dir === "down" ? "__wlAppend" : "__wlPrepend";
+          console.log(
+            `[wl] ${dir} done: appended ${parts.length} paras (${htmlStr.length} html chars)`,
+          );
+          // __wlAppend / __wlPrepend 内部会先 __wlHideLoading(dir) 再插入正文。
+          webViewRef.current?.injectJavaScript(
+            `window.${fn}(${JSON.stringify(htmlStr)}); true;`,
+          );
+        })
+        .catch((err) => {
+          console.warn(
+            `[wl] ${dir} failed:`,
+            err instanceof Error ? err.message : err,
+          );
+          hideLoading();
+        })
+        .finally(() => {
+          loadingRef.current[dir] = false;
+        });
+    },
+    [book, channelId, convertFragment],
+  );
+
+  /**
+   * WebView 上报视口顶部段：更新 `topParaRef`；当它跨入新的阅读单元时更新
+   * 锚点单元（触发标题刷新、阅读记录、伴读层坐标重算）。
+   */
+  const handleWlAnchor = useCallback(
+    (para: number) => {
+      topParaRef.current = para;
+      // 标题跟随当前位置的最深层章节（经名），而非阅读单元标题（品名）。
+      const ht = headingTocFor(book, para);
+      if (ht !== headingTocRef.current) {
+        headingTocRef.current = ht;
+        setHeadingToc(ht);
+      }
+      const u = unitRef.current;
+      if (u && para >= u.from && para <= u.to) return; // 仍在同一单元内
+      getReadingUnitAt(book, para).then((nu) => {
+        if (!nu) return;
+        const cur = unitRef.current;
+        if (cur && cur.book === nu.book && cur.from === nu.from) return;
+        unitRef.current = nu;
+        setUnit(nu);
+        console.log(
+          `[wl] anchor para=${para} → unit book=${book} [${nu.from}..${nu.to}] "${nu.chapter?.toc ?? ""}"`,
+        );
+      });
+    },
+    [book],
+  );
+
   useEffect(() => {
     if (!highlightSid) return;
     pendingHighlightRef.current = highlightSid;
@@ -857,6 +1342,21 @@ export function ReaderLayerPane({
     try {
       const msg = JSON.parse(e.nativeEvent.data);
       if (!msg) return;
+      if (msg.type === "wl-need" && (msg.dir === "down" || msg.dir === "up")) {
+        handleWlNeed(msg.dir, Number(msg.domFirst), Number(msg.domLast));
+        return;
+      }
+      if (msg.type === "wl-anchor" && typeof msg.para === "number") {
+        handleWlAnchor(msg.para);
+        return;
+      }
+      if (msg.type === "wl-unload" && (msg.dir === "up" || msg.dir === "down")) {
+        console.log(
+          `[wl] unload ${msg.dir}: paras=[${msg.from}..${msg.to}] count=${msg.count}` +
+            ` | domFirst=${msg.domFirst} domCount=${msg.domCount} scrollTop=${msg.scrollTop}`,
+        );
+        return;
+      }
       const book = Number(msg.book);
       const para = Number(msg.para);
       const start = Number(msg.start);
@@ -872,6 +1372,8 @@ export function ReaderLayerPane({
   };
 
   const handleAnnoLoadEnd = () => {
+    // 诊断：每次 WebView loadEnd 都打点，用于判断滚动中是否发生整页重载。
+    console.log("[wl] webview loadEnd");
     const sid = pendingHighlightRef.current;
     if (!sid) return;
     pendingHighlightRef.current = null;

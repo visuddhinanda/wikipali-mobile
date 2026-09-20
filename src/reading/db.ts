@@ -107,12 +107,66 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
   return tipitakaPromise;
 }
 
+/**
+ * 幂等补列：老版本设备上的 `para_html` 已存在，`CREATE TABLE IF NOT EXISTS`
+ * 不会给它补新列。用 `PRAGMA table_info` 探测后按需 `ALTER TABLE`。
+ */
+async function ensureColumn(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+  ddl: string,
+): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string }>(
+    `PRAGMA table_info(${table})`,
+  );
+  if (!cols.some((c) => c.name === column)) {
+    await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+
+/**
+ * 把 `para_html.html` 从「空段写 ''」迁移到「空段写 NULL」。
+ *
+ * 老库的 html 列是 NOT NULL，且空段写的是空串；SQLite 无法直接改列的可空性，
+ * 所以重建表：改成可空，并把空串转成 NULL（其余数据原样保留）。
+ */
+async function migrateParaHtmlNullable(db: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string; notnull: number }>(
+    "PRAGMA table_info(para_html)",
+  );
+  const htmlCol = cols.find((c) => c.name === "html");
+  if (!htmlCol || htmlCol.notnull === 0) return; // 已可空（新库）
+
+  // 事务里做 DDL 重建：失败可整体回滚，避免表被改到一半（RENAME 后 CREATE 失败等）。
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      ALTER TABLE para_html RENAME TO para_html_old;
+      CREATE TABLE para_html (
+        channel    TEXT    NOT NULL,
+        book       INTEGER NOT NULL,
+        para       INTEGER NOT NULL,
+        html       TEXT,
+        fetched_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        PRIMARY KEY (channel, book, para)
+      );
+      INSERT INTO para_html (channel, book, para, html, fetched_at, expires_at)
+        SELECT channel, book, para, NULLIF(html, ''), fetched_at, expires_at
+        FROM para_html_old;
+      DROP TABLE para_html_old;
+    `);
+  });
+}
+
 /** 可写的阅读缓存库（`para_html` / `download_state`）。 */
 export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
   if (!readingPromise) {
     readingPromise = (async () => {
       const db = await SQLite.openDatabaseAsync(READING_DB);
       await db.execAsync(SCHEMA);
+      await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
+      await migrateParaHtmlNullable(db);
       return db;
     })().catch((err) => {
       readingPromise = null;
@@ -183,14 +237,18 @@ const SCHEMA = `
 PRAGMA journal_mode = WAL;
 
 -- 正文缓存：按段落存，粒度与接口返回的 items 一致。
--- html = '' 表示「服务端确认该段为空」，与「没请求过」区分 —— 服务端会跳过
--- 空段落（docs/reading-content.md §2），不记下来的话含空段的章节永远命中不了缓存。
+-- html IS NULL 表示「服务端本次请求没返回该段」，与「没请求过」区分 —— 服务端会
+-- 跳过空段落（docs/reading-content.md §2），不记下来的话含空段的章节每次进入
+-- 都会重新请求。但「空」不一定是永久的：该版本后续可能补上，所以给空段记录一个
+-- 过期时间 expires_at（48 小时），过期后若联网则重新请求；非空正文 expires_at
+-- 为 NULL，永不过期。
 CREATE TABLE IF NOT EXISTS para_html (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
   para       INTEGER NOT NULL,
-  html       TEXT    NOT NULL,
+  html       TEXT,               -- 服务端没返回的段写 NULL；非空正文存 HTML
   fetched_at INTEGER NOT NULL,
+  expires_at INTEGER,            -- 空段占位的过期时间(epoch ms)；非空正文为 NULL
   PRIMARY KEY (channel, book, para)
 );
 
