@@ -116,14 +116,26 @@ function ToolCallBubble(props: any) {
   );
 }
 
+/** 生成一个 UUID v4，用作新一轮会话的 threadId（index.ts 已 polyfill crypto.getRandomValues）。 */
+function newThreadId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function ChatUI({
   seedText,
   draftText,
   systemPrompt,
+  passageRef,
 }: {
   seedText?: string;
   draftText?: string;
   systemPrompt?: string;
+  passageRef?: { book: number; paragraph: number; title: string };
 }) {
   const navigation = useNavigation<Nav>();
   const t = useT();
@@ -142,6 +154,11 @@ function ChatUI({
   useEffect(() => {
     if (seededRef.current) return;
     seededRef.current = true;
+    // agent 是按 agentId 共享的单例，消息会跨页面残留：每次进入「新对话」
+    // 都先清空上一轮会话，并换一个新的 threadId，让后端也从新线程开始，
+    // 否则从主导航点主题卡片进来会看到上次的聊天内容。
+    agent?.setMessages?.([]);
+    if (agent) agent.threadId = newThreadId();
     // 系统提示词要排在第一条用户消息**之前**，不然模型是在没有上下文的
     // 情况下先读到问题的（阅读器过来的「查词/提问」全靠它交代章节坐标）。
     if (systemPrompt) {
@@ -269,25 +286,35 @@ function ChatUI({
           ) : null
         }
       />
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder={t("chat.followUp")}
-          placeholderTextColor={colors.inkFaint}
-          multiline
-          onSubmitEditing={send}
-        />
-        {isRunning ? (
-          <Pressable style={styles.stopBtn} onPress={() => agent?.stop?.()}>
-            <View style={styles.stopSquare} />
-          </Pressable>
-        ) : (
-          <Pressable style={styles.sendBtn} onPress={send}>
-            <Text style={styles.sendIcon}>↑</Text>
-          </Pressable>
-        )}
+      <View style={styles.composer}>
+        {passageRef ? (
+          <View style={styles.aboutBubble}>
+            <Ionicons name="book-outline" size={15} color={colors.ochre} />
+            <Text style={styles.aboutBubbleText} numberOfLines={2}>
+              {t("chat.aboutPassage", { title: passageRef.title })}
+            </Text>
+          </View>
+        ) : null}
+        <View style={styles.inputBar}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder={t("chat.followUp")}
+            placeholderTextColor={colors.inkFaint}
+            multiline
+            onSubmitEditing={send}
+          />
+          {isRunning ? (
+            <Pressable style={styles.stopBtn} onPress={() => agent?.stop?.()}>
+              <View style={styles.stopSquare} />
+            </Pressable>
+          ) : (
+            <Pressable style={styles.sendBtn} onPress={send}>
+              <Text style={styles.sendIcon}>↑</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -296,13 +323,14 @@ function ChatUI({
 export function NewChatScreen({
   route,
 }: NativeStackScreenProps<RootStackParamList, "NewChat">) {
-  const { seedText, draftText, systemPrompt } = route.params ?? {};
+  const { seedText, draftText, systemPrompt, passageRef } = route.params ?? {};
   return (
     <CopilotChat agentId="pali_agent">
       <ChatUI
         seedText={seedText}
         draftText={draftText}
         systemPrompt={systemPrompt}
+        passageRef={passageRef}
       />
     </CopilotChat>
   );
@@ -382,14 +410,32 @@ const styles = StyleSheet.create({
     ...type.small,
     color: colors.inkSoft,
   },
+  composer: {
+    backgroundColor: colors.paperRaised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  aboutBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.paperSunken,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
+  },
+  aboutBubbleText: {
+    flex: 1,
+    ...type.small,
+    color: colors.inkSoft,
+  },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
     backgroundColor: colors.paperRaised,
   },
   input: {
