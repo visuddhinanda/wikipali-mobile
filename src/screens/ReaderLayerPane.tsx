@@ -12,11 +12,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
@@ -48,7 +50,6 @@ import type { ChapterChannel } from "../catalog";
 import { getBookHeadings } from "../catalog/headings";
 import { saveReadingRecord } from "../data/history";
 import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
-import { DownloadIconButton } from "../components/DownloadIconButton";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import {
@@ -154,6 +155,8 @@ export interface ReaderLayerPaneProps {
   onCrossHighlight: (book: number, para: number, start: number, end: number) => void;
   /** 需要滚动到并高亮的句子 data-sid（如 "101-507-2-23"）；仅命中的那一层有值。 */
   highlightSid?: string | null;
+  /** 打开阅读设置（底部导航「设置」触发，由外层控制 SettingsSheet）。 */
+  onOpenSettings: () => void;
   navigation: ReaderNavigation;
 }
 
@@ -742,6 +745,7 @@ export function ReaderLayerPane({
   onAnnoJump,
   onCrossHighlight,
   highlightSid,
+  onOpenSettings,
   navigation,
 }: ReaderLayerPaneProps) {
   const t = useT();
@@ -1160,7 +1164,6 @@ export function ReaderLayerPane({
     navigation.navigate("NewChat", {
       passageRef: { book, paragraph: para, title: toc },
       systemPrompt: passageSystemPrompt(book, para, channelId),
-      seedText: `关于《${title}》「${toc}」这一段落，请讲解大意。`,
     });
   };
 
@@ -1408,64 +1411,6 @@ export function ReaderLayerPane({
 
   return (
     <View style={[styles.pane, { backgroundColor: c.paper }]}>
-      {/* 导航条：目录 / 上一章 / 下一章 / 版本切换 / 离线下载（这一层自己的书） */}
-      <View
-        style={[
-          styles.navBar,
-          { backgroundColor: c.paperRaised, borderBottomColor: c.hairline },
-        ]}
-      >
-        <NavBtn
-          icon="list-outline"
-          c={c}
-          onPress={() => {
-            if (listDetail) {
-              if (!paneOpen) setPanePinned(true);
-              setPaneOpen((v) => !v);
-            } else {
-              setDrawerVisible(true);
-            }
-          }}
-        />
-        <NavBtn
-          icon="chevron-back"
-          label={t("reader.prevChapter")}
-          disabled={!hasPrev}
-          c={c}
-          onPress={goPrev}
-        />
-        <NavBtn
-          icon="chevron-forward"
-          label={t("reader.nextChapter")}
-          iconPosition="right"
-          disabled={!hasNext}
-          c={c}
-          onPress={goNext}
-        />
-        <NavBtn
-          icon="layers-outline"
-          label={t("reader.version")}
-          c={c}
-          onPress={openVersion}
-        />
-        <View style={styles.navBtn}>
-          {channelId ? (
-            <DownloadIconButton
-              book={book}
-              channelId={channelId}
-              color={c.ink}
-              size={18}
-            />
-          ) : (
-            <Ionicons
-              name="cloud-download-outline"
-              size={18}
-              color={c.inkFaint}
-            />
-          )}
-        </View>
-      </View>
-
       <View style={styles.bodyRow}>
         {listDetail && paneOpen ? (
           <View
@@ -1519,20 +1464,79 @@ export function ReaderLayerPane({
               onLoadEnd={handleAnnoLoadEnd}
             />
           )}
+          <Pressable
+            style={[styles.askFab, { backgroundColor: c.vermilion }]}
+            onPress={() => void askAboutParagraph()}
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={17}
+              color="#fdfaf1"
+            />
+            <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
+          </Pressable>
         </View>
       </View>
 
-      <Pressable
-        style={[styles.askFab, { backgroundColor: c.vermilion }]}
-        onPress={() => void askAboutParagraph()}
+      {/* 经文导航（底部两行）：上一行翻章，下一行工具（目录 / 版本 / 设置 / 更多）。 */}
+      <View
+        style={[
+          styles.navBar,
+          { backgroundColor: c.paperRaised, borderTopColor: c.hairline },
+        ]}
       >
-        <Ionicons
-          name="chatbubble-ellipses-outline"
-          size={17}
-          color="#fdfaf1"
-        />
-        <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
-      </Pressable>
+        <View style={styles.navRow}>
+          <NavBtn
+            icon="chevron-back"
+            label={t("reader.prevChapter")}
+            disabled={!hasPrev}
+            c={c}
+            onPress={goPrev}
+          />
+          <NavBtn
+            icon="chevron-forward"
+            label={t("reader.nextChapter")}
+            iconPosition="right"
+            disabled={!hasNext}
+            c={c}
+            onPress={goNext}
+          />
+        </View>
+        <View style={styles.navRow}>
+          <NavBtn
+            icon="list-outline"
+            label={t("reader.toc")}
+            c={c}
+            onPress={() => {
+              if (listDetail) {
+                if (!paneOpen) setPanePinned(true);
+                setPaneOpen((v) => !v);
+              } else {
+                setDrawerVisible(true);
+              }
+            }}
+          />
+          <NavBtn
+            icon="layers-outline"
+            label={t("reader.version")}
+            c={c}
+            onPress={openVersion}
+          />
+          <NavBtn
+            icon="settings-outline"
+            label={t("reader.settings")}
+            c={c}
+            onPress={onOpenSettings}
+          />
+          {/* 「更多」暂为占位，无动作（后续再指定）。 */}
+          <NavBtn
+            icon="ellipsis-horizontal"
+            label={t("reader.more")}
+            c={c}
+            onPress={() => {}}
+          />
+        </View>
+      </View>
 
       <ChapterDrawer
         visible={drawerVisible}
@@ -1577,76 +1581,107 @@ function VersionSheet({
   onPick: (ch: ChapterChannel) => void;
 }) {
   const t = useT();
+  const { width } = useWindowDimensions();
+  const panelW = Math.min(width * 0.84, 360);
+  const slide = useRef(new Animated.Value(panelW)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    slide.setValue(panelW);
+    Animated.timing(slide, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, panelW, slide]);
+
   return (
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <Pressable
-        style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]}
-        onPress={onClose}
-      />
-      <View
-        style={[
-          styles.sheet,
-          { backgroundColor: c.paperRaised, borderTopColor: c.border },
-        ]}
-      >
-        <Text
-          style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}
+      <View style={styles.sheetOverlay}>
+        <Pressable
+          style={[styles.sheetBackdrop, { backgroundColor: c.backdrop }]}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.sheetPanel,
+            {
+              width: panelW,
+              backgroundColor: c.paperRaised,
+              borderLeftColor: c.border,
+              transform: [{ translateX: slide }],
+            },
+          ]}
         >
-          {t("reader.switchVersion")}
-        </Text>
-        {channelsError ? (
-          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-            {channelsError}
-          </Text>
-        ) : !channels ? (
-          <View style={styles.versionLoading}>
-            <ActivityIndicator color={c.vermilion} />
+          <View
+            style={[styles.sheetPanelHeader, { borderBottomColor: c.hairline }]}
+          >
+            <Text
+              style={[
+                styles.sheetPanelTitle,
+                { color: c.ink, fontFamily: serifFont },
+              ]}
+            >
+              {t("reader.switchVersion")}
+            </Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={c.inkSoft} />
+            </Pressable>
           </View>
-        ) : channels.length === 0 ? (
-          <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-            {t("reader.noVersions")}
-          </Text>
-        ) : (
-          <ScrollView style={styles.versionList}>
-            {channels.map((ch) => {
-              const active = ch.channel_id === activeChannelId;
-              return (
-                <Pressable
-                  key={ch.uid}
-                  style={[
-                    styles.versionRow,
-                    {
-                      backgroundColor: active ? c.paperSunken : "transparent",
-                      borderBottomColor: c.hairline,
-                    },
-                  ]}
-                  onPress={() => onPick(ch)}
-                >
-                  <Text
-                    numberOfLines={1}
+          {channelsError ? (
+            <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+              {channelsError}
+            </Text>
+          ) : !channels ? (
+            <View style={styles.versionLoading}>
+              <ActivityIndicator color={c.vermilion} />
+            </View>
+          ) : channels.length === 0 ? (
+            <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+              {t("reader.noVersions")}
+            </Text>
+          ) : (
+            <ScrollView style={styles.versionList}>
+              {channels.map((ch) => {
+                const active = ch.channel_id === activeChannelId;
+                return (
+                  <Pressable
+                    key={ch.uid}
                     style={[
-                      styles.versionName,
+                      styles.versionRow,
                       {
-                        color: active ? c.vermilion : c.ink,
-                        fontWeight: active ? "700" : "400",
+                        backgroundColor: active ? c.paperSunken : "transparent",
+                        borderBottomColor: c.hairline,
                       },
                     ]}
+                    onPress={() => onPick(ch)}
                   >
-                    {ch.name}
-                  </Text>
-                  {active ? (
-                    <Ionicons name="checkmark" size={18} color={c.vermilion} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.versionName,
+                        {
+                          color: active ? c.vermilion : c.ink,
+                          fontWeight: active ? "700" : "400",
+                        },
+                      ]}
+                    >
+                      {ch.name}
+                    </Text>
+                    {active ? (
+                      <Ionicons name="checkmark" size={18} color={c.vermilion} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -1654,14 +1689,15 @@ function VersionSheet({
 
 /**
  * 「查词 / 提问 / 就此段落提问」共用的系统提示词：告诉模型用户正看着哪一段、
- * 哪个版本，让它先去查原文与译文，而不是凭空作答。
+ * 哪个版本，让它先查原文与频道内容、必要时参考 nissaya 与义注复注，
+ * 而不是凭空作答。
  */
 function passageSystemPrompt(
   book: number,
   para: number,
   channelUid?: string,
 ): string {
-  return `用户正在阅读巴利文献章节 ${book}-${para} channel:${channelUid ?? ""} 段落号${para} 。请根据原文，译文，和 该处相关资料回答用户的问题。`;
+  return `用户正在阅读经文${book}-${para} channel:${channelUid ?? ""} 请根据经文巴利原文，所选channel回答用户问题。回答时请参照nissaya(如果有)相关的义注复注。只需查询巴利原文，channel内容，nissaya,必要时再查询其他信息。`;
 }
 
 const styles = StyleSheet.create({
@@ -1669,8 +1705,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  navRow: {
     flexDirection: "row",
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   navBtn: {
     flex: 1,
@@ -1727,37 +1765,53 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sheetBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  sheetOverlay: {
     flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
   },
-  sheet: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    padding: 16,
-    paddingBottom: 32,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
+  sheetPanel: {
+    height: "100%",
+    borderLeftWidth: StyleSheet.hairlineWidth,
   },
-  sheetTitle: {
+  sheetPanelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetPanelTitle: {
     fontSize: 17,
     fontWeight: "600",
-    marginBottom: 12,
   },
   sheetSection: {
     fontSize: 13,
     marginTop: 8,
     marginBottom: 8,
+    paddingHorizontal: 16,
   },
   versionLoading: {
-    paddingVertical: 24,
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
   },
   versionList: {
-    maxHeight: 320,
+    flex: 1,
   },
   versionRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   versionName: {

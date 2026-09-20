@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DefaultTheme,
+  getFocusedRouteNameFromRoute,
   NavigationContainer,
   useNavigation,
   type Theme,
@@ -410,34 +411,43 @@ export function RootNavigator() {
       onReady={() => setNavReady(true)}
     >
       <Tab.Navigator
-        screenOptions={({ route }) => ({
-          // 头部由各 Tab 内部的 Stack 负责，避免双层标题栏
-          headerShown: false,
-          tabBarActiveTintColor: colors.vermilion,
-          tabBarInactiveTintColor: colors.inkFaint,
-          tabBarPosition: vertical ? "left" : "bottom",
-          tabBarVariant: vertical ? "material" : "uikit",
-          tabBarLabelPosition:
-            navKind === "sidebar" ? "beside-icon" : "below-icon",
-          // 矮窗口（手机横屏 / 桌面矮窗）只留图标，把纵向空间还给正文。
-          tabBarShowLabel: !(navKind === "tabs" && isShort),
-          tabBarStyle: vertical
-            ? [styles.rail, { width: navWidth }]
-            : styles.tabBar,
-          tabBarLabelStyle: styles.tabLabel,
-          tabBarIcon: ({ focused }) => {
-            const meta = TAB_ICONS[route.name as keyof TabParamList];
-            return (
-              <TabBarIcon
-                name={focused ? meta.active : meta.inactive}
-                focused={focused}
-                // 凸起中央按钮只存在于 compact 的底部 Tab；
-                // rail / 侧边栏里「探索」退化为普通高亮项（保留强调色）。
-                raised={!vertical && route.name === "AiChat"}
-              />
-            );
-          },
-        })}
+        screenOptions={({ route }) => {
+          // 阅读器与聊天对话页都是全屏沉浸页：进入后隐藏 App 自身的导航容器
+          // （底部 Tab / 左侧 rail / 侧边栏）。阅读器把底部让给经文导航，
+          // 聊天对话页则让对话占据整个屏幕。
+          const focused = getFocusedRouteNameFromRoute(route) ?? route.name;
+          const immersive = focused === "Reader" || focused === "NewChat";
+          return {
+            // 头部由各 Tab 内部的 Stack 负责，避免双层标题栏
+            headerShown: false,
+            tabBarActiveTintColor: colors.vermilion,
+            tabBarInactiveTintColor: colors.inkFaint,
+            tabBarPosition: vertical ? "left" : "bottom",
+            tabBarVariant: vertical ? "material" : "uikit",
+            tabBarLabelPosition:
+              navKind === "sidebar" ? "beside-icon" : "below-icon",
+            // 矮窗口（手机横屏 / 桌面矮窗）只留图标，把纵向空间还给正文。
+            tabBarShowLabel: !(navKind === "tabs" && isShort),
+            tabBarStyle: immersive
+              ? { display: "none" }
+              : vertical
+                ? [styles.rail, { width: navWidth }]
+                : styles.tabBar,
+            tabBarLabelStyle: styles.tabLabel,
+            tabBarIcon: ({ focused }) => {
+              const meta = TAB_ICONS[route.name as keyof TabParamList];
+              return (
+                <TabBarIcon
+                  name={focused ? meta.active : meta.inactive}
+                  focused={focused}
+                  // 凸起中央按钮只存在于 compact 的底部 Tab；
+                  // rail / 侧边栏里「探索」退化为普通高亮项（保留强调色）。
+                  raised={!vertical && route.name === "AiChat"}
+                />
+              );
+            },
+          };
+        }}
       >
         {(Object.keys(TAB_STACKS) as (keyof TabParamList)[]).map((name) => (
           <Tab.Screen

@@ -20,6 +20,7 @@ import { bookEntryAt, bookLayerAt } from "../catalog";
 import type { CommentaryLayer } from "../catalog/commentary";
 import { getChapterLayers } from "../reading";
 import { ReaderLayerPane } from "./ReaderLayerPane";
+import { DownloadIconButton } from "../components/DownloadIconButton";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import { readerColors, type ReaderChrome } from "../theme/reader";
@@ -120,9 +121,19 @@ export function ReaderScreen({ route, navigation }: Props) {
     uid: channelId,
     name: channelName,
   });
+  // 每一层当前选的版本（uid/name）：标题栏的「下载」按钮只针对当前层，
+  // 需要知道这一层现在用哪个版本。由各层上报，这里按下标记一份。
+  const [layerChannels, setLayerChannels] = useState<
+    Record<number, { uid?: string; name?: string }>
+  >({});
   const handleChannelChange = useCallback(
-    (uid: string | undefined, name: string | undefined) => {
+    (index: number, uid: string | undefined, name: string | undefined) => {
       if (uid) preferredChannelRef.current = { uid, name };
+      setLayerChannels((prev) => {
+        const cur = prev[index];
+        if (cur?.uid === uid && cur?.name === name) return prev;
+        return { ...prev, [index]: { uid, name } };
+      });
     },
     [],
   );
@@ -386,6 +397,7 @@ export function ReaderScreen({ route, navigation }: Props) {
 
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
+  const activeChannel = layerChannels[activeIndex];
 
   // 分享当前章节：生成一条 WikiPali 网页链接，直接打开系统分享抽屉
   // （其中自带「复制」）。定位取「用户自己这一层」当前章节锚点，
@@ -429,7 +441,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         }
         preferredChannelUid={preferredChannelRef.current.uid}
         preferredChannelName={preferredChannelRef.current.name}
-        onChannelChange={handleChannelChange}
+        onChannelChange={(uid, name) => handleChannelChange(i, uid, name)}
+        onOpenSettings={() => setSettingsVisible(true)}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
         onAnnoJump={handleAnnoJump}
@@ -447,7 +460,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: c.paper }]}
-      edges={["top", "left", "right"]}
+      // App 导航栏在阅读器里隐藏，底部需要自己避让系统手势条 / Home 指示器。
+      edges={["top", "left", "right", "bottom"]}
     >
       <View
         style={[
@@ -508,10 +522,17 @@ export function ReaderScreen({ route, navigation }: Props) {
         >
           <Ionicons name="share-outline" size={22} color={c.ink} />
         </Pressable>
-        {/* 阅读设置（字号/主题/离线下载）是全局的，不属于某一层，放标题栏共享一份。 */}
-        <Pressable onPress={() => setSettingsVisible(true)} hitSlop={8}>
-          <Ionicons name="settings-outline" size={22} color={c.ink} />
-        </Pressable>
+        {/* 离线下载：原「设置」图标已移到底部导航，这里换成针对当前层的下载。 */}
+        {active && activeChannel?.uid ? (
+          <DownloadIconButton
+            book={active.book}
+            channelId={activeChannel.uid}
+            color={c.ink}
+            size={22}
+          />
+        ) : (
+          <Ionicons name="cloud-download-outline" size={22} color={c.inkFaint} />
+        )}
       </View>
 
       <View

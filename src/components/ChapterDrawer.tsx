@@ -124,11 +124,11 @@ export function ChapterDrawer({
   const { width } = useWindowDimensions();
   const panelW = Math.min(width * 0.84, 360);
 
-  const slide = useRef(new Animated.Value(panelW)).current;
+  const slide = useRef(new Animated.Value(-panelW)).current;
 
   useEffect(() => {
     if (!visible) return;
-    slide.setValue(panelW);
+    slide.setValue(-panelW);
     Animated.timing(slide, {
       toValue: 0,
       duration: 180,
@@ -154,7 +154,7 @@ export function ChapterDrawer({
             {
               width: panelW,
               backgroundColor: c.paperRaised,
-              borderLeftColor: c.border,
+              borderRightColor: c.border,
               transform: [{ translateX: slide }],
             },
           ]}
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
   },
   backdrop: {
     position: "absolute",
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   },
   panel: {
     height: "100%",
-    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: StyleSheet.hairlineWidth,
   },
   header: {
     flexDirection: "row",
