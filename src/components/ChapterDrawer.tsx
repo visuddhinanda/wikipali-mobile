@@ -30,6 +30,8 @@ interface Props {
   visible: boolean;
   book: number;
   currentParagraph: number;
+  /** 该版本译出的章节标题（段落号 → 文本）；缺的条目用目录库的巴利 toc。 */
+  titles?: Map<number, string>;
   dark: boolean;
   onClose: () => void;
   onSelect: (book: number, paragraph: number) => void;
@@ -47,11 +49,18 @@ interface Row {
 export function ChapterTree({
   book,
   currentParagraph,
+  titles,
   c,
   onSelect,
 }: {
   book: number;
   currentParagraph: number;
+  /**
+   * 该版本译出的章节标题（段落号 → 文本），由阅读器从 `para_html` 查好传进来
+   * （`src/reading/heading.ts`）。缺的条目退回目录库里的巴利 `toc` —— 逐条
+   * 回退，残缺译本常常只译了前几章的标题。
+   */
+  titles?: Map<number, string>;
   c: ReaderChrome;
   onSelect: (book: number, paragraph: number) => void;
 }) {
@@ -100,6 +109,7 @@ export function ChapterTree({
       renderItem={({ item }) => (
         <RowItem
           node={item.node}
+          title={titles?.get(item.node.heading.paragraph)}
           depth={item.depth}
           expanded={expanded.has(item.node.heading.paragraph)}
           current={item.node.heading.paragraph === currentParagraph}
@@ -116,6 +126,7 @@ export function ChapterDrawer({
   visible,
   book,
   currentParagraph,
+  titles,
   dark,
   onClose,
   onSelect,
@@ -170,6 +181,7 @@ export function ChapterDrawer({
           <ChapterTree
             book={book}
             currentParagraph={currentParagraph}
+            titles={titles}
             c={c}
             onSelect={onSelect}
           />
@@ -181,6 +193,7 @@ export function ChapterDrawer({
 
 function RowItem({
   node,
+  title,
   depth,
   expanded,
   current,
@@ -189,6 +202,8 @@ function RowItem({
   onSelect,
 }: {
   node: HeadingNode;
+  /** 该版本译出的标题；没有就用目录库的巴利 `toc`。 */
+  title?: string;
   depth: number;
   expanded: boolean;
   current: boolean;
@@ -231,7 +246,7 @@ function RowItem({
             },
           ]}
         >
-          {node.heading.toc}
+          {title || node.heading.toc}
         </Text>
       </Pressable>
     </View>

@@ -29,6 +29,7 @@ import { getBookChannels } from "../api";
 import {
   WINDOW_STRLEN,
   bookBounds,
+  channelHeadingTexts,
   extendWindow,
   findFirstContent,
   getBookHeadingRows,
@@ -36,6 +37,7 @@ import {
   getNextUnit,
   getPrevUnit,
   getReadingUnitAt,
+  htmlToText,
   initialWindow,
   loadParasMap,
   localChannelsFor,
@@ -89,6 +91,11 @@ const FALLBACK_CHANNEL_NAME = "_System_Pali_VRI_";
 
 interface ReaderDoc {
   title: string;
+  /**
+   * 标题是不是巴利原文。译出的标题不能拿巴利转写器去转 —— 中文碰巧不受影响，
+   * 但英文译名会被整条转写成缅文/泰文，成一串乱码。
+   */
+  titlePali: boolean;
   subtitle?: string;
   body: string;
 }
@@ -96,14 +103,25 @@ interface ReaderDoc {
 /**
  * 覆盖某个段落的最深层章节标题（品 → 经 → 子标题），用于滚动时让顶部标题跟随
  * 当前位置，而不是停留在「阅读单元」那一级的标题（如整个品名）。
+ *
+ * `texts` 是该版本译出的标题（`channelHeadingTexts`）：译了就用译文，没译才用
+ * 目录库里的巴利 `toc`。逐条回退 —— 残缺译本常常只译了前几章的标题。
  */
-function headingTocFor(book: number, para: number): string | null {
+function headingTocFor(
+  book: number,
+  para: number,
+  texts?: Map<number, string>,
+): { toc: string | null; translated: boolean } {
   const headings = getBookHeadings(book);
   let toc: string | null = null;
+  let translated = false;
   for (const h of headings) {
-    if (h.paragraph <= para) toc = h.toc;
+    if (h.paragraph > para) continue;
+    const text = texts?.get(h.paragraph);
+    toc = text ?? h.toc;
+    translated = text != null;
   }
-  return toc;
+  return { toc, translated };
 }
 
 /** HTML 转义（目录标题当作文本塞进 HTML 前用）。 */
@@ -826,6 +844,16 @@ export function ReaderLayerPane({
   const lengthsRef = useRef<Map<number, number>>(new Map());
   /** 本书标题行（level ≤ 7）：段落号 → {level, toc}，用于空标题段回退渲染。 */
   const headingsRef = useRef<Map<number, HeadingRow> | undefined>(undefined);
+  /**
+   * 该版本译出的章节标题：段落号 → 标题文本；没译的段不在里面（退回巴利 toc）。
+   *
+   * 两份：`state` 给目录列表渲染，`ref` 给 `handleWlAnchor` 那种在回调里读最新
+   * 值的地方（它只随 book/channel 重建，闭包会读到旧 state）。
+   */
+  const [headingTexts, setHeadingTexts] = useState<Map<number, string>>(
+    () => new Map(),
+  );
+  const headingTextsRef = useRef<Map<number, string>>(new Map());
   /** 视口顶部当前所在的段（WebView 上报，滚动中持续更新）。 */
   const topParaRef = useRef<number>(0);
   /** 各方向是否有在途的增量取数 —— 防止快速滚动连发 wl-need 重复请求同一区间。 */
@@ -844,6 +872,12 @@ export function ReaderLayerPane({
 
   const c = readerColors(settings.theme === "dark");
   const isDark = settings.theme === "dark";
+
+  /** 译文标题两份一起更新，避免 ref 与渲染用的 state 脱节。 */
+  const applyHeadingTexts = useCallback((next: Map<number, string>) => {
+    headingTextsRef.current = next;
+    setHeadingTexts(next);
+  }, []);
 
   // 进入 / 换章：定位阅读单元。paragraph 有值（义注/复注层恒有值，原文层
   // 是目录点击或深链接）就直接用；原文层未指定则续读上次位置或本书第一章。
@@ -1062,13 +1096,31 @@ export function ReaderLayerPane({
       winRef.current = win;
       topParaRef.current = anchor;
 
+      // 该版本译出的章节标题：标题栏、正文大标题、目录抽屉都用它，没译才退回
+      // 目录库里的巴利 toc。整本一次查完（标题行最多的一本 2407 行，三条语句），
+      // 之后滚动增量加载时按新到的段落就地合并，不再查库。
+      const headingTexts = await channelHeadingTexts(channelId, book, [
+        ...headings.keys(),
+      ]);
+      if (!alive || token !== loadTokenRef.current) return;
+      applyHeadingTexts(headingTexts);
+      const anchorHeading = headingTocFor(book, anchor, headingTexts);
+      headingTocRef.current = anchorHeading.toc;
+      setHeadingToc(anchorHeading.toc);
+
       const parts: string[] = [];
       for (let p = win.from; p <= win.to; p++) {
         const html = renderParaHtml(p, map.get(p), headings);
         if (html) parts.push(html);
       }
-      const titleText = unitRef.current?.chapter?.toc ?? initialToc ?? title;
-      setDoc({ title: titleText, body: parts.join("\n") });
+      const titleText =
+        anchorHeading.toc ?? unitRef.current?.chapter?.toc ?? initialToc ?? title;
+      setDoc({
+        title: titleText,
+        // 回退到目录库 toc / 书名的分支都是巴利，只有译出的标题不是
+        titlePali: !anchorHeading.translated,
+        body: parts.join("\n"),
+      });
     })().catch((err) => {
       if (alive && token === loadTokenRef.current) {
         setError(err instanceof Error ? err.message : t("common.loadFailed"));
@@ -1116,14 +1168,16 @@ export function ReaderLayerPane({
   const paliScript = resolvePaliScript(settings.paliScript, locale);
 
   /**
-   * 正文只转服务端标了 `class='original'` 的段落；标题（章节 toc）本身就是
-   * 巴利，整条转。译文频道一个字都不动。
+   * 正文只转服务端标了 `class='original'` 的段落；标题是巴利 toc 时整条转，
+   * 是该版本译出的标题（`titlePali === false`）就一个字都不动。
    */
   const shown = useMemo<ReaderDoc | null>(() => {
     if (!doc || paliScript === "roman") return doc;
     return {
       ...doc,
-      title: convertScript(doc.title, { from: "roman", to: paliScript }),
+      title: doc.titlePali
+        ? convertScript(doc.title, { from: "roman", to: paliScript })
+        : doc.title,
       body: convertPaliHtml(doc.body, { to: paliScript }),
     };
   }, [doc, paliScript]);
@@ -1409,6 +1463,19 @@ export function ReaderLayerPane({
             hideLoading();
             return;
           }
+          // 这一批里新到的标题段顺手补进译文标题表（标题栏/目录跟着变），
+          // 不必为此再查一次库。
+          const headings = headingsRef.current;
+          if (headings) {
+            let added: Map<number, string> | null = null;
+            for (const [para, html] of map) {
+              if (!html || !headings.has(para)) continue;
+              if (headingTextsRef.current.has(para)) continue;
+              const text = htmlToText(html);
+              if (text) (added ??= new Map(headingTextsRef.current)).set(para, text);
+            }
+            if (added) applyHeadingTexts(added);
+          }
           const parts: string[] = [];
           for (let p = range[0]; p <= range[1]; p++) {
             const html = renderParaHtml(p, map.get(p), headingsRef.current);
@@ -1451,7 +1518,7 @@ export function ReaderLayerPane({
       // 435↔437 中间隔着空段 436）来回跳，直接跟会连锁触发标题/伴读层反复刷新。
       if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
       anchorTimerRef.current = setTimeout(() => {
-        const ht = headingTocFor(book, para);
+        const ht = headingTocFor(book, para, headingTextsRef.current).toc;
         if (ht !== headingTocRef.current) {
           headingTocRef.current = ht;
           setHeadingToc(ht);
@@ -1531,6 +1598,7 @@ export function ReaderLayerPane({
             <ChapterTree
               book={book}
               currentParagraph={p}
+              titles={headingTexts}
               c={c}
               onSelect={(b, para) => {
                 navigateTo(b, para);
@@ -1646,6 +1714,7 @@ export function ReaderLayerPane({
         visible={drawerVisible}
         book={book}
         currentParagraph={p}
+        titles={headingTexts}
         dark={isDark}
         onClose={() => setDrawerVisible(false)}
         onSelect={(b, para) => {

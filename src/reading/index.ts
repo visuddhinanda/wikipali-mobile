@@ -22,6 +22,7 @@ import {
 export type { HeadingRow, ReadingUnit, ReadingUnitMode } from "./unit";
 export { getCompanionLayers, getChapterLayers } from "./companion";
 export { bookApiChapters, apiChapterAt, type ApiChapter } from "./chapter";
+export { channelHeadingTexts, htmlToText } from "./heading";
 export {
   channelNames,
   findFirstContent,
