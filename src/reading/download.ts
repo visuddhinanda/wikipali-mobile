@@ -1,12 +1,17 @@
 /**
  * 整本书离线下载（见 `docs/reading-content.md` §4.4）。
  *
- * 断点续传不需要状态机：每批写入前先查该批已缓存的段，已有的跳过。
- * 中断在哪都不用记，重启时自然从缺口继续。
+ * 取数与阅读走同一条链路：`tipitaka-read-chapter` 按章节 + 游标一块块取，
+ * 每块写回 `para_html`，块覆盖到但没回来的段记 `html = NULL` + 过期时间。
+ *
+ * 断点续传不需要状态机：每章开始前先查该章已解析（且未过期）的段，游标落在
+ * 第一个缺口上。中断在哪都不用记，重启时自然从缺口继续。
  */
-import { planBookRanges } from "./batch";
-import { cachedParaCount, cachedParas, storeParas } from "./cache";
+import { DOWNLOAD_PAGE_SIZE } from "../api/read-chapter";
+import { bookApiChapters, type ApiChapter } from "./chapter";
+import { cachedParaCount, fetchChapterBlock, resolvedParas } from "./cache";
 import { openReadingDb, tipitakaRunner } from "./db";
+import { t } from "../i18n";
 
 export type DownloadStatus =
   | "pending"
@@ -19,9 +24,12 @@ export interface DownloadProgress {
   channel: string;
   book: number;
   status: DownloadStatus;
-  /** 该书段落总数（含章节标题行）。 */
+  /**
+   * 分母：该版本在本书**有译文**的段落总数（章节接口的 `total_para` 逐章累加）。
+   * 还没开工、拿不到接口数字时退化成本书的段落总数，开工后立刻被真值替换。
+   */
   total: number;
-  /** 已缓存段数。 */
+  /** 分子：已缓存到有正文的段数。 */
   done: number;
   error?: string | null;
   updatedAt: number;
@@ -34,11 +42,20 @@ export function percent(p: Pick<DownloadProgress, "total" | "done">): number {
 }
 
 /**
- * 该书段落总数（只读库，离线可算）——进度的分母。
+ * 探分母用的块大小：1 段。
  *
- * 数的是**全部行**，不是只数 `level = 100` 的正文行：章节标题行同样有正文
- * （接口对标题行也返回 display，如书 93 的 para 5 是个 `<h4>`），下载与缓存
- * 都会把它们存进 para_html。只数正文行会让分子大于分母，进度冲破 100%。
+ * 每章的第一次调用只为拿 `total_para`（该章有多少段有译文），内容顺带存下来，
+ * 所以块开到最小。一本书顶层章节最多 8 个，探完分母就固定了，进度条不会
+ * 边下边变分母。
+ */
+const PROBE_PAGE_SIZE = 1;
+const PROBE_PAGE_UNIT = "para";
+
+/**
+ * 该书段落总数（只读库，离线可算）——**分母的兜底值**。
+ *
+ * 真正的分母是「该版本有译文的段数」，只有联网问过章节接口才知道；一次都没
+ * 下载过的书拿不到，先用本书段落总数顶着，开工后第一轮探测就会换成真值。
  */
 async function totalParas(book: number): Promise<number> {
   const sql = await tipitakaRunner();
@@ -47,22 +64,6 @@ async function totalParas(book: number): Promise<number> {
     [book],
   );
   return rows[0]?.n ?? 0;
-}
-
-/**
- * 该书的段落范围（下载时按 paragraph 从小到大扫）。
- *
- * 全库 217 本的段落号都是连续的（`count(*) == max - min + 1`，已校验），
- * 所以直接按 `lo..hi` 扫不会请求到不存在的段，`done` 也不会超过 `total`。
- */
-async function paraRange(book: number): Promise<[number, number] | null> {
-  const sql = await tipitakaRunner();
-  const rows = await sql.all<{ lo: number; hi: number }>(
-    "SELECT min(paragraph) lo, max(paragraph) hi FROM pali_text WHERE book = ?",
-    [book],
-  );
-  const r = rows[0];
-  return r && r.lo != null ? [r.lo, r.hi] : null;
 }
 
 async function writeState(p: DownloadProgress): Promise<void> {
@@ -155,10 +156,19 @@ export function pauseDownload(channelId: string, book: number): void {
   if (flag) flag.cancelled = true;
 }
 
+/** 章节里第一个还没解析（或占位已过期）的段；整章都齐了返回 null。 */
+function firstGap(chapter: ApiChapter, resolved: Set<number>, after = 0): number | null {
+  const from = Math.max(chapter.start, after);
+  for (let p = from; p <= chapter.end; p++) {
+    if (!resolved.has(p)) return p;
+  }
+  return null;
+}
+
 /**
  * 下载整本书。已在下载中则直接返回当前进度。
  *
- * @param onProgress 每批结束后回调，用于刷新 UI 百分比。
+ * @param onProgress 每块结束后回调，用于刷新 UI 百分比。
  */
 export async function downloadBook(
   channelId: string,
@@ -177,70 +187,85 @@ export async function downloadBook(
   const flag = { cancelled: false };
   running.set(key, flag);
 
-  const total = await totalParas(book);
   let progress: DownloadProgress = {
     channel: channelId,
     book,
     status: "downloading",
-    total,
+    total: await totalParas(book),
     done: await cachedParaCount(channelId, book),
     error: null,
     updatedAt: Date.now(),
   };
-  await writeState(progress);
-  onProgress?.(progress);
+  const publish = async (patch: Partial<DownloadProgress>) => {
+    progress = { ...progress, ...patch, updatedAt: Date.now() };
+    await writeState(progress);
+    onProgress?.(progress);
+  };
+  await publish({});
 
   try {
-    const range = await paraRange(book);
-    if (!range) throw new Error(`book ${book} 无段落数据`);
-    const [lo, hi] = range;
+    const chapters = await bookApiChapters(await tipitakaRunner(), book);
+    if (chapters.length === 0) throw new Error(`book ${book} 无段落数据`);
 
-    // 断点续传：先算出还缺哪些段，只对缺口分批。中断在哪都不用记 ——
-    // 已写入的段自然被跳过（docs/reading-content.md §4.4）。
-    const have = await cachedParas(channelId, book, lo, hi);
-    const missing: number[] = [];
-    for (let p = lo; p <= hi; p++) {
-      if (!have.has(p)) missing.push(p);
-    }
-
-    // 按巴利文字符数分批，不按固定段数（见 batch.ts）
-    const ranges = await planBookRanges(await tipitakaRunner(), book, missing);
-    for (const [from, to] of ranges) {
+    // ── 1. 探分母：每章问一次「有多少段有译文」，累加即本书的可下载段数 ──
+    let total = 0;
+    for (const ch of chapters) {
       if (flag.cancelled) {
-        progress = { ...progress, status: "paused", updatedAt: Date.now() };
-        await writeState(progress);
-        onProgress?.(progress);
+        await publish({ status: "paused" });
         return progress;
       }
+      const probe = await fetchChapterBlock(
+        channelId,
+        book,
+        ch.start,
+        PROBE_PAGE_SIZE,
+        PROBE_PAGE_UNIT,
+      );
+      if (!probe) throw new Error(t("error.network"));
+      total += probe.total;
+    }
+    await publish({ total, done: await cachedParaCount(channelId, book) });
 
-      await storeParas(channelId, book, from, to);
-      progress = {
-        ...progress,
-        done: await cachedParaCount(channelId, book),
-        updatedAt: Date.now(),
-      };
-      await writeState(progress);
-      onProgress?.(progress);
+    // ── 2. 逐章按游标取数，缺口在哪就从哪续 ──
+    const resolved = await resolvedParas(
+      channelId,
+      book,
+      chapters[0].start,
+      chapters[chapters.length - 1].end,
+    );
+
+    for (const ch of chapters) {
+      let cursor = firstGap(ch, resolved);
+      while (cursor != null) {
+        if (flag.cancelled) {
+          await publish({ status: "paused" });
+          return progress;
+        }
+
+        const covered = await fetchChapterBlock(
+          channelId,
+          book,
+          cursor,
+          DOWNLOAD_PAGE_SIZE,
+        );
+        if (!covered) throw new Error(t("error.network"));
+        for (let p = cursor; p <= covered.to; p++) resolved.add(p);
+
+        await publish({ done: await cachedParaCount(channelId, book) });
+        cursor = firstGap(ch, resolved, covered.to + 1);
+      }
     }
 
-    progress = {
-      ...progress,
-      status: "done",
-      done: await cachedParaCount(channelId, book),
-      updatedAt: Date.now(),
-    };
-    await writeState(progress);
-    onProgress?.(progress);
+    // 分子按「渲染出正文的段」数，分母按服务端的「有译文的段」数 —— 个别段
+    // 在服务端有句子、渲染出来却是空的，会差上几段。整本取完就按满算，
+    // 否则进度条永远停在 99%。
+    await publish({ status: "done", done: total });
     return progress;
   } catch (err) {
-    progress = {
-      ...progress,
+    await publish({
       status: "error",
       error: err instanceof Error ? err.message : String(err),
-      updatedAt: Date.now(),
-    };
-    await writeState(progress);
-    onProgress?.(progress);
+    });
     return progress;
   } finally {
     running.delete(key);

@@ -11,7 +11,7 @@ import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { getBookChannels } from "../api";
-import { fetchReadParas } from "../api/read-para";
+import { loadOnePara } from "../reading";
 import type { ChapterChannel } from "../catalog";
 import { useT } from "../i18n/I18nContext";
 import { colors, radius, spacing, type } from "../theme";
@@ -137,15 +137,11 @@ export function CitationSheet({
       }
 
       try {
-        const { items, mock } = await fetchReadParas(
-          target.book,
-          target.paragraph,
-          target.paragraph,
-          channelId,
-        );
+        // 走阅读链路的缓存（`src/reading/cache.ts`）：该版本没有这一段、
+        // 或离线取不到，都回 null —— 离线占位文不能冒充真经显示出去。
+        const body = await loadOnePara(channelId, target.book, target.paragraph);
         if (!alive) return;
-        const body = items[0]?.display ?? "";
-        if (mock || !body) {
+        if (!body) {
           setError(true);
           return;
         }

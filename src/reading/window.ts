@@ -14,10 +14,37 @@
  * 章节只是「当前锚点所属单元」这一概念，由上层在窗口顶部段跨入新单元时更新。
  *
  * 段落不可再分，所以窗口边界取到「累计字符数首次 ≥ 目标值」的那一段；
- * 单个超大段落（全库最长 30138 字符）会自成一段进入窗口，与
- * `src/reading/batch.ts` 的分批语义一致。
+ * 单个超大段落（全库最长 30138 字符）会自成一段进入窗口。
  */
 import type { SqlRunner } from "../catalog/commentary";
+
+/**
+ * 段落字符数按书缓存。`length` 是**巴利原文**的字符数 —— 译文的 HTML 体量
+ * 与它不成正比，但这是本地唯一可得的体量代理，用来划窗口足够了。
+ */
+const lengthCache = new Map<number, Promise<Map<number, number>>>();
+
+/** 一本书的段落字符数（按书缓存）：段落号 → 巴利原文字符数。 */
+export function paragraphLengths(
+  sql: SqlRunner,
+  book: number,
+): Promise<Map<number, number>> {
+  let p = lengthCache.get(book);
+  if (!p) {
+    p = (async () => {
+      const rows = await sql.all<{ paragraph: number; length: number | null }>(
+        "SELECT paragraph, length FROM pali_text WHERE book = ? ORDER BY paragraph",
+        [book],
+      );
+      return new Map(rows.map((r) => [r.paragraph, r.length ?? 0]));
+    })().catch((err) => {
+      lengthCache.delete(book); // 失败不缓存，下次重试
+      throw err;
+    });
+    lengthCache.set(book, p);
+  }
+  return p;
+}
 
 /** 单次向一个方向扩展的目标巴利文字符数（用户指定，如 3000）。 */
 export const WINDOW_STRLEN = 3000;

@@ -21,8 +21,11 @@ import {
 
 export type { HeadingRow, ReadingUnit, ReadingUnitMode } from "./unit";
 export { getCompanionLayers, getChapterLayers } from "./companion";
+export { bookApiChapters, apiChapterAt, type ApiChapter } from "./chapter";
 export {
   channelNames,
+  findFirstContent,
+  loadOnePara,
   loadParasMap,
   localChannelsFor,
   rememberChannelName,
@@ -33,10 +36,11 @@ export {
   bookBounds,
   extendWindow,
   initialWindow,
+  paragraphLengths,
   windowStrlen,
   type ParaWindow,
 } from "./window";
-export { paragraphLengths } from "./batch";
+
 export { tipitakaRunner } from "./db";
 export type { ChapterLayers, LayerChapter } from "./companion";
 export type { CompanionChapter, CompanionLayers } from "./companion";
