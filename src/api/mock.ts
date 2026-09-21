@@ -154,7 +154,7 @@ export function mockGetChapterToc(book: number): Promise<TocItem[]> {
 }
 
 /**
- * 阅读模式段落的离线占位数据（对应 `tipitaka-read-para`）。
+ * 阅读模式段落的离线占位数据（取数链路见 `src/api/read-chapter.ts`）。
  *
  * 逐段返回，形状与真实接口的 `items` 一致；空段由缓存层记为 ''。
  */

@@ -5,6 +5,14 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
+    /**
+     * 错误响应的 JSON 正文（解析失败则为 undefined）。
+     *
+     * 4xx 的正文里有服务端的判定理由，调用方据此区分「参数写错了」与
+     * 「这是一个正常的业务边界」—— 章节接口的 422 `errors.from` 就是后者：
+     * 游标之后没有译文了，是取数的终点而不是 bug（见 `read-chapter.ts`）。
+     */
+    public readonly body?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -35,7 +43,15 @@ export async function request<T>(
     });
 
     if (!res.ok) {
-      throw new ApiError(`HTTP ${res.status}`, res.status);
+      // 错误正文要读出来：v3 的 422/404 把判定理由放在 body 里，
+      // 只回一个状态码的话调用方无法区分业务边界与参数错误。
+      let body: unknown;
+      try {
+        body = JSON.parse(await res.text());
+      } catch {
+        body = undefined;
+      }
+      throw new ApiError(`HTTP ${res.status}`, res.status, body);
     }
 
     text = await res.text();

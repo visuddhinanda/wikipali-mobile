@@ -6,6 +6,7 @@
  */
 import { resolveBaseUrl, toApiV3Base } from "./config";
 import { request } from "./client";
+import { metaInt, unwrapV3Collection } from "./v3";
 import { t } from "../i18n";
 
 interface Envelope<T> {
@@ -106,7 +107,7 @@ export interface ChannelBook {
   updated_at?: string;
 }
 
-/** 一页的条数。服务端不传 limit 时只回 10 条，必须显式翻页。 */
+/** 一页的条数。服务端不给页大小时只回 10 条，必须显式翻页。 */
 const BOOKS_PAGE_SIZE = 200;
 
 /** 翻页的兜底上限，防止服务端 total 不对时空转。 */
@@ -122,24 +123,29 @@ const BOOKS_MAX_PAGES = 50;
 export async function fetchChannelBooks(uid: string): Promise<ChannelBook[]> {
   const base = toApiV3Base(await resolveBaseUrl());
   const rows: ChannelBook[] = [];
+  const seen = new Set<number>();
   let total = Infinity;
 
-  for (let page = 0; page < BOOKS_MAX_PAGES && rows.length < total; page += 1) {
-    const env = await request<Envelope<{ rows: ChannelBook[]; total?: number }>>(
+  for (let page = 1; page <= BOOKS_MAX_PAGES && rows.length < total; page += 1) {
+    // 翻页参数两套一起传：新契约认 `page` / `per_page`，仍在跑的旧版本认
+    // `offset` / `limit`，两者指的是同一页，谁认哪个都对。
+    const offset = (page - 1) * BOOKS_PAGE_SIZE;
+    const raw = await request<unknown>(
       `${base}/progress?view=channel&channels=${encodeURIComponent(uid)}` +
-        `&level=1&order=updated_at&offset=${rows.length}&limit=${BOOKS_PAGE_SIZE}`,
+        `&level=1&order=updated_at&page=${page}&per_page=${BOOKS_PAGE_SIZE}` +
+        `&offset=${offset}&limit=${BOOKS_PAGE_SIZE}`,
     );
-    const data = unwrap(env);
-    const batch = data.rows ?? [];
-    if (batch.length === 0) break;
-    rows.push(...batch);
+    const { items, meta } = unwrapV3Collection<ChannelBook>(raw);
+    // 服务端忽略翻页参数时每页回的是同一批，只靠 total 会空转 50 轮 ——
+    // 这一页一本新书都没有就收工。
+    const fresh = items.filter((r) => !seen.has(r.book));
+    if (fresh.length === 0) break;
+    for (const r of fresh) seen.add(r.book);
+    rows.push(...fresh);
     // total 缺失时退化成「取到不满一页就结束」。
+    const reported = metaInt(meta, "total");
     total =
-      typeof data.total === "number"
-        ? data.total
-        : batch.length < BOOKS_PAGE_SIZE
-          ? rows.length
-          : Infinity;
+      reported ?? (items.length < BOOKS_PAGE_SIZE ? rows.length : Infinity);
   }
 
   return rows;
