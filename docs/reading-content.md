@@ -9,12 +9,13 @@
 用户点书名
   └─ 本地 SQLite（pali_text）算出阅读单元区间 [from, to]      ← §3
       └─ 查缓存库（para_html），列出缺口段落                  ← §4
-          └─ 缺口走 tipitaka-read-para 接口批量拉取           ← §2
-              └─ 写回缓存库（事务），拼成 HTML 灌进 WebView
+          └─ 缺口走 tipitaka-read-chapter 接口按游标取块      ← §2
+              └─ 块里回来的段写 HTML、块覆盖到但没回来的段写 NULL
+                 （带过期时间），拼成 HTML 灌进 WebView
 ```
 
 
-> 本文只管「正文」这一条链路。阅读页把**注释书（义注/复注）对应段落**段级内嵌进正文的设计见 [`docs/reading-annotations.md`](./reading-annotations.md) —— 它复用本文的 `tipitaka-read-para` 接口与 `para_html` 缓存，不另建取数链路。
+> 本文只管「正文」这一条链路。阅读页把**注释书（义注/复注）对应段落**段级内嵌进正文的设计见 [`docs/reading-annotations.md`](./reading-annotations.md) —— 它复用本文的取数接口与 `para_html` 缓存，不另建取数链路。
 
 ## 1. 背景
 
@@ -42,54 +43,133 @@
 | 章节树读 `src/data/tipitaka_heading.json` | `src/catalog/headings.ts` | 改读 SQLite `pali_text`（JSON 只有标题行，缺 `level=100` 正文行，算不出区间字符数） |
 
 
-## 2. 数据接口：`tipitaka-read-para`
+## 2. 数据接口：`tipitaka-read-chapter`
 
-后端实现：`mint/api-v13/app/Http/Controllers/TipitakaReadParaController.php`
+后端实现：`mint/api-v13/app/Http/Controllers/TipitakaReadChapterController.php`
+客户端：`src/api/read-chapter.ts`
 
 ```
-GET /api/v3/tipitaka-read-para
-    ?book=93&para=5&to=10
-    &channel=73c03e1a-f333-11f0-808a-438f0af4b9e9
-    &format=html&view=display
+GET /api/v3/tipitaka-read-chapter
+    ?book=94&para=3&from=3
+    &channel=19f53a65-81db-4b7d-8144-ac33f1217d34
+    &format=html&view=display&pagesize=3000&unit=byte
 ```
+
+### 2.1 为什么成片取数换掉了 `tipitaka-read-para`
+
+段落区间接口的语义是「给一段区间，**期待里面都有内容**」。可多数译本是残缺的
+—— 译到哪算哪，中间大段大段没有。于是：
+
+- 区间落在没译的地方 → 整批回空，客户端只能记下「这一段没有」再往后试；
+- 一本书只有后半部有译文 → 从书首进去，前面每一批都是空的，
+  **用户第一次点开书什么都看不到**。
+
+实测书 94 配「庄春江工作站」频道：章节从段 3 起，第一段译文在 **287**。
+旧链路从段 3 开窗口，前面 284 段一个字都没有。
+
+章节接口把方向反过来：由服务端在章节范围内**只数有译文的段落**、按内容量
+切块，每块都保证有内容；客户端要做的是从块的**覆盖区间**反推「哪些段确认
+没有译文」。
+
+### 2.2 参数
 
 | 参数 | 必填 | 说明 |
 |---|---|---|
 | `book` | ✅ | 书 id |
-| `para` | ✅ | 区间起始段 |
-| `to` | | 区间结束段（含）。缺省 = `para`，即单段 |
-| `channel` | ✅ | 频道 uuid（原文 / 各译本）|
+| `para` | ✅ | **章节起始段号**。取数范围 = `[para, para + chapter_len - 1]` |
+| `from` | | 游标，从这一段开始取；缺省 = `para`。落在没有译文的段上服务端顺延到其后第一段 |
+| `channel` | ✅ | 频道 uuid |
 | `format` | | `html` \| `markdown` \| `react` \| `text`，缺省 `html` |
-| `view` | | `display`（整段合并）\| `sentences`（逐句）\| `all`，缺省 `display` |
+| `view` | | `display`（整段合并）\| `sentences` \| `all`，缺省 `display` |
+| `pagesize` | | 每块大小，本 App 固定 **3000**（服务端上限 5000 字节 / 200 段）|
+| `unit` | | `para` 按段数、`byte` 按段落原文字节数累加；本 App 固定 **`byte`** |
 
-响应（实测，已省略部分内容）：
+**`para` 取哪一层**：本地 `pali_text` 里 `parent = -1` 的**顶层行**
+（`src/reading/chapter.ts`）。全库 217 本校验过，顶层行首尾相接、
+**不重不漏地平铺整本书**，每本 1–8 行，最长的一章 15943 段。
+
+取最粗的一层而不是末层章节：接口每次调用都要在整个章节范围里数一遍
+「该 channel 有多少段有译文」（进度条的分母），章节越碎调用次数越多。
+顶层一本书最多 8 章，游标在章内一路推进，**块数由内容量决定而不是由目录
+结构决定**。
+
+### 2.3 响应
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "items": [
-      { "para": 5, "display": "<div class='translation' data-para='5'><h4><div class='sentence' data-sid='93-5-2-2'><span>游行者品</span></div></h4></div>" },
-      { "para": 6, "display": "<div class='translation' data-para='6'><div class='para-block'><div class='sentence' data-sid='93-6-2-30'><span>如是我闻……</span></div>…</div></div>" }
-    ],
-    "pagination": { "page": 1, "pageSize": 6, "total": 6 }
+  "data": [
+    { "para": 287, "display": "<div id='para-287' class='translation' …>…</div>" },
+    { "para": 288, "display": "…" }
+  ],
+  "meta": {
+    "current_para": 3, "total_para": 427,
+    "page_size": 3000, "page_size_unit": "byte",
+    "book": 94, "chapter": 3,
+    "first_para": 287, "last_para": 295, "remaining_para": 418
   }
 }
 ```
 
-要点：
+meta 各键：
 
-- 外层是项目统一信封 `{ ok, data, message }`，用现有 `unwrap()` 拆。
-- `items` 是**逐段**的数组，每项 `{ para, display }`。这正是缓存按段落存的依据（§4）。
-- **空段落会被服务端跳过**（`if (empty($paragraph['display'])) continue;`），
-  所以 `items.length` 可能小于 `to - para + 1`。缓存层必须能区分
-  「没请求过」和「请求过但服务端无内容」，否则每次进这一章都会重发请求。
-  → 用 `html = ''` 的行记录「已确认为空」，见 §4.2。
-- `display` 内的 `data-para` / `data-sid` 是既有阅读器 CSS 依赖的锚点
-  （`src/screens/ReaderScreen.tsx` 的 `buildReaderHtml`），格式不变，直接拼接即可。
-- 区间过大时服务端是 `foreach range()` 逐段查库，**没有上限保护**。
-  客户端自己按巴利文字符数与段数双重限制分批，见 §4.6。
+| 键 | 含义 |
+|---|---|
+| `current_para` | 请求的游标 `from` 原样回显 |
+| `total_para` | 该 channel 在本章节内**有译文**的段落总数 —— 进度条的分母 |
+| `page_size` / `page_size_unit` | 实际生效的块大小（超上限不报错，按上限算）|
+| `book` / `chapter` | 回显 |
+| `first_para` / `last_para` | 本块实际**覆盖**的段落闭区间 |
+| `remaining_para` | `last_para` 之后本章节内还剩多少段有译文；0 即本章取完 |
 
+> **信封**：新契约是 Laravel 资源集合原样输出（`{data, meta}`），错误走
+> RFC 9457 Problem Details；仍在跑旧版本的实例外面还包一层
+> `{ ok, data: { items, pagination }, message }`。`src/api/v3.ts` 的
+> `unwrapV3Collection` 两种都认，拿不到 `first_para` / `last_para` 就当契约
+> 不符报错 —— **不能静默当成空结果**，那会被缓存层写成「确认无内容」。
+
+### 2.4 覆盖区间：客户端的立足点
+
+`data` 可能比 `[first_para, last_para]` **短**：区间内渲染出来是空的段会被
+剔出 `data`，但仍算在本块之内。续传必须按 `last_para` 推进，否则会卡在那一段
+上原地打转。
+
+客户端据此得到一条硬结论：
+
+> **`[from, last_para]` 里没出现在 `data` 中的段，就是「该版本没有这一段」。**
+
+游标与 `first_para` 之间那一截（例：`from=3`、`first_para=287`）同理 ——
+服务端顺延过去了，说明中间全都没有译文。
+
+`remaining_para = 0` 时再补一刀：本章节后面不会再有译文了，从 `last_para + 1`
+到章节末尾一并记空，省掉下一次进来时那个只会换回 422 的请求。
+
+### 2.5 两种「没有」
+
+| 响应 | 含义 | 客户端动作 |
+|---|---|---|
+| `404` | 整个章节该 channel 一段译文都没有 | 整章记空 |
+| `422` + `errors.from` | 游标在章节区间内，但它之后没有译文了 | 游标到章节末尾记空 |
+
+两者都不是参数错误，是取数的正常终点。`src/api/client.ts` 的 `ApiError` 因此
+带上了错误响应的 `body` —— 只看状态码分不出「参数写错了」和「这是边界」。
+
+### 2.6 精确取一段仍然用 `tipitaka-read-para`
+
+章节接口**不能回答「这一段有没有」**：游标落在没有译文的段上它会顺延到下一段
+有译文的，问 `9102-7` 回的可能是 `9102-350`。
+
+AI 回答里的引文角标要的恰好是「这一段，有就是有、没有就是没有」，所以
+`src/api/read-para.ts` 保留，`loadOnePara`（`src/reading/cache.ts`）用它取单段：
+
+```
+GET /api/v3/tipitaka-read-para?book=9102&para=7&to=7&channel=…
+```
+
+区间接口不顺延，请求了却没回来就是「该版本没有这一段」。写回规则与阅读完全
+一致（有正文写 HTML、没有写 NULL + 过期时间），两条路共用同一份 `para_html`：
+读过的段点角标不再联网，点过角标的段进阅读器也直接命中。
+
+它**只**用于单段取数 —— 成片取正文走章节接口，理由见 §2.1。
 
 ## 3. 阅读单元切分算法
 
@@ -222,7 +302,8 @@ SELECT paragraph, length, level, parent
 区间 **`93 / 3–11`，9 段，4674 字符**：段 3/4/5 是三级标题（自带层级上下文），
 段 6–11 是 `Paribbājakakathā` 正文。
 
-请求：`tipitaka-read-para?book=93&para=3&to=11&channel=…&format=html&view=display`
+这是**阅读单元**的区间（决定一屏渲染哪些段）；取数按 §2 的章节接口走游标，
+两者不必对齐 —— 取回来的块盖过窗口是常事，多出来的段进缓存等着下次滚动。
 
 #### 书 33，起点 `para 2` —— `chapter` + 扩展
 
@@ -294,17 +375,16 @@ Node 端校验脚本继续用 `node:sqlite`。
 ### 4.2 表结构
 
 ```sql
--- 正文缓存：按段落存，粒度与接口返回的 items 一致
+-- 正文缓存：按段落存，粒度与接口返回的条目一致
 CREATE TABLE IF NOT EXISTS para_html (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
   para       INTEGER NOT NULL,
-  html       TEXT    NOT NULL,   -- 接口的 display 字段；'' = 服务端确认无内容
+  html       TEXT,               -- 接口的 display 字段；NULL = 该版本没有这一段
   fetched_at INTEGER NOT NULL,   -- epoch ms
+  expires_at INTEGER,            -- 空段占位的过期时间；非空正文为 NULL（永不过期）
   PRIMARY KEY (channel, book, para)
 );
-CREATE INDEX IF NOT EXISTS idx_para_html_book
-  ON para_html (channel, book, para);
 
 -- 用户显式下载过的书（区别于阅读时被动产生的缓存）
 CREATE TABLE IF NOT EXISTS download_state (
@@ -319,8 +399,15 @@ CREATE TABLE IF NOT EXISTS download_state (
 );
 ```
 
-**为什么 `html = ''` 要单独记一行**：接口会跳过空段落（§2）。若不记录，
-每次进入含空段的区间都会重新请求那几段，永远命中不了缓存。
+**为什么「没有」也要单独记一行**：块的覆盖区间里没回来的段就是「该版本没译
+这一段」（§2.4）。若不记录，每次进入含空段的区间都会重新请求，永远命中不了
+缓存 —— 而残缺的译本里空段是**多数**。
+
+**为什么空段要带过期时间**（`EMPTY_PARA_TTL_MS = 48h`）：「没有」不是永久
+结论，译者随时可能补上。非空正文 `expires_at = NULL` 永不过期；空段占位过期
+后视同缺失，联网重取一次。旧库里没有 `expires_at` 列的行一律当已过期
+（`src/reading/db.ts` 的 `ensureColumn` / `migrateParaHtmlNullable` 负责补列
+与把老的空串迁成 NULL）。
 
 **为什么按段落而不按区间**：阈值可调、用户从目录/上一章/书签等不同入口
 进入同一片正文，产生的区间互相重叠。段落是唯一稳定的复用单位。
@@ -329,41 +416,59 @@ CREATE TABLE IF NOT EXISTS download_state (
 
 ```
 读区间 [from, to]：
-  1. SELECT para, html FROM para_html
+  1. SELECT para, html, expires_at FROM para_html
       WHERE channel=? AND book=? AND para BETWEEN ? AND ? ORDER BY para
+     —— 非空正文直接命中；空段占位只在过期时间内算命中
   2. 与 [from, to] 求差，得到缺口段落
-  3. 把缺口合并成连续子区间，逐个请求接口（单批上限 200 段）
-  4. 一个事务内写回：返回的段写 display，请求了但没返回的段写 ''
+  3. 游标落在第一个缺口上，反复调 §2 的章节接口取块：
+       block → [游标, last_para] 里回来的段写 HTML，其余写 NULL + 过期时间
+       empty → [游标, 章节末尾] 整段写 NULL + 过期时间
+       游标推到 last_para + 1，跳过中间已缓存的段，直到盖过 to
+  4. 每块一个事务（多值 INSERT 批量写：整章记空可达上万段，逐段过桥要好几秒）
   5. 按 para 升序拼接所有非空 html，交给 WebView
 ```
 
-第 4 步「请求了但没返回的段写 `''`」是空段落记录的写入点。
+一块常常盖到 `to` 之外 —— 那些段已经写进缓存了，也一并返回给调用方，
+省下一次滚动扩窗的往返。
+
+**首屏一段正文都没有怎么办**（`findFirstContent`）：残缺译本书首整片是空的，
+窗口停在那里只有一串目录标题。用户正在读的那一层（`ReaderLayerPane` 的
+`seekContent`）会往后找第一段真有正文的段，把窗口挪过去 —— 先扫缓存里
+「从这里起连续解析过」的部分，扫到缺口才联网。义注/复注层不挪：它们的落点
+是按原文层算出来的对应章节，挪走三层对读就错位了。
 
 ### 4.4 整本下载与断点续传
 
-进度不需要单独的状态机，**由数据本身推出来**：
+下载与阅读走同一条链路，只有块大小不同：阅读 3000 字节（跟着窗口走，首屏要
+快），下载 **5000 字节**（服务端的字节上限，块越大往返越少）。实测书 94
+的 1557 段：3000 要 142 块 13.8 秒，5000 只要 91 块 10.8 秒。
 
-```sql
--- 分母：该书段落总数（只读库，离线可算）
-SELECT count(*) FROM pali_text WHERE book = ?;
+**进度条的分子分母**（`src/reading/download.ts`）：
 
--- 分子：已缓存段数
-SELECT count(*) FROM para_html WHERE channel = ? AND book = ?;
-```
+| | 取值 | 为什么 |
+|---|---|---|
+| 分母 `total` | Σ 各章节的 `meta.total_para` | 该版本在本书**有译文**的段数 |
+| 分子 `done` | `SELECT count(html) …`（非空段数）| 已经下到手的正文段数 |
 
-⚠️ 分母数的是**全部行**，不是只数 `level = 100` 的正文行。章节标题行同样有
-正文（接口对标题行也返回 `display`，如书 93 的 `para 5` 是个 `<h4>`），
-下载与缓存都会把它们存进 `para_html`。只数正文行会让分子大于分母，
-进度冲破 100%。
+分母不能用「本书段落总数」：残缺译本里多数段没有译文，下载时它们只是被记成
+空段，一个请求就能扫掉上千段 —— 进度条会瞬间冲到 90% 再原地不动，完全不反映
+实际下了多少内容。同理分子只数非空段。
+
+分母在开工时一次探清：每个顶层章节发一个 `pagesize=1&unit=para` 的小请求，
+拿它的 `total_para` 累加（一本书最多 8 个章节）。**先探完再开下**，进度条的
+分母就不会边下边变。探回来的那一段内容顺手也存下来。
 
 下载循环：
 
-1. 先查该书已缓存的段，算出**还缺哪些段**（这就是断点续传——中断在哪都不用记，
-   重启时自然从缺口继续）；
-2. 只对缺口按 §4.6 的规则分批；
-3. 每批写入是一个事务，进程被杀不会留下半截数据；
-4. 每批结束更新 `download_state.done`，UI 据此显示百分比；
+1. 查该书**已解析且未过期**的段（`resolvedParas`），算出还缺哪些 ——
+   这就是断点续传，中断在哪都不用记，重启时自然从缺口继续；
+2. 逐章把游标落在第一个缺口上，按 §2 取块、写回，游标推到 `last_para + 1`；
+3. 每块写入是一个事务，进程被杀不会留下半截数据；
+4. 每块结束更新 `download_state.done`，UI 据此显示百分比；
 5. 暂停 / 取消 = 停止循环，已写入的数据全部有效，`status` 置 `paused`。
+
+整本取完时把 `done` 按 `total` 写满：服务端数的是「有句子的段」，客户端数的是
+「渲染出正文的段」，个别段两边会差一点，不补的话进度条永远停在 99%。
 
 `download_state` 的作用是记录**用户主动下载过哪本书**，用于：
 
@@ -383,52 +488,27 @@ SELECT count(*) FROM para_html WHERE channel = ? AND book = ?;
 统计所需的 SQL：
 
 ```sql
--- 各频道占用（近似，按 html 长度）
-SELECT channel, count(*) paras, sum(length(html)) bytes
+-- 各频道占用（近似，按 html 长度）；count(html) 只数有正文的段，
+-- 空段占位同样占一行，按 count(*) 算会把「扫过一遍但一段没译」算成有内容
+SELECT channel, count(html) paras, sum(length(html)) bytes
   FROM para_html GROUP BY channel;
 ```
 
 
-### 4.6 请求分批：按字符数，不按段数
+### 4.6 分块交给服务端
 
-段落大小差两个数量级（全库最短几个字符，最长 **30138** 个字符），
-按固定段数分批会让批次体量剧烈摆动。200 段一批时实测：
+旧链路要在客户端按巴利文字符数分批（`FETCH_BATCH_STRLEN` / `FETCH_BATCH_MAX_PARAS`）
+—— 段落大小差两个数量级（最短几个字符，最长 **30138**），按固定段数分批会让
+批次体量在 24 K 到 321 K 字符之间摆动，1 MB 的 HTML 必然撞上
+`src/api/client.ts` 的 12 秒超时。
 
-| | 固定 200 段 | 30000 字符 / 300 段 |
-|---|---|---|
-| 每批字符 中位 | 24.6 K | 30.1 K |
-| 99% | 125 K | 31.6 K |
-| **最大** | **321 K**（书 24 段 201–400） | **54 K** |
-| 每批段数 最大 | 200 | 300 |
-| 全库批次 | 2728 | 3682 |
+章节接口自带这件事：`pagesize` + `unit=byte` 就是「按段落原文字节数累加到
+上限即断块」，且服务端另有每块 200 段的硬上限管住偈颂类的书。客户端只要给
+一个块大小，分批算法（`src/reading/batch.ts` 的 `planRanges`）与它的校验脚本
+`scripts/check-batch.mjs` 一并删除。
 
-321 K 字符的 HTML 接近 1 MB，必然撞上 `src/api/client.ts` 的 12 秒超时。
-
-段落字符数 `pali_text.length` 本地就有，扫一遍即可自适应分批
-（`src/reading/batch.ts` 的 `planRanges`）。**两个约束缺一不可，谁先到算谁**：
-
-- **`FETCH_BATCH_STRLEN = 30000`（字符）** —— 管住段落大的书。
-  书 24：434 段切 19 批，每批 11–38 段不等，字符稳定卡在 3 万。
-- **`FETCH_BATCH_MAX_PARAS = 300`（段）** —— 管住偈颂类的书。
-  光按字符数会攒出 1700 段一批，而服务端是 `foreach range()` **逐段查库**，
-  段数才是它的成本。书 59：每批顶到 300 段就断，字符只有 7–10 K。
-
-新方案的最大值 54037 = 阈值 + 那个 30138 字符的单段 —— 段落不可再分，切不动了。
-
-两点说明：
-
-- `length` 是**巴利原文**的字符数。译文频道的实际 HTML 体量与它不成正比，
-  但这是本地唯一可得的体量代理，用来分批足够了 —— 目的是消掉数量级差异，
-  不是精确预测响应大小。
-- `planRanges` 只合并**连续**的段落。中间有缺口说明那些段已缓存，不必重取。
-
-`planRanges` 是纯函数（只接 `SqlRunner`），校验脚本跑的是同一份实现：
-
-```
-node scripts/check-batch.mjs        # 全库统计 + 覆盖性校验
-node scripts/check-batch.mjs 24     # 某本书的分批明细
-```
-
+段落字符数（`pali_text.length`）仍然要用，但只用于**划阅读窗口**
+（`src/reading/window.ts` 的 `paragraphLengths`），与取数无关。
 
 ## 5. 阅读位置与导航
 
@@ -449,8 +529,10 @@ node scripts/check-batch.mjs 24     # 某本书的分批明细
 | `READING_UNIT_MAX` | 5000 | 阅读单元字符上限（§3.2）|
 | `READING_UNIT_MIN` | 1500 | 阅读单元字符下限，触发向后扩展（§3.2）|
 | `CHAPTER_MAX_LEVEL` | 7 | 章节行 level 上限，复用 `commentary.ts` |
-| `FETCH_BATCH_STRLEN` | 30000 | 单次请求的目标字符数（§4.6）|
-| `FETCH_BATCH_MAX_PARAS` | 300 | 单次请求的最大段数（§4.6）|
+| `CHAPTER_PAGE_SIZE` | 3000 | 阅读时每块的字节数（§2.2）|
+| `DOWNLOAD_PAGE_SIZE` | 5000 | 下载时每块的字节数，服务端上限（§4.4）|
+| `WINDOW_STRLEN` | 3000 | 阅读窗口每次扩展的巴利文字符数 |
+| `EMPTY_PARA_TTL_MS` | 48 小时 | 空段占位的过期时间（§4.2）|
 | `CACHE_QUOTA_BYTES` | 200 MB | 被动缓存配额（§4.5）|
 
 ### 5.3 上一单元 / 下一单元
@@ -470,9 +552,9 @@ node scripts/check-batch.mjs 24     # 某本书的分批明细
 
 ## 6. 实施进度
 
-已完成 1–10（`npx tsc --noEmit` 通过，Metro 打包通过，
-`check-reading-unit.mjs` / `check-batch.mjs` 全库校验通过，
-真机（waydroid + dev build）已验证阅读、翻页、换版本、缓存命中、整本下载与进度）：
+已完成 1–11（`npx tsc --noEmit` 通过，Metro 打包通过，
+`check-reading-unit.mjs` 全库校验通过，
+真机（USB + dev build）已验证阅读、翻页、换版本、缓存命中、整本下载与进度）：
 
 1. ✅ `expo-sqlite` + `expo-asset` 依赖；`metro.config.js` 把 `db3` 加进
    `assetExts`（默认只有 `db`，不加则 `require('…/tipitaka.db3')` 解析不到）。
@@ -480,7 +562,9 @@ node scripts/check-batch.mjs 24     # 某本书的分批明细
 2. ✅ `src/reading/db.ts`：拷贝 assets 里的只读库、打开 `reading.db3`、建表。
 3. ✅ `src/reading/unit.ts`：§3.2 算法（纯函数 + 按书的内存索引）。
 4. ✅ `src/reading/cache.ts`：§4.3 读取流程（查缓存 → 补缺口 → 事务写回）。
-5. ✅ `src/api/read-para.ts`：`tipitaka-read-para` 客户端。
+5. ✅ `src/api/read-chapter.ts`：`tipitaka-read-chapter` 客户端（§2）；
+   `src/api/v3.ts` 统一拆 v3 列表信封。`src/api/read-para.ts` **保留**，
+   见 §2.6：它是唯一能精确取某一段的口子，引文角标要用。
 6. ✅ `src/reading/index.ts` 作为门面；`src/api/index.ts` 与 §1.2 列出的旧代码
    全部删除（`fetchChapterContent` / `fetchChapterByChannel` / `flattenReadHtml` /
    `getChapterContent` / `getChapterByChannel` / `mockGetChapterContent` /
@@ -495,11 +579,16 @@ node scripts/check-batch.mjs 24     # 某本书的分批明细
 9. ✅ 下载 UI 与入口：`DownloadControl`（进度环 + 状态 + 管理操作）与
    `DownloadIconButton`（图标 + 百分比）；入口三处 —— 版本列表每行、
    阅读器顶栏、阅读器设置弹层 / 书架「已下载」。
-10. ✅ 请求分批改为按巴利文字符数（§4.6）。
+10. ✅ 取数改走章节接口（§2）：`src/reading/chapter.ts` 给出取数章节
+    （`parent = -1` 的顶层行），`cache.ts` 按游标补缺口、按覆盖区间记空段
+    （带 48 小时过期时间），`download.ts` 按 `total_para` 算进度。
+    客户端分批（`batch.ts` / `check-batch.mjs`）随之删除（§4.6）。
+11. ✅ 首屏没有正文时挪到第一段真有正文的地方（§4.3 `findFirstContent`），
+    只对用户正在读的那一层生效。
 
 待做：
 
-11. **后续**：`src/catalog/headings.ts` 由读 JSON 改为读 `pali_text`，
+12. **后续**：`src/catalog/headings.ts` 由读 JSON 改为读 `pali_text`，
     删除 `src/data/tipitaka_heading.json`。目录抽屉目前是同步 API，
     改 SQLite 要一并改成异步，与本次改动解耦，单独做。
 
@@ -518,6 +607,7 @@ node scripts/check-reading-unit.mjs 59       # 某本书连续翻页
 
 ### 离线占位数据不入库
 
-无后端时 `fetchReadParas` 回退 `mockReadParas`，但结果带 `mock: true`，
-缓存层据此**不写盘** —— 否则占位文会冒充真经永久留在 `para_html` 里，
-比一次加载失败糟得多。
+网络不可达时 `fetchReadChapter` 回 `status: "offline"`，缓存层据此改用
+`mockReadParas` 的占位文**只供当次显示、不写盘** —— 否则占位文会冒充真经
+永久留在 `para_html` 里，比一次加载失败糟得多。引文角标走的 `loadOnePara`
+（§2.6）连显示都不显示，直接回 null 提示取不到。
