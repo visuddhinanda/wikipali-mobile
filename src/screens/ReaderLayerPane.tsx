@@ -30,6 +30,7 @@ import {
   WINDOW_STRLEN,
   bookBounds,
   extendWindow,
+  findFirstContent,
   getBookHeadingRows,
   getChapterUnitAt,
   getNextUnit,
@@ -133,6 +134,14 @@ function renderParaHtml(
   return "";
 }
 
+/** 窗口里是否有**该版本的正文**（本地补渲染的目录标题不算）。 */
+function hasContent(map: Map<number, string>, win: ParaWindow): boolean {
+  for (let p = win.from; p <= win.to; p++) {
+    if (map.get(p)) return true;
+  }
+  return false;
+}
+
 export interface ReaderLayerPaneProps {
   book: number;
   /** 初始定位段。原文层缺省时按阅读记录/本书首章续读；义注/复注层由对应算法给出，一定有值。 */
@@ -141,6 +150,15 @@ export interface ReaderLayerPaneProps {
   title: string;
   /** 进场前已知的章节标题，用于 unit 解出来之前的过渡显示。 */
   initialToc?: string | null;
+  /**
+   * 首屏一段正文都没有时，是否允许把窗口挪到第一段真有正文的地方。
+   *
+   * 只有**用户正在读的那一层**给 true。译文残缺的版本书首整片是空的，窗口
+   * 停在那里只会看到一串目录标题、正文一个字也没有；挪过去才看得到东西。
+   * 义注/复注层一律不给：它们的落点是按原文层算出来的对应章节，挪走就跟
+   * 原文对不上了，三层对读会错位。
+   */
+  seekContent?: boolean;
   initialChannelId?: string;
   initialChannelName?: string;
   /** 自动选版本时优先匹配的版本名（如「deepseek」）——同名版本存在就用它，而不是无脑取第一个。 */
@@ -747,6 +765,7 @@ export function ReaderLayerPane({
   paragraph,
   title,
   initialToc,
+  seekContent = false,
   initialChannelId,
   initialChannelName,
   preferredChannelUid,
@@ -942,7 +961,7 @@ export function ReaderLayerPane({
           if (!picked) {
             // 列表为空但明确知道上一层用的版本（义注/复注层沿用原文层的版本 uid）：
             // 部分后端/测试库缺「版本列表」接口数据时，仍直接沿用该 uid 取正文，
-            // 而不是报「无版本」。正文接口（tipitaka-read-para）按 channel 直接可用。
+            // 而不是报「无版本」。正文接口（tipitaka-read-chapter）按 channel 直接可用。
             if (preferredChannelUid) {
               setChannelId(preferredChannelUid);
               setChannelName(preferredChannelName ?? undefined);
@@ -1016,15 +1035,32 @@ export function ReaderLayerPane({
       if (!alive || token !== loadTokenRef.current) return;
       if (!bounds) throw new Error(t("common.loadFailed"));
 
-      const win = initialWindow(lengths, bounds, target, WINDOW_STRLEN);
-      const map = await loadParasMap(channelId, book, win.from, win.to);
+      let win = initialWindow(lengths, bounds, target, WINDOW_STRLEN);
+      let map = await loadParasMap(channelId, book, win.from, win.to);
       if (!alive || token !== loadTokenRef.current) return;
+
+      // 译文残缺的版本，书首整片没有正文 —— 窗口停在这里只会看到一串
+      // 目录标题，正文一个字也没有（这正是章节接口要解决的老毛病）。
+      // 没有指定段落时（从书架/书籍页进来的「打开这本书」）把窗口挪到
+      // 第一段真有正文的地方；指定了段落的入口（目录点击、深链接、
+      // 义注复注层的对应章节）不能挪，挪了就跟调用方要的位置对不上了。
+      let anchor = target;
+      if (seekContent && !hasContent(map, win)) {
+        const found = await findFirstContent(channelId, book, win.to + 1, bounds.hi);
+        if (!alive || token !== loadTokenRef.current) return;
+        if (found != null) {
+          anchor = found;
+          win = initialWindow(lengths, bounds, found, WINDOW_STRLEN);
+          map = await loadParasMap(channelId, book, win.from, win.to);
+          if (!alive || token !== loadTokenRef.current) return;
+        }
+      }
 
       boundsRef.current = bounds;
       lengthsRef.current = lengths;
       headingsRef.current = headings;
       winRef.current = win;
-      topParaRef.current = target;
+      topParaRef.current = anchor;
 
       const parts: string[] = [];
       for (let p = win.from; p <= win.to; p++) {

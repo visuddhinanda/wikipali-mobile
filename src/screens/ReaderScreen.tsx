@@ -435,6 +435,9 @@ export function ReaderScreen({ route, navigation }: Props) {
         paragraph={p.paragraph}
         title={p.title}
         initialToc={p.toc}
+        // 只有用户正在读的那一层可以「首屏没内容就挪到有内容处」，
+        // 义注/复注层要跟原文层的章节对齐，不能自己跑掉。
+        seekContent={i === selfIndexRef.current}
         initialChannelId={i === selfIndexRef.current ? channelId : undefined}
         initialChannelName={
           i === selfIndexRef.current ? channelName : undefined
