@@ -382,4 +382,4 @@ src/
   theme/                 colors, typography, reader theme
 ```
 
-Architecture and product decisions live in [`DESIGN.md`](../DESIGN.md).
+Architecture and product decisions live in [`docs/README.md`](./README.md).

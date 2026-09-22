@@ -2,7 +2,7 @@
 
 > 版本：v2.0（2026-09-19，对齐实现：译文内嵌、`{{note}}` 的 `cite`/`citelink` 参数、段后脚注编号与角标↔脚注联动）
 > 范围：阅读器「段落阅读」内嵌注释书内容 —— 根本中内嵌义注、义注中内嵌复注。
-> 前置文档：`DESIGN.md`（§3 阅读器、§4 响应式断点＝唯一真源）；`docs/commentary-layers.md`（注释层次与对应章节查询）；`docs/reading-content.md`（正文获取、阅读单元切分与缓存）。
+> 前置文档：[`README.md`](./README.md)（§4 响应式断点＝唯一真源）、[`reader.md`](./reader.md)（阅读器）；[`commentary-layers.md`](./commentary-layers.md)（注释层次与对应章节查询）；`docs/reading-content.md`（正文获取、阅读单元切分与缓存）。
 > 后端参照：mint/api-v13 的 `TipitakaReadParaController`、`PaliContentService`、`MdRender` / `TemplateRender`、`discussions` 表；锚定规范参照 [W3C Web Annotation Data Model](https://www.w3.org/TR/annotation-model/)。
 
 ## 1. 定位
@@ -163,7 +163,7 @@ App 用 `TipitakaReadChapterController`（`GET /api/v3/tipitaka-read-chapter`，
 - `annotationMode="inline"`：注释以 sidenote 形态显示 —— 窄屏点角标就地展开，宽屏（净宽 ≥ `SIDENOTE_MARGIN_MIN_WIDTH`=840dp）常驻右侧边注栏。
 - `annotationMode="footnote"`：注释以**段后脚注列表**显示，正文只保留数字角标（`.sidenote` 强制隐藏，`display:none !important`）。
 
-宽度阈值沿用 `theme/breakpoints.ts`（`DESIGN.md` §4.1），不按设备类型硬编码：
+宽度阈值沿用 `theme/breakpoints.ts`（[`README.md`](./README.md) §4.1），不按设备类型硬编码：
 
 - 净宽 < `SIDENOTE_MARGIN_MIN_WIDTH`（840dp）→ 角标折叠（行内）；
 - 净宽 ≥ 840 且未开双列 → 右侧边注栏（仅 `annotationMode="inline"` 生效）；
@@ -369,4 +369,4 @@ INSERT INTO discussions (
 7. 平板横屏（双列）：左根本行内模式，点角标右侧义注高亮对应句；右义注也显示为行内模式（内嵌复注）。
 8. 大平板横屏（双列，右栏 ≥ 840）：左栏同 7，右栏为边注模式。
 9. `annotationMode`、`annotationCollapsedLines` 在阅读设置可调并持久化。
-10. 无对应注释的段落不出现任何角标/脚注，正文外观与现状一致；改/删注释记录后刷新能看到变化（缓存失效生效）；缩回窄屏/切换字号/深浅色时布局无状态丢失（`DESIGN.md` §4.9）。
+10. 无对应注释的段落不出现任何角标/脚注，正文外观与现状一致；改/删注释记录后刷新能看到变化（缓存失效生效）；缩回窄屏/切换字号/深浅色时布局无状态丢失（[`README.md`](./README.md) §4.9）。

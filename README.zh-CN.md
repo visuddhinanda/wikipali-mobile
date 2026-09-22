@@ -132,8 +132,9 @@ docs/              开发指南与问题排查
 | [开发指南](docs/development.md) | 环境要求、配置、运行环境、EAS 构建、Waydroid、目录结构（英文） |
 | [注释层次](docs/commentary-layers.md) | 章节注释层次识别与对应章节查询算法 |
 | [问题排查](docs/troubleshooting.md) | Expo Go、Metro/jose、polyfill 顺序、补丁、文件监听上限、网络（英文） |
-| [DESIGN.md](DESIGN.md) | 产品与架构设计文档 |
-| [DESIGN.chat.md](DESIGN.chat.md) | AI 探索 / 问答页设计 |
+| [docs/README.md](docs/README.md) | 产品与架构设计文档（总入口） |
+| [docs/multi-user-sync.md](docs/multi-user-sync.md) | 多用户与数据同步设计 |
+| [docs/chat.md](docs/chat.md) | AI 探索 / 问答页设计 |
 | [STATUS.md](STATUS.md) | 进度记录 |
 
 ## 相关链接

@@ -1,8 +1,8 @@
 # 法音 · Chat 栏目设计文档（App / Web 一致）
 
 > 版本：v1.0（2026-08-24）
-> 范围：从 `DESIGN.md` §1.3「AI Chat」独立提取并细化。App 与 Web 共用同一套信息架构、视觉与文案。
-> 前置文档：`DESIGN.md`（§4 响应式总览＝断点唯一真源、§6 技术栈、§7 接口映射）；`STATUS.md`（P0 现状）。
+> 范围：从 `README.md` §1.3「AI Chat」独立提取并细化。App 与 Web 共用同一套信息架构、视觉与文案。
+> 前置文档：`README.md`（§4 响应式总览＝断点唯一真源、§6 技术栈、§7 接口映射）；`STATUS.md`（P0 现状）。
 
 ---
 
@@ -146,13 +146,13 @@ Chat 栏目是「巴利经文 AI 问答」的核心入口，分为**引流层 + 
 - **Schema**：`{ ref: string, passageId: string, pali: string, zh: string }`。
 - **展示**：AI 回答内/下方内联渲染；每张卡片显示出处 `ref` + 经文片段（pali / zh）。
 - **跳转**：点击 → 阅读器对应段落（`passageId` → `book` + `paragraph` → `Reader` 路由）。
-- **实现**：CopilotKit 无等 `citations` 字段，经 **Generative UI / tool-call 渲染**（`useRenderTool({ name: "retrieve_sutta_passage", render })`）内联渲染，不改 `CopilotChat` 本体（详见 `DESIGN.md` §6.2）。
+- **实现**：CopilotKit 无等 `citations` 字段，经 **Generative UI / tool-call 渲染**（`useRenderTool({ name: "retrieve_sutta_passage", render })`）内联渲染，不改 `CopilotChat` 本体（详见 `README.md` §6.2）。
 
 ---
 
 ## 4. 响应式布局（手机 / 平板竖屏 / 平板横屏=电脑）
 
-断点**以 `DESIGN.md` §4.2 为准**（本节只描述探索页在各档的形态，不另定义阈值）。按窗口宽度分档，不按设备类型；App 用 `useWindowDimensions().width`（dp），Web 为 CSS px：
+断点**以 `README.md` §4.2 为准**（本节只描述探索页在各档的形态，不另定义阈值）。按窗口宽度分档，不按设备类型；App 用 `useWindowDimensions().width`（dp），Web 为 CSS px：
 
 | 档位 | 判定 | 首页 | 问答页 |
 |---|---|---|---|
@@ -161,9 +161,9 @@ Chat 栏目是「巴利经文 AI 问答」的核心入口，分为**引流层 + 
 | **expanded** | `840 – 1199` | 居中限宽（≤800）；输入框升至 Hero 下方常驻；列表**三列卡片** | 左侧栏（280–320）+ 右对话区居中限宽 |
 | **large** | `≥ 1200` | 居中限宽（≤840）；列表**四列卡片** | 左侧栏（280–320）+ 右对话区居中限宽 |
 
-- 与 `DESIGN.md` §4.8 的 AI Chat 列保持一致：compact 全屏对话，medium 及以上「左历史右对话」。
-- 导航容器沿 `DESIGN.md` §4.3：compact 底部 Tab bar；medium / expanded 左侧 rail（80）；large 常驻侧边栏（280）。
-- 断点判定用 `useLayout()`（`DESIGN.md` §4.9），不在本页自行比较宽度。
+- 与 `README.md` §4.8 的 AI Chat 列保持一致：compact 全屏对话，medium 及以上「左历史右对话」。
+- 导航容器沿 `README.md` §4.3：compact 底部 Tab bar；medium / expanded 左侧 rail（80）；large 常驻侧边栏（280）。
+- 断点判定用 `useLayout()`（`README.md` §4.9），不在本页自行比较宽度。
 - Web 额外增强（仅 Web，不影响 App）：鼠标悬停态、右键菜单、`Cmd/Ctrl + K` 聚焦输入框、内容区最大宽度避免超宽拉伸。
 
 ---
@@ -181,7 +181,7 @@ Chat 栏目是「巴利经文 AI 问答」的核心入口，分为**引流层 + 
 
 ## 6. 数据契约与后端对接
 
-沿用 `DESIGN.md` §7 的 mint `ChatController` / `ChatMessageController`，需**新增「公开问题 + 结构化 citations」模型与接口**：
+沿用 `README.md` §7 的 mint `ChatController` / `ChatMessageController`，需**新增「公开问题 + 结构化 citations」模型与接口**：
 
 | 目标接口 | 用途 | 现状 |
 |---|---|---|

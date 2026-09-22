@@ -129,7 +129,7 @@ function TabBarIcon({
  *
  * 下钻页面（分类 → 章节 → 版本 → 阅读器）必须放在 Tab **内部**的 Stack 里，
  * 否则最外层 Stack 会整屏盖住导航容器 —— 宽屏下 rail / 侧边栏会在下钻时消失，
- * 与 `DESIGN.md` §4.3「导航容器常驻」相悖。
+ * 与 `docs/README.md` §4.3「导航容器常驻」相悖。
  */
 // 用函数返回：`styles` 在模块尾部声明，模块顶层直接取值会命中 TDZ。
 const stackScreenOptions = () => ({
@@ -395,7 +395,7 @@ const TAB_STACKS: Record<keyof TabParamList, React.ComponentType> = {
 };
 
 export function RootNavigator() {
-  // 导航容器随窗口宽度切换（DESIGN.md §4.3）：
+  // 导航容器随窗口宽度切换（docs/README.md §4.3）：
   // compact 底部 Tab bar / medium·expanded 左侧 rail(80) / large 常驻侧边栏(280)。
   const { navKind, navWidth, isShort } = useLayout();
   const t = useT();

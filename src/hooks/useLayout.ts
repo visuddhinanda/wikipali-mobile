@@ -1,5 +1,5 @@
 /**
- * 响应式布局唯一入口（`DESIGN.md` §4.9）。
+ * 响应式布局唯一入口（`docs/README.md` §4.9）。
  *
  * 页面只读本 hook，不自行比较像素宽度；断点数值集中在 `theme/breakpoints`。
  * 一律基于 `useWindowDimensions()` —— `Dimensions.get('window')` 的一次性取值

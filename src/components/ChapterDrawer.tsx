@@ -44,7 +44,7 @@ interface Row {
 }
 
 /**
- * 章节树列表 —— 抽屉（compact）与宽屏常驻列表栏（expanded/large，DESIGN.md §4.6）共用。
+ * 章节树列表 —— 抽屉（compact）与宽屏常驻列表栏（expanded/large，docs/README.md §4.6）共用。
  */
 export function ChapterTree({
   book,

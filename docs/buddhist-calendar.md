@@ -476,7 +476,7 @@ export interface LunarDay {
 | **选中框画在内层盒子上** | 直接给格子加 `borderWidth` 会把 1px 的分隔线吃掉，下缘看着像断了 |
 | **日高度图用 View 画，不引 SVG** | 项目没装 `react-native-svg`，为一张图加原生依赖（还要重新出包）不值得。曲线切成 144 段，每段一个 View 用 rotate 转到该段斜率上 —— 轴对齐的矩形在陡处会露台阶，转过就不会 |
 
-**新增原生依赖只有 `expo-location` 一个**，其余全是 JS。按 `DESIGN.md` §0.3，动了 `app.json` 的原生配置就要 `eas build` 重新出包（或用容器里已装好的本地 Android 工具链）。
+**新增原生依赖只有 `expo-location` 一个**，其余全是 JS。按 [`README.md`](./README.md) §0.3，动了 `app.json` 的原生配置就要 `eas build` 重新出包（或用容器里已装好的本地 Android 工具链）。
 
 ---
 

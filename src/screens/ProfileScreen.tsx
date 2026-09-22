@@ -97,7 +97,7 @@ export function ProfileScreen() {
         <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
       </Pressable>
 
-      {/* 仅开发构建可见：实时查看响应式断点判定（DESIGN.md §4.9） */}
+      {/* 仅开发构建可见：实时查看响应式断点判定（docs/README.md §4.9） */}
       {__DEV__ ? (
         <Pressable
           style={styles.row}

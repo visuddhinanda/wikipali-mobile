@@ -30,7 +30,7 @@ const CHANNEL_PREVIEW = 4;
 export function DiscoverScreen() {
   const navigation = useNavigation<Nav>();
   const roots = getTree();
-  // 卡片列数随宽度档变化（DESIGN.md §4.5）。
+  // 卡片列数随宽度档变化（docs/README.md §4.5）。
   const { cardWidth } = useLayout();
   const { t, locale } = useI18n();
   const basketWidth = cardWidth(spacing.md);

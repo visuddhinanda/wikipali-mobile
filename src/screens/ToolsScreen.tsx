@@ -46,7 +46,7 @@ export function ToolsScreen() {
   const t = useT();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  // 卡片列数随宽度档变化（DESIGN.md §4.5）。
+  // 卡片列数随宽度档变化（docs/README.md §4.5）。
   const { cardWidth } = useLayout();
   const width = cardWidth(spacing.md);
 

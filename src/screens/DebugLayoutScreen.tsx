@@ -2,7 +2,7 @@
  * 布局调试页（仅 __DEV__ 可见）——实时显示 `useLayout()` 的判定结果。
  *
  * 用途：拖动窗口 / 旋转 / 改系统字号时，直接看断点落在哪一档，
- * 排除「以为没生效，其实是宽度没跨过线」的误判（DESIGN.md §4.9 验证矩阵）。
+ * 排除「以为没生效，其实是宽度没跨过线」的误判（docs/README.md §4.9 验证矩阵）。
  */
 import React from "react";
 import { Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
