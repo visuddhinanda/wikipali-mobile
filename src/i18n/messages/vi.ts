@@ -43,6 +43,7 @@ const vi: Messages = {
   "channel.filter.all": "Tất cả",
   "channel.emptyFiltered": "Không có sách nào khớp bộ lọc này",
   "bookshelf.downloadedBooks": "Đã tải {n} cuốn",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} mục",
 
   "chapterList.empty": "Chưa có sách trong mục này",
@@ -170,6 +171,11 @@ const vi: Messages = {
   "signIn.serverHint":
     "Bạn có thể đổi máy chủ đăng nhập tại Tôi → Cài đặt → Máy chủ API.",
 
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
   "settings.apiServer": "Máy chủ API",
   "settings.apiServerHint": "Chọn máy chủ cung cấp dữ liệu kinh văn.",
   "settings.envOverride": "Hiện đang bị ghi đè bởi EXPO_PUBLIC_API_URL: {url}",

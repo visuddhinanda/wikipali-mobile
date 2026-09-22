@@ -42,6 +42,7 @@ const si: Messages = {
   "channel.filter.all": "සියල්ල",
   "channel.emptyFiltered": "මෙම පෙරහනට ගැළපෙන පොත් නැත",
   "bookshelf.downloadedBooks": "පොත් {n} බාගෙන ඇත",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · අයිතම {n}",
 
   "chapterList.empty": "මෙම වර්ගයේ පොත් නොමැත",
@@ -169,6 +170,11 @@ const si: Messages = {
   "signIn.serverHint":
     "පිවිසුම් සේවාදායකය මම → සැකසුම් → API සේවාදායකය තුළ මාරු කළ හැක.",
 
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
   "settings.apiServer": "API සේවාදායකය",
   "settings.apiServerHint": "පෙළ දත්ත සපයන සේවාදායකය තෝරන්න.",
   "settings.envOverride":

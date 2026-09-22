@@ -42,6 +42,7 @@ const zhHant: Messages = {
   "channel.filter.all": "全部",
   "channel.emptyFiltered": "沒有符合篩選條件的書",
   "bookshelf.downloadedBooks": "{n} 本已下載",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} 項",
 
   "chapterList.empty": "該目錄暫無書籍",
@@ -165,6 +166,11 @@ const zhHant: Messages = {
   "signIn.expired": "登入狀態已失效",
   "signIn.serverHint": "登入伺服器可在「我 → 設定 → API 伺服器」中切換。",
 
+  "sync.mergeTitle": "同步訪客資料？",
+  "sync.mergeMessage":
+    "是否將未登入期間的閱讀記錄、收藏、書籤和下載記錄同步到目前帳戶？",
+  "sync.mergeConfirm": "同步",
+  "sync.mergeSkip": "暫不",
   "settings.apiServer": "API 伺服器",
   "settings.apiServerHint": "選擇讀取經文資料所用的後端伺服器。",
   "settings.envOverride": "目前由 .env 的 EXPO_PUBLIC_API_URL 覆寫：{url}",

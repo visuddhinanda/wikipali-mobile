@@ -44,6 +44,7 @@ const en: Messages = {
   "channel.filter.all": "All",
   "channel.emptyFiltered": "No books match this filter",
   "bookshelf.downloadedBooks": "{n} books downloaded",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} items",
 
   "chapterList.empty": "No books in this category",
@@ -169,6 +170,13 @@ const en: Messages = {
   "signIn.expired": "Your session has expired",
   "signIn.serverHint":
     "You can switch the sign-in server under Me → Settings → API server.",
+
+  // Multi-user sync
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
 
   "settings.apiServer": "API server",
   "settings.apiServerHint": "Choose the backend that serves the text data.",

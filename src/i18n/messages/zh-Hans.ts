@@ -50,6 +50,7 @@ const zhHans = {
   "channel.filter.all": "全部",
   "channel.emptyFiltered": "没有符合筛选条件的书",
   "bookshelf.downloadedBooks": "{n} 本已下载",
+  "bookshelf.downloadedPending": "{done} 本已下载 · {pending} 本待下载",
   "categoryBrowse.count": " · {n} 项",
 
   // 章节 / 版本
@@ -180,6 +181,13 @@ const zhHans = {
   "signIn.badCredentials": "用户名或密码错误",
   "signIn.expired": "登录状态已失效",
   "signIn.serverHint": "登录服务器可在「我 → 设置 → API 服务器」中切换。",
+
+  // 多用户同步
+  "sync.mergeTitle": "同步游客数据？",
+  "sync.mergeMessage":
+    "是否将未登录期间的阅读记录、收藏、书签和下载记录同步到当前账户？",
+  "sync.mergeConfirm": "同步",
+  "sync.mergeSkip": "暂不",
 
   // 设置
   "settings.apiServer": "API 服务器",

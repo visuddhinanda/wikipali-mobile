@@ -43,6 +43,7 @@ const lo: Messages = {
   "channel.filter.all": "ທັງໝົດ",
   "channel.emptyFiltered": "ບໍ່ມີປຶ້ມທີ່ກົງກັບຕົວກັ່ນຕອງນີ້",
   "bookshelf.downloadedBooks": "ດາວໂຫລດແລ້ວ {n} ຫົວ",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} ລາຍການ",
 
   "chapterList.empty": "ຍັງບໍ່ມີປຶ້ມໃນໝວດນີ້",
@@ -169,6 +170,11 @@ const lo: Messages = {
   "signIn.expired": "ເຊດຊັນໝົດອາຍຸແລ້ວ",
   "signIn.serverHint": "ປ່ຽນເຊີບເວີໄດ້ທີ່ ຂ້ອຍ → ຕັ້ງຄ່າ → ເຊີບເວີ API",
 
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
   "settings.apiServer": "ເຊີບເວີ API",
   "settings.apiServerHint": "ເລືອກເຊີບເວີທີ່ໃຊ້ດຶງຂໍ້ມູນພຣະໄຕປິດົກ.",
   "settings.envOverride": "ປັດຈຸບັນຖືກແທນທີ່ດ້ວຍ EXPO_PUBLIC_API_URL: {url}",

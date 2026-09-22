@@ -42,6 +42,7 @@ const th: Messages = {
   "channel.filter.all": "ทั้งหมด",
   "channel.emptyFiltered": "ไม่มีหนังสือที่ตรงกับตัวกรองนี้",
   "bookshelf.downloadedBooks": "ดาวน์โหลดแล้ว {n} เล่ม",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} รายการ",
 
   "chapterList.empty": "ยังไม่มีหนังสือในหมวดนี้",
@@ -169,6 +170,11 @@ const th: Messages = {
   "signIn.serverHint":
     "เปลี่ยนเซิร์ฟเวอร์ได้ที่ ฉัน → ตั้งค่า → เซิร์ฟเวอร์ API",
 
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
   "settings.apiServer": "เซิร์ฟเวอร์ API",
   "settings.apiServerHint": "เลือกเซิร์ฟเวอร์ที่ใช้ดึงข้อมูลพระไตรปิฎก",
   "settings.envOverride": "ขณะนี้ถูกแทนที่ด้วย EXPO_PUBLIC_API_URL: {url}",

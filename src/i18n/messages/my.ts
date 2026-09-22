@@ -43,6 +43,7 @@ const my: Messages = {
   "channel.filter.all": "အားလုံး",
   "channel.emptyFiltered": "ဤစစ်ထုတ်မှုနှင့် ကိုက်ညီသောစာအုပ်မရှိပါ",
   "bookshelf.downloadedBooks": "စာအုပ် {n} အုပ် ဒေါင်းလုဒ်ပြီး",
+  "bookshelf.downloadedPending": "{done} downloaded · {pending} to re-download",
   "categoryBrowse.count": " · {n} ခု",
 
   "chapterList.empty": "ဤအမျိုးအစားတွင် စာအုပ်မရှိသေးပါ",
@@ -172,6 +173,11 @@ const my: Messages = {
   "signIn.serverHint":
     "ဝင်ရောက်ရာ ဆာဗာကို ကျွန်ုပ် → ဆက်တင် → API ဆာဗာ တွင် ပြောင်းနိုင်ပါသည်။",
 
+  "sync.mergeTitle": "Sync guest data?",
+  "sync.mergeMessage":
+    "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
+  "sync.mergeConfirm": "Sync",
+  "sync.mergeSkip": "Not now",
   "settings.apiServer": "API ဆာဗာ",
   "settings.apiServerHint": "စာပေအချက်အလက် ရယူမည့် ဆာဗာကို ရွေးပါ။",
   "settings.envOverride":
