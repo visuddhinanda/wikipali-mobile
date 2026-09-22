@@ -255,7 +255,14 @@ export function BookshelfScreen() {
             <ChannelRow
               key={c.summary.id}
               channel={c.summary}
-              subtitle={t("bookshelf.downloadedBooks", { n: c.books })}
+              subtitle={
+                c.pendingBooks > 0
+                  ? t("bookshelf.downloadedPending", {
+                      done: c.books,
+                      pending: c.pendingBooks,
+                    })
+                  : t("bookshelf.downloadedBooks", { n: c.books })
+              }
               onPress={() =>
                 navigation.navigate("ChannelDetail", {
                   uid: c.summary.id,
@@ -283,8 +290,10 @@ export function BookshelfScreen() {
 
 interface DownloadedChannel {
   summary: ChannelSummary;
-  /** 该频道下有缓存的书本数。 */
+  /** 该频道下本机有正文缓存（done>0）的书本数。 */
   books: number;
+  /** 该频道下有下载记录、但本机无正文（pending，需重新下载）的书本数。 */
+  pendingBooks: number;
 }
 
 /**
@@ -292,14 +301,25 @@ interface DownloadedChannel {
  *
  * 名字先用本地 `channels` 表（离线也有），再尽量向服务端要工作室头像 ——
  * 拿不到就退回首字占位，不该因为没网就让「已下载」空着。
+ *
+ * 下载记录分两类：`done`（本机有正文，可离线读）与 `pending`（只有同步回来的
+ * 下载记录、正文不在本机，可重新下载），两类都要在「已下载」里可见。
  */
 async function loadDownloadedChannels(): Promise<DownloadedChannel[]> {
-  const rows = (await listDownloads()).filter((d) => d.done > 0);
-  const byChannel = new Map<string, { books: number; updatedAt: number }>();
+  const rows = await listDownloads();
+  const byChannel = new Map<
+    string,
+    { books: number; pendingBooks: number; updatedAt: number }
+  >();
   for (const r of rows) {
-    const hit = byChannel.get(r.channel) ?? { books: 0, updatedAt: 0 };
+    const hit = byChannel.get(r.channel) ?? {
+      books: 0,
+      pendingBooks: 0,
+      updatedAt: 0,
+    };
     byChannel.set(r.channel, {
-      books: hit.books + 1,
+      books: hit.books + (r.done > 0 ? 1 : 0),
+      pendingBooks: hit.pendingBooks + (r.done > 0 ? 0 : 1),
       updatedAt: Math.max(hit.updatedAt, r.updatedAt),
     });
   }
@@ -324,6 +344,7 @@ async function loadDownloadedChannels(): Promise<DownloadedChannel[]> {
           studio: info?.studio,
         },
         books: stat.books,
+        pendingBooks: stat.pendingBooks,
         updatedAt: stat.updatedAt,
       };
     })

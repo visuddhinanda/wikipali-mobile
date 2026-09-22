@@ -280,6 +280,42 @@ export async function firstReadingParagraph(
   );
 }
 
+/**
+ * 覆盖指定段落的 `level = 1` 段（「书」）。
+ *
+ * 收藏 / 下载锚定「书」：从当前所在段**向上搜索到 level=1**（不是取第一个 level=1）——
+ * 一个 book 文件里可能有多个 level=1 作品，当前段落在哪一部就锚定哪一部。
+ */
+export async function level1ParagraphOf(
+  sql: SqlRunner,
+  book: number,
+  para: number,
+): Promise<number | null> {
+  const rows = await sql.all<{ p: number }>(
+    "SELECT paragraph p FROM pali_text WHERE book = ? AND level = 1 AND paragraph <= ? ORDER BY paragraph DESC LIMIT 1",
+    [book, para],
+  );
+  return rows[0]?.p ?? null;
+}
+
+/**
+ * 包含指定段落的章节标题段（`level ≤ 7`）。
+ *
+ * 书签定位到「视口顶部段」（可能是 `level=100` 正文段），而 `progress_chapters`
+ * 只有章节级，所以书签的 target 锚定到「包含它的章节标题段」。
+ */
+export async function chapterParagraphOf(
+  sql: SqlRunner,
+  book: number,
+  para: number,
+): Promise<number | null> {
+  const rows = await sql.all<{ p: number }>(
+    "SELECT MAX(paragraph) p FROM pali_text WHERE book = ? AND level <= 7 AND paragraph <= ?",
+    [book, para],
+  );
+  return rows[0]?.p ?? null;
+}
+
 /** 下一个阅读单元：起点 = 当前区间 `to + 1`。到书末返回 null。 */
 export async function nextReadingUnit(
   sql: SqlRunner,

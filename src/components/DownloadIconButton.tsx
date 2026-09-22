@@ -26,6 +26,8 @@ interface Props {
   color: string;
   doneColor?: string;
   size?: number;
+  /** 下载时所在段（用于同步时向上搜索到 level=1 锚定「书」）。 */
+  paragraph?: number;
   /** 进度变化后的回调（列表据此刷新）。 */
   onChanged?: (p: DownloadProgress) => void;
 }
@@ -36,6 +38,7 @@ export function DownloadIconButton({
   color,
   doneColor = "#52c41a",
   size = 20,
+  paragraph,
   onChanged,
 }: Props) {
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
@@ -75,7 +78,7 @@ export function DownloadIconButton({
     downloadBook(channelId, book, (p) => {
       setProgress(p);
       onChanged?.(p);
-    }).finally(refresh);
+    }, paragraph).finally(refresh);
   };
 
   const icon: keyof typeof Ionicons.glyphMap = done

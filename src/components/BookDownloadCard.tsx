@@ -36,6 +36,8 @@ interface Props {
   meta: string;
   title: string;
   channelId: string;
+  /** 下载时所在段（用于同步时向上搜索到 level=1 锚定「书」）。 */
+  paragraph?: number;
   /** 外部（「全部下载」）正在跑时强制轮询，见 DownloadControl 同名参数。 */
   watch?: boolean;
   /** 只读模式：不显示下载动作，仅书名 + 信息。 */
@@ -50,6 +52,7 @@ export function BookDownloadCard({
   title,
   meta,
   channelId,
+  paragraph,
   watch = false,
   readonly = false,
   onPress,
@@ -96,7 +99,7 @@ export function BookDownloadCard({
   const start = async () => {
     setBusy(true);
     try {
-      await downloadBook(channelId, book, apply);
+      await downloadBook(channelId, book, apply, paragraph);
     } finally {
       setBusy(false);
       void refresh();

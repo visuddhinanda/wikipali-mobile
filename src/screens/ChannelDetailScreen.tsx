@@ -204,7 +204,7 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       if (stopped.current) break;
       setBulk({ done: i, total: merged.length });
       try {
-        await downloadBook(uid, merged[i].book);
+        await downloadBook(uid, merged[i].book, undefined, merged[i].para);
       } catch {
         // 单本失败不该中断整批：书列表里那一行会显示失败状态。
       }
@@ -295,6 +295,7 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
               title={bookTitle(b)}
               meta={meta}
               channelId={uid}
+              paragraph={b.para}
               readonly={readonly}
               watch={bulk !== null}
               onPress={() => openBook(b)}

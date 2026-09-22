@@ -1,18 +1,19 @@
 /**
- * 阅读链路的两个数据库（见 `docs/reading-content.md` §4.1）。
+ * 阅读链路的两个数据库（见 `docs/reading-content.md` §4.1、`docs/multi-user-sync.md` §2）。
  *
  * | 文件           | 用途                 | 读写 | 来源 |
  * |----------------|----------------------|------|------|
- * | `tipitaka.db3` | 章节树 / `pali_text` | 只读 | 打包在 assets，随版本整体替换 |
- * | `reading.db3`  | 正文缓存 + 下载状态  | 读写 | 首次启动建表 |
+ * | `tipitaka.db3` | 章节树 / `pali_text` | 只读 | 打包在 assets，随版本整体替换，**所有用户共享** |
+ * | `reading.db3`  | 正文缓存 + 下载 + 历史/收藏/书签 + 同步队列 | 读写 | **每个用户一份**，在 `users/<uuid>/` 子目录 |
  *
- * 分开的理由：`tipitaka.db3` 是随 App 版本替换的只读资产，一旦混入用户数据，
- * 每次更新都要做数据迁移；分开后更新只是覆盖文件，用户缓存不受影响。
+ * 多用户：`reading.db3` 按当前用户作用域（`src/user/userScope.ts`）落到
+ * `SQLite/users/<guest-uuid 或 user-uuid>/reading.db3`。切用户 = 切库文件。
  */
 import { Asset } from "expo-asset";
 import { Directory, File, Paths } from "expo-file-system";
 import * as SQLite from "expo-sqlite";
 import type { SqlRunner } from "../catalog/commentary";
+import { onScopeChange, resolveScope } from "../user/userScope";
 
 /** expo-sqlite 打开数据库时使用的目录（`Paths.document/SQLite`）。 */
 const DB_DIR = "SQLite";
@@ -30,6 +31,22 @@ export function toRunner(db: SQLite.SQLiteDatabase): SqlRunner {
 
 let tipitakaPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let readingPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+/** 当前 `readingPromise` 对应的用户目录 id，用于切换时判断要不要重开。 */
+let readingScopeId: string | null = null;
+
+// 切用户：关掉旧连接、清空缓存 promise，下次 open 时指向新库。
+onScopeChange(() => {
+  const old = readingPromise;
+  readingPromise = null;
+  readingScopeId = null;
+  if (old) {
+    old
+      .then((db) => db.closeAsync())
+      .catch(() => {
+        /* 关闭失败忽略，连接句柄由下次 GC 释放 */
+      });
+  }
+});
 
 /**
  * 把打包的 `assets/db/tipitaka.db3`（46 MB）拷到 expo-sqlite 的目录。
@@ -52,17 +69,10 @@ async function ensureTipitakaFile(force = false): Promise<void> {
   }
   const source = new File(asset.localUri);
   // expo-file-system 57 的 `copy()` 是**异步**的（另有 `copySync()`）。
-  // 早先这里没 await，46 MB 还在拷，下面就去读大小 —— 快的机器侥幸拷完了，
-  // 慢的机器读到的是「文件还不存在」，于是报「拷贝不完整：nul/45989888」。
   await source.copy(target);
 
-  // release 构建里资源来自 APK 的 res/raw，拷贝失败时只会留下 0 字节文件，
-  // SQLite 把它当成空库打开，报的是「no such table」而不是拷贝错误 ——
-  // 这里当场比一次大小，把真正的原因暴露出来。
-  // 大小要用新的 File 现查：`target` 手里的可能是拷贝之前的元数据快照。
   const copiedSize = () => new File(dir, TIPITAKA_DB).size ?? 0;
   if (copiedSize() !== source.size) {
-    // 再同步拷一次兜底（异步那次可能被某些机型的存储实现吞掉）。
     const retry = new File(dir, TIPITAKA_DB);
     if (retry.exists) retry.delete();
     source.copySync(retry);
@@ -90,7 +100,6 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
       await ensureTipitakaFile();
       let db = await SQLite.openDatabaseAsync(TIPITAKA_DB);
       if (!(await hasPaliText(db))) {
-        // 文件在但表不在 = 上次拷贝留下了半截/空文件，重拷一次自愈。
         await db.closeAsync();
         await ensureTipitakaFile(true);
         db = await SQLite.openDatabaseAsync(TIPITAKA_DB);
@@ -100,7 +109,7 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
       }
       return db;
     })().catch((err) => {
-      tipitakaPromise = null; // 失败不缓存，下次重试
+      tipitakaPromise = null;
       throw err;
     });
   }
@@ -108,8 +117,8 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
 }
 
 /**
- * 幂等补列：老版本设备上的 `para_html` 已存在，`CREATE TABLE IF NOT EXISTS`
- * 不会给它补新列。用 `PRAGMA table_info` 探测后按需 `ALTER TABLE`。
+ * 幂等补列：老版本设备上的表已存在，`CREATE TABLE IF NOT EXISTS` 不会给它补新列。
+ * 用 `PRAGMA table_info` 探测后按需 `ALTER TABLE`。
  */
 async function ensureColumn(
   db: SQLite.SQLiteDatabase,
@@ -127,18 +136,14 @@ async function ensureColumn(
 
 /**
  * 把 `para_html.html` 从「空段写 ''」迁移到「空段写 NULL」。
- *
- * 老库的 html 列是 NOT NULL，且空段写的是空串；SQLite 无法直接改列的可空性，
- * 所以重建表：改成可空，并把空串转成 NULL（其余数据原样保留）。
  */
 async function migrateParaHtmlNullable(db: SQLite.SQLiteDatabase): Promise<void> {
   const cols = await db.getAllAsync<{ name: string; notnull: number }>(
     "PRAGMA table_info(para_html)",
   );
   const htmlCol = cols.find((c) => c.name === "html");
-  if (!htmlCol || htmlCol.notnull === 0) return; // 已可空（新库）
+  if (!htmlCol || htmlCol.notnull === 0) return;
 
-  // 事务里做 DDL 重建：失败可整体回滚，避免表被改到一半（RENAME 后 CREATE 失败等）。
   await db.withTransactionAsync(async () => {
     await db.execAsync(`
       ALTER TABLE para_html RENAME TO para_html_old;
@@ -159,14 +164,53 @@ async function migrateParaHtmlNullable(db: SQLite.SQLiteDatabase): Promise<void>
   });
 }
 
-/** 可写的阅读缓存库（`para_html` / `download_state`）。 */
+/** 当前用户 `reading.db3` 所在目录的 URI（不存在则创建）。 */
+async function readingDirUri(scopeId: string): Promise<string> {
+  const dir = new Directory(Paths.document, DB_DIR, "users", scopeId);
+  if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+  return dir.uri;
+}
+
+/**
+ * 首次升级：旧版本把用户数据放在共享的 `SQLite/reading.db3`，现在搬到
+ * `<guest-uuid>/reading.db3`。只做一次（目标已存在则跳过）。
+ */
+async function migrateLegacyReadingDb(scopeId: string): Promise<void> {
+  const legacy = new File(Paths.document, DB_DIR, READING_DB);
+  if (!legacy.exists) return;
+  const target = new File(Paths.document, DB_DIR, "users", scopeId, READING_DB);
+  if (target.exists) return;
+  try {
+    await legacy.move(target);
+  } catch {
+    // 搬不动就放弃迁移：新用户从空库开始，legacy 文件不再被读取。
+  }
+}
+
+/**
+ * 打开指定用户（目录 id）的读写库并初始化 schema。
+ * 供「当前用户」与「guest 数据合并」两类场景复用。
+ */
+export async function openReadingDbFor(
+  scopeId: string,
+): Promise<SQLite.SQLiteDatabase> {
+  const dirUri = await readingDirUri(scopeId); // 先建目录，migrate 才能把 legacy 文件搬进来
+  await migrateLegacyReadingDb(scopeId);
+  const db = await SQLite.openDatabaseAsync(READING_DB, undefined, dirUri);
+  await db.execAsync(SCHEMA);
+  await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
+  await ensureColumn(db, "download_state", "server_id", "server_id TEXT");
+  await migrateParaHtmlNullable(db);
+  return db;
+}
+
+/** 可写的当前用户读写库（`para_html` / `download_state` / 历史 / 收藏 / 书签 / 同步队列）。 */
 export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
   if (!readingPromise) {
     readingPromise = (async () => {
-      const db = await SQLite.openDatabaseAsync(READING_DB);
-      await db.execAsync(SCHEMA);
-      await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
-      await migrateParaHtmlNullable(db);
+      const scope = await resolveScope();
+      const db = await openReadingDbFor(scope.id);
+      readingScopeId = scope.id;
       return db;
     })().catch((err) => {
       readingPromise = null;
@@ -178,11 +222,6 @@ export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
 
 /**
  * 串行化 `reading.db3` 上的写事务。
- *
- * `withTransactionAsync` 只是裸的 `BEGIN`/`COMMIT`，同一个连接上并发调用会
- * 嵌套 —— 三层对读同时预取时第二个 `BEGIN` 失败，catch 里的 `ROLLBACK` 又
- * 撞上「cannot rollback - no transaction is active」。这里排成队列，一次只
- * 跑一个事务。
  */
 let writeQueue: Promise<unknown> = Promise.resolve();
 
@@ -197,7 +236,7 @@ export function withReadingTransaction<T>(
     });
     return result;
   });
-  writeQueue = run.catch(() => undefined); // 一次失败不该卡死后面的写入
+  writeQueue = run.catch(() => undefined);
   return run;
 }
 
@@ -208,10 +247,6 @@ export async function tipitakaRunner(): Promise<SqlRunner> {
 
 /**
  * App 更新后若打包的数据库比设备上的新，则覆盖。
- *
- * 判据是 `meta.generated_at`（导出时写入，见
- * `mint/api-v13` 的 `export:mobile.heading`）。用户数据在另一个库里，
- * 覆盖不影响缓存与下载。
  */
 export async function refreshTipitakaDbIfStale(
   bundledGeneratedAt: string,
@@ -237,31 +272,24 @@ const SCHEMA = `
 PRAGMA journal_mode = WAL;
 
 -- 正文缓存：按段落存，粒度与接口返回的 items 一致。
--- html IS NULL 表示「服务端本次请求没返回该段」，与「没请求过」区分 —— 服务端会
--- 跳过空段落（docs/reading-content.md §2），不记下来的话含空段的章节每次进入
--- 都会重新请求。但「空」不一定是永久的：该版本后续可能补上，所以给空段记录一个
--- 过期时间 expires_at（48 小时），过期后若联网则重新请求；非空正文 expires_at
--- 为 NULL，永不过期。
 CREATE TABLE IF NOT EXISTS para_html (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
   para       INTEGER NOT NULL,
-  html       TEXT,               -- 服务端没返回的段写 NULL；非空正文存 HTML
+  html       TEXT,
   fetched_at INTEGER NOT NULL,
-  expires_at INTEGER,            -- 空段占位的过期时间(epoch ms)；非空正文为 NULL
+  expires_at INTEGER,
   PRIMARY KEY (channel, book, para)
 );
 
--- 版本表：uid → 显示名。para_html / download_state 里存的 channel 就是这个
--- uid，**认版本一律认 uid**（显示名可能在服务端被改，按名字匹配会认错人）。
--- 名字只用于显示，见过一次就记下来，离线时也能挑版本、显示名字；名字更新
--- 可能滞后，但数据是对的。
+-- 版本表：uid → 显示名。
 CREATE TABLE IF NOT EXISTS channels (
   uid  TEXT PRIMARY KEY,
   name TEXT NOT NULL
 );
 
 -- 用户显式下载过的书，区别于阅读时被动产生的缓存（清理时不误删）。
+-- server_id：同步后回填的服务器 like.id（type=download）。
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
@@ -270,6 +298,58 @@ CREATE TABLE IF NOT EXISTS download_state (
   done       INTEGER NOT NULL,
   error      TEXT,
   updated_at INTEGER NOT NULL,
+  server_id  TEXT,
   PRIMARY KEY (channel, book)
+);
+
+-- ── 用户行为数据（多用户同步，见 docs/multi-user-sync.md §5）──
+
+-- 阅读记录（对应服务器 recents）。同一本书只留最后一条。
+CREATE TABLE IF NOT EXISTS reading_history (
+  book       INTEGER NOT NULL,
+  paragraph  INTEGER NOT NULL,
+  title      TEXT    NOT NULL,
+  heading    TEXT,
+  channel_id TEXT,
+  updated_at INTEGER NOT NULL,
+  server_id  TEXT,
+  PRIMARY KEY (book)
+);
+
+-- 书签（对应服务器 likes，type=bookmark）。同一（书, 段）只留一条。
+CREATE TABLE IF NOT EXISTS bookmarks (
+  book       INTEGER NOT NULL,
+  paragraph  INTEGER NOT NULL,
+  title      TEXT    NOT NULL,
+  heading    TEXT,
+  channel_id TEXT,
+  updated_at INTEGER NOT NULL,
+  server_id  TEXT,
+  PRIMARY KEY (book, paragraph)
+);
+
+-- 收藏（对应服务器 likes，type=favorite）。同一本书只收藏一次。
+CREATE TABLE IF NOT EXISTS starred (
+  book       INTEGER NOT NULL,
+  paragraph  INTEGER,
+  title      TEXT    NOT NULL,
+  channel_id TEXT,
+  updated_at INTEGER NOT NULL,
+  server_id  TEXT,
+  PRIMARY KEY (book)
+);
+
+-- 待同步操作队列：一条本地记录一行，local_key 唯一。
+-- op=upsert 表示该记录存在且待推送；op=delete 表示该记录已删、待服务器删除。
+CREATE TABLE IF NOT EXISTS sync_outbox (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_key  TEXT NOT NULL UNIQUE,
+  kind       TEXT NOT NULL,
+  op         TEXT NOT NULL,
+  payload    TEXT NOT NULL,
+  server_id  TEXT,
+  created_at INTEGER NOT NULL,
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT
 );
 `;

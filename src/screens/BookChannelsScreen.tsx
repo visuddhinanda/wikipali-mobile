@@ -277,6 +277,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
                   book={book}
                   channelId={item.channel_id}
                   color={colors.inkSoft}
+                  paragraph={item.para}
                 />
               </View>
               <Ionicons

@@ -11,6 +11,8 @@ import { DOWNLOAD_PAGE_SIZE } from "../api/read-chapter";
 import { bookApiChapters, type ApiChapter } from "./chapter";
 import { cachedParaCount, fetchChapterBlock, resolvedParas } from "./cache";
 import { openReadingDb, tipitakaRunner } from "./db";
+import { firstReadingParagraph, level1ParagraphOf } from "./unit";
+import { localKey, outboxUpsert } from "../data/queue";
 import { t } from "../i18n";
 
 export type DownloadStatus =
@@ -66,13 +68,52 @@ async function totalParas(book: number): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
-async function writeState(p: DownloadProgress): Promise<void> {
+async function writeState(
+  p: DownloadProgress,
+  anchorParagraph?: number,
+): Promise<void> {
   const db = await openReadingDb();
+  // 用 upsert 保留 server_id（同步回填的服务器 like.id），下载进度更新不覆盖它。
   await db.runAsync(
-    `INSERT OR REPLACE INTO download_state
-       (channel, book, status, total, done, error, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO download_state (channel, book, status, total, done, error, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(channel, book) DO UPDATE SET
+       status = excluded.status,
+       total = excluded.total,
+       done = excluded.done,
+       error = excluded.error,
+       updated_at = excluded.updated_at`,
     [p.channel, p.book, p.status, p.total, p.done, p.error ?? null, p.updatedAt],
+  );
+  // 下载完成 = 一条「下载记录」，入队同步到服务器 likes（type=download）。
+  if (p.status === "done") {
+    await enqueueDownloadSync(db, p.channel, p.book, anchorParagraph);
+  }
+}
+
+/** 下载完成时入队一条下载记录同步（幂等，local_key 唯一）。 */
+async function enqueueDownloadSync(
+  db: import("expo-sqlite").SQLiteDatabase,
+  channel: string,
+  book: number,
+  anchorParagraph?: number,
+): Promise<void> {
+  const prev = await db.getFirstAsync<{ server_id: string | null }>(
+    "SELECT server_id FROM download_state WHERE channel = ? AND book = ?",
+    [channel, book],
+  );
+  // 下载是书级操作：锚定 level=1 段（progress_chapters 里 para 指向 level=1 的行就是「书」）。
+  // 从「下载时所在段」向上搜索到 level=1；没传则退回第一个 level=1。
+  const sql = await tipitakaRunner();
+  const raw = anchorParagraph ?? (await firstReadingParagraph(sql, book));
+  const paragraph =
+    raw != null ? await level1ParagraphOf(sql, book, raw) : null;
+  await outboxUpsert(
+    db,
+    localKey("download", book, undefined, channel),
+    "download",
+    { channel, book, paragraph, updatedAt: Date.now() },
+    prev?.server_id ?? null,
   );
 }
 
@@ -174,6 +215,7 @@ export async function downloadBook(
   channelId: string,
   book: number,
   onProgress?: (p: DownloadProgress) => void,
+  anchorParagraph?: number,
 ): Promise<DownloadProgress> {
   const key = runKey(channelId, book);
   if (running.has(key)) {
@@ -198,7 +240,7 @@ export async function downloadBook(
   };
   const publish = async (patch: Partial<DownloadProgress>) => {
     progress = { ...progress, ...patch, updatedAt: Date.now() };
-    await writeState(progress);
+    await writeState(progress, anchorParagraph);
     onProgress?.(progress);
   };
   await publish({});

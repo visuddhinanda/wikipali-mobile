@@ -141,7 +141,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   // 双列对照：阅读区净宽（onLayout 实测）达到 canDualColumn 的阈值就并排
-  // 显示两层，否则退回单层 + 滑动（DESIGN.md §4.7）。
+  // 显示两层，否则退回单层 + 滑动（docs/README.md §4.7）。
   const layout = useLayout();
   const [bodyWidth, setBodyWidth] = useState(0);
   const dual = layout.canDualColumn(bodyWidth);
@@ -533,6 +533,7 @@ export function ReaderScreen({ route, navigation }: Props) {
             channelId={activeChannel.uid}
             color={c.ink}
             size={22}
+            paragraph={paragraph}
           />
         ) : (
           <Ionicons name="cloud-download-outline" size={22} color={c.inkFaint} />
