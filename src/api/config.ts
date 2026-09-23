@@ -16,11 +16,19 @@ export async function resolveBaseUrl(): Promise<string> {
 }
 
 /**
- * 把 v2 基础地址（如 `https://next.wikipali.org/api/v2`）切换为 v3。
- * `api/v3/search` 系列接口（章节正文检索）使用 v3 前缀。
+ * 把 v2/v3 基础地址收敛到 `/api` 根，与 dashboard-v6 的 `openapi-fetch`
+ * 客户端对齐（其 `baseUrl: "/api"`）。`schema.d.ts` 里的路径（`/v2/...`、
+ * `/v3/...`）都以 `/api` 为前缀拼成完整 URL。
+ *
+ * 要求入参是 `.../api/vN` 形态（线上域名与 `.env` 覆盖都如此）。
  */
-export function toApiV3Base(baseUrl: string): string {
-  return baseUrl.replace(/\/api\/v\d+\/?$/, "/api/v3");
+export function toApiRoot(baseUrl: string): string {
+  return baseUrl.replace(/\/api\/v\d+\/?$/, "/api");
+}
+
+/** 解析到 `/api` 根（供类型化客户端 `openapi-client.ts` 使用）。 */
+export async function resolveApiRoot(): Promise<string> {
+  return toApiRoot(await resolveBaseUrl());
 }
 
 export const ENV_API_URL = envUrl;

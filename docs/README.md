@@ -22,6 +22,7 @@
 | [`commentary-layers.md`](./commentary-layers.md) | 注释层次与对应章节查询 |
 | [`chat.md`](./chat.md) | 探索（AI 问答）栏目设计（App / Web 一致） |
 | [`multi-user-sync.md`](./multi-user-sync.md) | **多用户支持与数据同步**（登录/游客隔离 + 阅读/下载/收藏/书签同步，含 API 缺口清单） |
+| [`api-schema.md`](./api-schema.md) | **API 契约与 OpenAPI 注解完善清单**（schema 工作流 + 类型化客户端 + 服务端需补齐项） |
 | [`user-data-db.md`](./user-data-db.md) | **用户数据数据库设计**（SQLite 表结构 / 字段语义 / 同步字段 / 迁移） |
 | [`pali-script.md`](./pali-script.md) | 巴利文字体（script）转换 |
 | [`buddhist-calendar.md`](./buddhist-calendar.md) | 佛教日历（五套历法 + 天文计算 + 飞行计算） |
