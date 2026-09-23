@@ -25,11 +25,15 @@ export type RootStackParamList = {
   ChapterList: {
     tagPath: string[];
     title: string;
+    /** 从根到当前节点的显示名（含当前节点），用于面包屑。 */
+    breadcrumb: string[];
   };
   BookChannels: {
     book: number;
     paragraph: number;
     title: string;
+    /** 从根到当前节点的显示名（含当前节点），用于面包屑。 */
+    breadcrumb: string[];
   };
   Reader: {
     book: number;

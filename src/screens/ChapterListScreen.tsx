@@ -3,8 +3,10 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
+import { Breadcrumb } from "../components/Breadcrumb";
 import { getBooksByTags, bookKind, type BookKind } from "../catalog";
-import { useT } from "../i18n/I18nContext";
+import { useI18n } from "../i18n/I18nContext";
+import { bookSeriesText, bookTitleText } from "../i18n/bookTitles";
 import type { MessageKey } from "../i18n";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
@@ -25,8 +27,8 @@ const KIND_LABEL: Record<BookKind, MessageKey> = {
 };
 
 export function ChapterListScreen({ route, navigation }: Props) {
-  const { tagPath, title } = route.params;
-  const t = useT();
+  const { tagPath, breadcrumb } = route.params;
+  const { t, locale } = useI18n();
   const books = getBooksByTags(tagPath).sort(
     (a, b) =>
       KIND_RANK[bookKind(a.tags)] - KIND_RANK[bookKind(b.tags)],
@@ -34,11 +36,10 @@ export function ChapterListScreen({ route, navigation }: Props) {
 
   return (
     <Screen scroll={false} contentStyle={styles.contentFill}>
-      <View style={styles.subheader}>
-        <Text style={styles.subheaderText}>
-          {t("chapterList.count", { title, n: books.length })}
-        </Text>
-      </View>
+      <Breadcrumb
+        items={breadcrumb}
+        trailing={t("chapterList.count", { n: books.length })}
+      />
 
       {books.length === 0 ? (
         <View style={styles.center}>
@@ -54,20 +55,29 @@ export function ChapterListScreen({ route, navigation }: Props) {
           renderItem={({ item }) => (
             <Pressable
               style={styles.row}
-              onPress={() =>
+              onPress={() => {
+                const bookTitle =
+                  bookSeriesText(locale, item.title) ?? item.title;
                 navigation.navigate("BookChannels", {
                   book: item.book,
                   paragraph: item.paragraph,
-                  title: item.title,
-                })
-              }
+                  title: bookTitle,
+                  breadcrumb: [...breadcrumb, bookTitle],
+                });
+              }}
             >
               <View style={styles.kind}>
                 <Text style={styles.kindText}>{t(KIND_LABEL[bookKind(item.tags)])}</Text>
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>{item.title}</Text>
-                {item.toc ? <Text style={styles.rowToc}>{item.toc}</Text> : null}
+                <Text style={styles.rowTitle}>
+                  {bookSeriesText(locale, item.title) ?? item.title}
+                </Text>
+                {item.toc ? (
+                  <Text style={styles.rowToc}>
+                    {bookTitleText(locale, item.book, item.paragraph) ?? item.toc}
+                  </Text>
+                ) : null}
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.vermilion} />
             </Pressable>
@@ -86,16 +96,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   centerText: {
-    ...type.caption,
-    color: colors.inkSoft,
-  },
-  subheader: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
-  },
-  subheaderText: {
     ...type.caption,
     color: colors.inkSoft,
   },

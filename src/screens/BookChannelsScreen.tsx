@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
+import { Breadcrumb } from "../components/Breadcrumb";
 import { ProgressRing } from "../components/ProgressRing";
 import { DownloadIconButton } from "../components/DownloadIconButton";
 import { getBookChannels } from "../api";
@@ -95,7 +96,7 @@ interface ChannelSection {
 }
 
 export function BookChannelsScreen({ route, navigation }: Props) {
-  const { book, paragraph, title } = route.params;
+  const { book, paragraph, title, breadcrumb } = route.params;
   // 上次读到哪一段：从版本列表进阅读器时接着上次读，而不是每次都从头开始。
   // 只在这里查一次（进列表时），点版本时直接用。
   const [lastParagraph, setLastParagraph] = useState<number | null>(null);
@@ -190,11 +191,10 @@ export function BookChannelsScreen({ route, navigation }: Props) {
 
   return (
     <Screen scroll={false} contentStyle={styles.contentFill}>
-      <View style={styles.subheader}>
-        <Text style={styles.subheaderText}>
-          {t("channels.count", { title, n: channels.length })}
-        </Text>
-      </View>
+      <Breadcrumb
+        items={breadcrumb}
+        trailing={t("channels.count", { n: channels.length })}
+      />
       {channels.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="library-outline" size={40} color={colors.inkFaint} />
@@ -301,16 +301,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   centerText: {
-    ...type.caption,
-    color: colors.inkSoft,
-  },
-  subheader: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
-  },
-  subheaderText: {
     ...type.caption,
     color: colors.inkSoft,
   },

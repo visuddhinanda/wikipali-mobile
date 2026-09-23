@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
+import { Breadcrumb } from "../components/Breadcrumb";
 import { isLeaf } from "../catalog";
 import { label } from "../catalog/labels";
 import { useI18n } from "../i18n/I18nContext";
@@ -17,15 +18,17 @@ export function CategoryBrowseScreen({ route, navigation }: Props) {
   const { t, locale } = useI18n();
 
   const openChild = (child: (typeof children)[number]) => {
+    const name = label(child.name, locale);
     if (isLeaf(child)) {
       navigation.navigate("ChapterList", {
         tagPath: child.tag,
-        title: label(child.name, locale),
+        title: name,
+        breadcrumb: [...breadcrumb, name],
       });
     } else {
       navigation.push("CategoryBrowse", {
         node: child,
-        breadcrumb: [...breadcrumb, label(child.name, locale)],
+        breadcrumb: [...breadcrumb, name],
       });
     }
   };
@@ -33,17 +36,10 @@ export function CategoryBrowseScreen({ route, navigation }: Props) {
   return (
     <Screen scroll={false} contentStyle={styles.contentFill}>
       {/* 面包屑 */}
-      <View style={styles.breadcrumb}>
-        {breadcrumb.map((name, i) => (
-          <Text key={`${name}-${i}`} style={styles.breadcrumbText}>
-            {i > 0 ? "  /  " : ""}
-            {name}
-          </Text>
-        ))}
-        <Text style={styles.breadcrumbCount}>
-          {t("categoryBrowse.count", { n: children.length })}
-        </Text>
-      </View>
+      <Breadcrumb
+        items={breadcrumb}
+        trailing={t("categoryBrowse.count", { n: children.length })}
+      />
 
       <FlatList
         data={children}
@@ -73,22 +69,6 @@ export function CategoryBrowseScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  breadcrumb: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.hairline,
-  },
-  breadcrumbText: {
-    ...type.caption,
-    color: colors.inkSoft,
-  },
-  breadcrumbCount: {
-    ...type.caption,
-    color: colors.inkFaint,
-  },
   contentFill: {
     flex: 1,
   },
