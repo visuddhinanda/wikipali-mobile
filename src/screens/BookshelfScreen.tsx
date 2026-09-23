@@ -13,7 +13,8 @@ import { loadStarred, type StarredBook } from "../data/starred";
 import { loadBookmarks, type Bookmark } from "../data/bookmarks";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
-import { useT } from "../i18n/I18nContext";
+import { useI18n } from "../i18n/I18nContext";
+import { bookTitleText } from "../i18n/bookTitles";
 import type { MessageKey } from "../i18n";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -82,7 +83,7 @@ interface ShelfItem {
 
 export function BookshelfScreen() {
   const navigation = useNavigation<Nav>();
-  const t = useT();
+  const { t, locale } = useI18n();
   const [active, setActive] = useState<TabId>("reading");
   const [records, setRecords] = useState<ReadingRecord[] | null>(null);
   const [starredList, setStarredList] = useState<StarredBook[] | null>(null);
@@ -133,14 +134,20 @@ export function BookshelfScreen() {
   const channelList = channels ?? [];
 
   /**
-   * 列表标题用 level=1 的作品名（`toc`），不是丛书名 —— 一个 book 文件
+   * 列表标题用 level=1 的作品名，不是丛书名 —— 一个 book 文件
    * 可能装着多部作品，丛书名对读者没有定位作用。
+   * 优先 i18n 本地化译名（`book.title.<book>-<para>`），未译时回退巴利 toc。
    */
   const workTitle = (
     book: number,
     paragraph?: number,
     fallback?: string,
-  ): string => bookEntryAt(book, paragraph)?.toc ?? fallback ?? String(book);
+  ): string => {
+    const entry = bookEntryAt(book, paragraph);
+    const localized =
+      entry != null ? bookTitleText(locale, book, entry.paragraph) : undefined;
+    return localized ?? entry?.toc ?? fallback ?? String(book);
+  };
 
   /** 版本显示名：现查 channels 表；查不到才退回旧记录里的名字快照。 */
   const channelLabel = (uid?: string, legacy?: string): string | undefined =>

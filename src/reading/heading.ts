@@ -67,3 +67,41 @@ export async function channelHeadingTexts(
   }
   return out;
 }
+
+/**
+ * 一批 (book, para) 里频道译出的标题文本，book → 文本。
+ *
+ * 与 `channelHeadingTexts` 的区别是跨多本书一次查，供频道书列表的书名卡片用。
+ * 传入的 (book, para) 通常就是每本书的 level=1 段。
+ */
+export async function channelHeadingTextsByBook(
+  channelId: string,
+  refs: { book: number; para: number }[],
+): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  if (!channelId || refs.length === 0) return out;
+
+  const db = await openReadingDb();
+  // 每个 (book, para) 占 2 个占位符；留余量给 SQLite 999 变量上限。
+  const CHUNK = 450;
+  for (let i = 0; i < refs.length; i += CHUNK) {
+    const chunk = refs.slice(i, i + CHUNK);
+    const conds = chunk.map(() => "(book = ? AND para = ?)").join(" OR ");
+    const params: (string | number)[] = [channelId];
+    for (const r of chunk) params.push(r.book, r.para);
+    const rows = await db.getAllAsync<{
+      book: number;
+      para: number;
+      html: string;
+    }>(
+      `SELECT book, para, html FROM para_html
+        WHERE channel = ? AND html IS NOT NULL AND (${conds})`,
+      params,
+    );
+    for (const r of rows) {
+      const text = htmlToText(r.html);
+      if (text) out.set(r.book, text);
+    }
+  }
+  return out;
+}

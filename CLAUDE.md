@@ -15,7 +15,7 @@
 | `src/user/` | 多用户作用域与设备身份（`userScope` / `deviceUuid`） |
 | `src/reading/` | 阅读链路（正文缓存、阅读单元、下载、章节查询） |
 | `src/catalog/` | 三藏目录树 / 书目 |
-| `src/i18n/` + `messages/` | 界面语言（新增文案要同步加到 8 个 locale 文件，`MessageKey` 由 `zh-Hans` 推导） |
+| `src/i18n/` | 界面语言（按语言分目录、按语义分文件，见下方「i18n 目录结构」规则） |
 | `src/theme/` | 主题与响应式断点数值（断点唯一数值来源 `breakpoints.ts`） |
 | `src/settings/` | 用户设置项持久化 |
 | `src/hooks/` | 跨组件复用 hook（如 `useLayout`） |
@@ -27,6 +27,27 @@
 
 - 跨层依赖方向：`screens/components` → `api/data/auth/user/reading/...`，底层模块不得反向依赖页面。
 - 不改动 `index.ts` 的 polyfill 导入顺序、`metro.config.js`、`patches/`（见 `docs/README.md` §0.3 工程约束）。
+
+# i18n 目录结构（必须遵守）
+
+界面语言统一放在 `src/i18n/`，**按语言分目录、按语义分文件**：
+
+```
+src/i18n/
+  index.ts          # Locale 类型、MessageKey 推导、translate/t、语言检测
+  I18nContext.tsx   # useT() / useI18n() 的 React 绑定
+  bookTitles.ts     # 巴利书名查找（book.title.<book>-<para>）
+  zh-Hans/          # ← 每个 Locale 一个目录（zh-Hans / zh-Hant / en / my / th / si / vi / lo）
+    messages.ts     # 一般消息：标题 / 描述 / 提示 / 空态 / 错误 / 占位
+    labels.ts       # 标签：徽标 / Tab / 状态 / 选项 / 分类名（短名词、形容词）
+    buttons.ts      # 按钮 / 动作文案（祈使动词，点在按钮上做的事）
+    books.ts        # 巴利书名（丛书名 + level=1 实际书名），兜底用
+```
+
+- **语义归类**：新增文案先按「消息 / 标签 / 按钮」落对文件，再加到其它 7 个 locale 的同名文件。
+- **`MessageKey`**：由 `zh-Hans` 的 `messages + labels + buttons` 三类 key 合并推导（`src/i18n/index.ts`），其它语言缺 key 会在 `tsc` 阶段报错。
+- **books.ts 只放本地化译名，不放巴利名**：巴利原名在目录库 `pali_text.toc` 里，书名兜底链是「频道 level=1 译文 → i18n 译名 → 巴利 toc」。某语言还没译 `books.ts` 就不建该文件，`bookTitles.ts` 里也不登记，让它自然回退到巴利名。
+- 别把巴利名、目录树节点名（`src/catalog/labels.ts` 那批）或字体名（`src/pali/script/labels.ts`，endonym）塞进 i18n 的 messages/labels/buttons。
 
 # 设计文档使用规则（必须遵守）
 

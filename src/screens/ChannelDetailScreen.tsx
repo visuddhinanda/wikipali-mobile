@@ -41,11 +41,12 @@ import {
   listDownloads,
   pauseDownload,
   rememberChannelName,
+  resolveBookTitles,
   type DownloadProgress,
 } from "../reading";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
-import { useT } from "../i18n/I18nContext";
+import { useI18n } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ChannelDetail">;
@@ -70,9 +71,11 @@ function bucket(p?: DownloadProgress): Exclude<Filter, "all"> {
 
 export function ChannelDetailScreen({ route, navigation }: Props) {
   const { uid, name, mode } = route.params;
-  const t = useT();
+  const { t, locale } = useI18n();
   const [info, setInfo] = useState<ChannelInfo | null>(null);
   const [books, setBooks] = useState<ChannelBook[] | null>(null);
+  // 各书的展示名：频道 level=1 译文 > i18n > 服务端 title > 巴利 toc。
+  const [titles, setTitles] = useState<Map<number, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   // 本地下载记录（并集的另一半，也用来把已下载的排到前面）。
   const [local, setLocal] = useState<Map<number, DownloadProgress>>(new Map());
@@ -116,6 +119,23 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       alive = false;
     };
   }, [uid]);
+
+  // 书名卡片：频道译出的 level=1 标题优先，其次 i18n，最后巴利 toc。
+  // 书列表或 UI 语言变化时重算（i18n 是兜底，跟界面语言走）。
+  useEffect(() => {
+    if (!books) return;
+    let alive = true;
+    resolveBookTitles(
+      locale,
+      uid,
+      books.map((b) => ({ book: b.book, para: b.para, serverTitle: b.title })),
+    ).then((m) => {
+      if (alive) setTitles(m);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [books, locale, uid]);
 
   // 离开页面就别再往下下一本了 —— 批量下载是用户在这个页面上发起的动作。
   useEffect(
@@ -184,6 +204,16 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     );
   }, []);
 
+  /** 书名：优先已解析的（频道译文 / i18n），没解析完就退回本地书目 toc。 */
+  const bookTitle = useCallback(
+    (b: ChannelBook): string =>
+      titles.get(b.book) ??
+      bookEntryAt(b.book, b.para)?.toc ??
+      b.title ??
+      String(b.book),
+    [titles],
+  );
+
   const openBook = useCallback(
     (b: ChannelBook) =>
       navigation.navigate("Reader", {
@@ -193,7 +223,7 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
         channelId: uid,
         channelName: name,
       }),
-    [navigation, uid, name],
+    [navigation, uid, name, bookTitle],
   );
 
   const downloadAll = async () => {
@@ -345,11 +375,6 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       </Modal>
     </Screen>
   );
-}
-
-/** 书名：服务端的 title 常是空串，退回本地书目里该段所属的作品名。 */
-function bookTitle(b: ChannelBook): string {
-  return bookEntryAt(b.book, b.para)?.toc || b.title || String(b.book);
 }
 
 /**

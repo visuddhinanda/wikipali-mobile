@@ -6,7 +6,7 @@
  * 弹窗告知，而不是让用户进到一个永远转圈的对话页。
  */
 import { Alert } from "react-native";
-import type { MessageKey } from "../i18n/messages/zh-Hans";
+import type { MessageKey } from "../i18n";
 
 const RUNTIME_URL = (
   process.env.EXPO_PUBLIC_RUNTIME_URL ||

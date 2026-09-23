@@ -7,23 +7,62 @@
  *
  * 只有 UI 文案走这里。经文正文的语言是内容维度（版本 / 频道选择），
  * 与界面语言无关，不要混在一起。
+ *
+ * 文案按语言分目录、按语义分文件（见 `docs/README.md` §i18n）：
+ *   i18n/<locale>/messages.ts  一般消息（标题 / 描述 / 提示 / 空态 / 错误）
+ *   i18n/<locale>/labels.ts    标签（徽标 / Tab / 状态 / 选项 / 分类名）
+ *   i18n/<locale>/buttons.ts   按钮 / 动作文案
+ *   i18n/<locale>/books.ts     巴利书名（丛书名 + 实际书名，兜底用）
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLocales } from "expo-localization";
-import zhHans, { type MessageKey, type Messages } from "./messages/zh-Hans";
-import zhHant from "./messages/zh-Hant";
-import en from "./messages/en";
-import my from "./messages/my";
-import th from "./messages/th";
-import si from "./messages/si";
-import vi from "./messages/vi";
-import lo from "./messages/lo";
+import zhHansMessages from "./zh-Hans/messages";
+import zhHansLabels from "./zh-Hans/labels";
+import zhHansButtons from "./zh-Hans/buttons";
+import zhHantMessages from "./zh-Hant/messages";
+import zhHantLabels from "./zh-Hant/labels";
+import zhHantButtons from "./zh-Hant/buttons";
+import enMessages from "./en/messages";
+import enLabels from "./en/labels";
+import enButtons from "./en/buttons";
+import myMessages from "./my/messages";
+import myLabels from "./my/labels";
+import myButtons from "./my/buttons";
+import thMessages from "./th/messages";
+import thLabels from "./th/labels";
+import thButtons from "./th/buttons";
+import siMessages from "./si/messages";
+import siLabels from "./si/labels";
+import siButtons from "./si/buttons";
+import viMessages from "./vi/messages";
+import viLabels from "./vi/labels";
+import viButtons from "./vi/buttons";
+import loMessages from "./lo/messages";
+import loLabels from "./lo/labels";
+import loButtons from "./lo/buttons";
 
 export type Locale =
   "zh-Hans" | "zh-Hant" | "en" | "my" | "th" | "si" | "vi" | "lo";
 
 /** 语言选择；`system` 表示跟随系统。 */
 export type LocalePreference = Locale | "system";
+
+/** 文案 key：以 zh-Hans 的三类文案推导（缺 key 会在 tsc 阶段报错）。 */
+export type MessageKey =
+  | keyof typeof zhHansMessages
+  | keyof typeof zhHansLabels
+  | keyof typeof zhHansButtons;
+
+export type Messages = Record<MessageKey, string>;
+
+const zhHans: Messages = { ...zhHansMessages, ...zhHansLabels, ...zhHansButtons };
+const zhHant: Messages = { ...zhHantMessages, ...zhHantLabels, ...zhHantButtons };
+const en: Messages = { ...enMessages, ...enLabels, ...enButtons };
+const my: Messages = { ...myMessages, ...myLabels, ...myButtons };
+const th: Messages = { ...thMessages, ...thLabels, ...thButtons };
+const si: Messages = { ...siMessages, ...siLabels, ...siButtons };
+const vi: Messages = { ...viMessages, ...viLabels, ...viButtons };
+const lo: Messages = { ...loMessages, ...loLabels, ...loButtons };
 
 export const CATALOGS: Record<Locale, Messages> = {
   "zh-Hans": zhHans,
@@ -180,8 +219,6 @@ export function t(
 ): string {
   return translate(activeLocale, key, vars);
 }
-
-export type { MessageKey, Messages };
 
 /**
  * 界面语言 → 内容语族。
