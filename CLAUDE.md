@@ -60,3 +60,13 @@
 - **同步锚点规则（在读/阅读记录）**：用「当前阅读页面最上面的 para」（视口顶部段），走 recent 的 `article_id = "<book>-<para>"`。
 - 移动端 `book`（int）是一个「文件」，一个 book 可能装多部作品（多个 `level=1`）；书架上的「书」= `(book, 某个 level=1 的 para)`。
 - **reaction 的 `context`**：收藏记 `book:<book>-<para>`、下载记 `book:<book>-<para>:<channel>`（para=level=1 段）、书签记 `para:<n>`（精确段）；下拉还原时以反查 `target_id`（progress_chapters 表）为准，context 是补充（书签用它还原精确段）。
+
+# 书架测试 skill
+
+- **触发词**：「测试书架功能」/「测试书架」。
+- **行为**：自动跑一遍 `scripts/test-bookshelf.sh`，并按 `docs/multi-user-sync.md` §12 检查表逐项验证（三件套：本地 db + 服务器 + 手机 UI dump），最后输出一份测试报告（通过 / 失败 / 边界）。
+- **语义区分**：
+  - 只说「测试」→ **只测、不改代码**，报告问题即可。
+  - 说「测试并改代码」→ 测 + 修 bug，修完再测一遍，报告修复内容。
+- **环境前提**：真机经 adb（`ADB_SERVER_SOCKET=tcp:127.0.0.1:5037`）已连、本地服务器 `127.0.0.1:8000` 已开、Metro 已起（dev client 需加载最新 bundle，改代码后要重启 Metro 再测）。
+- 测试账号 `visuddhinanda` / `123456`；验证手段见 `docs/testing.md` §0（uiautomator dump、注入点击盲区等）。

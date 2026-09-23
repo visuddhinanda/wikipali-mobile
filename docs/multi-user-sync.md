@@ -393,14 +393,54 @@ Schema::create('recents', function (Blueprint $table) {
 
 ---
 
-## 12. 测试
+## 12. 测试说明（检查表）
 
-- 真机：`com.iapt.mobile`，经宿主机 `adb -a -P 5037`（见 `docs/testing.md` §0）。
-- 测试账号：`visuddhinanda` / `123456`（由用户提供，仅用于联调）。
-- 用例：
-  1. 未登录阅读 / 收藏 / 书签 / 下载 → 全部落在 `<guest-uuid>/reading.db3`；重进仍在。
-  2. 重启 App，游客 uuid 不变（同一目录、数据不丢）。
-  3. 登录 → 切到 `<user-uuid>/`，出现「是否合并游客数据」；选合并 → 服务器 `recents`/`reactions` 出现对应行。
-  4. 换设备 / 清数据后登录 → 阅读记录能拉回（缺口 2 反查未补前，收藏 / 书签 / 下载列表为空，属预期）。
-  5. 下载记录同步后，正文 `para_html` 为空 → 书架「已下载」能点「重新下载」。
-  6. 登出 → 回到游客目录，游客数据仍在。
+> 触发方式见仓库根 `CLAUDE.md`「书架测试 skill」：说「测试书架功能」自动跑一遍并输出报告；
+> 只说「测试」不改 bug，说「测试并改代码」才测 + 改。脚本 `scripts/test-bookshelf.sh`。
+>
+> 测试环境：真机 `com.iapt.mobile`，宿主机 `adb -a -P 5037`，本地服务器 `127.0.0.1:8000`
+> （对外 `0.0.0.0:8000`），测试账号 `visuddhinanda` / `123456`。
+> 验证手段三件套：**本地 db**（`adb exec-out run-as com.iapt.mobile cat .../reading.db3` + sqlite3）、
+> **服务器**（curl `/api/v3/me/reactions`、`/api/v2/recent`）、**手机 UI**（`uiautomator dump`）。
+
+### 12.1 不登录（guest）
+
+| # | 操作 | 预期 |
+|---|---|---|
+| G1 | 进入任意书阅读 | guest 库 `reading_history` 新增一条（book+视口顶部段），书架「在读」显示 |
+| G2 | 收藏一本书 | guest 库 `starred` 新增，书架「收藏」显示 |
+| G3 | 取消收藏 | guest 库 `starred` 删除，书架「收藏」消失 |
+| G4 | 加书签 | guest 库 `bookmarks` 新增（book+精确段），书架「书签」显示 |
+| G5 | 删书签 | guest 库 `bookmarks` 删除，书架「书签」消失 |
+| G6 | 下载一本书 | guest 库 `download_state` 新增 `done`，书架「已下载」显示 |
+| G7 | 删除下载（仅删数据） | `para_html` 清空、`download_state` 变 `pending`，记录保留 |
+| G8 | 删除下载（数据和记录） | `para_html` 清空、`download_state` 删除 |
+| G9 | 四个 tab 列表 | 书架「在读/已下载/收藏/书签」显示与 db 一致 |
+| G10 | **guest 不同步** | guest 库 `sync_outbox` 恒为 0；服务器 `recents`/`reactions` **无新增** |
+
+### 12.2 登录账号
+
+| # | 操作 | 预期 |
+|---|---|---|
+| L1 | 登录 | 目录切到 `<user-uuid>/`；若 guest 有数据弹「同步游客数据？」 |
+| L2 | 合并（选「同步」） | guest 的阅读/收藏/书签/下载**复制进** user 库，并 push 到服务器 |
+| L3 | 合并（选「暂不」） | 不复制，user 库无 guest 新增数据 |
+| L4 | 账号下阅读/收藏/书签/下载 | user 库各表正确增删，`sync_outbox` 入队 |
+| L5 | **有网** 时操作 | 操作后（前台/登录收尾触发 `syncNow`）服务器立即出现对应 `recents`/`reactions`，outbox 清空 |
+| L6 | **无网** 时操作（开飞行模式） | 本地 db 照常更新，`sync_outbox` 累积（`attempts` 增长），服务器**无新增** |
+| L7 | 无网操作后**恢复网络** | outbox 自动补推，服务器出现之前累积的操作，outbox 清空 |
+| L8 | 网络 db 改变（外部往服务器加一条）→ 打开 app | 冷启动/登录下拉，本地出现该条（收藏/书签/下载靠反查还原，阅读靠 recent） |
+| L9 | 网络 db 改变 → 进行上述操作 | 操作触发 `syncNow`，本地与服务器双向收敛 |
+
+### 12.3 退出账号
+
+| # | 操作 | 预期 |
+|---|---|---|
+| E1 | 登出 | 目录切回 `<guest-uuid>/`，书架显示 guest 的数据（不是账号数据） |
+| E2 | 登出后操作 | 回到 12.1 的 guest 行为（本地记录、不同步） |
+
+### 12.4 已知边界（预期内，不算 bug）
+
+- 旧数据 channel 无效（如 `7fea264d...`）：对应收藏/书签 push 满 3 次后放弃，本地保留。
+- `recent` 无删除接口：清阅读记录只清本地，服务器残留。
+- 书签下拉还原到「章节段」（progress_chapters 只有章节级），精确段靠 context 还原。
