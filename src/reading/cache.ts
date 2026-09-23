@@ -386,22 +386,6 @@ export async function fetchChapterBlock(
   return { to: covered.to, remaining: covered.remaining, total: covered.total };
 }
 
-/** 删除一本书某频道的全部缓存。 */
-export async function clearBookCache(
-  channelId: string,
-  book: number,
-): Promise<void> {
-  const db = await openReadingDb();
-  await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
-    channelId,
-    book,
-  ]);
-  await db.runAsync(
-    "DELETE FROM download_state WHERE channel = ? AND book = ?",
-    [channelId, book],
-  );
-}
-
 export interface CacheUsage {
   channel: string;
   book: number;

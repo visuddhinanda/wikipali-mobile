@@ -209,7 +209,10 @@ const zhHant: Messages = {
   "download.pause": "暫停",
   "download.delete": "刪除",
   "download.deleteConfirm": "刪除後將無法離線閱讀本書，需重新下載。",
-  "download.paraCount": "{done} / {total} 段",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "{done} / {total} 段",
   "download.pickVersionFirst": "請先選擇版本，再下載。",
 
   "scan.title": "掃碼",

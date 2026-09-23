@@ -217,6 +217,9 @@ const en: Messages = {
   "download.delete": "Delete",
   "download.deleteConfirm":
     "You will no longer be able to read this book offline and will need to download it again.",
+  "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
   "download.paraCount": "{done} / {total} paragraphs",
   "download.pickVersionFirst": "Choose a version before downloading.",
 

@@ -215,7 +215,10 @@ const vi: Messages = {
   "download.delete": "Xóa",
   "download.deleteConfirm":
     "Sau khi xóa sẽ không đọc ngoại tuyến được cuốn này, cần tải lại.",
-  "download.paraCount": "{done} / {total} đoạn",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "{done} / {total} đoạn",
   "download.pickVersionFirst": "Hãy chọn phiên bản trước khi tải.",
 
   "scan.title": "Quét mã",

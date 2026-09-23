@@ -48,16 +48,17 @@ export type { CompanionChapter, CompanionLayers } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";
 export type { DownloadProgress, DownloadStatus } from "./download";
 export {
+  clearDownloadData,
   downloadBook,
   getDownloadProgress,
   isDownloading,
   listDownloads,
   pauseDownload,
   percent,
+  removeDownload,
 } from "./download";
 export {
   cacheUsage,
-  clearBookCache,
   enforceCacheQuota,
   CACHE_QUOTA_BYTES,
   EMPTY_PARA_TTL_MS,

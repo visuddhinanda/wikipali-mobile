@@ -230,6 +230,9 @@ const zhHans = {
   "download.pause": "暂停",
   "download.delete": "删除",
   "download.deleteConfirm": "删除后将无法离线阅读本书，需重新下载。",
+  "download.deleteChoose": "请选择删除方式。",
+  "download.deleteDataOnly": "仅删除下载数据",
+  "download.deleteDataAndRecord": "删除数据和下载记录",
   "download.paraCount": "{done} / {total} 段",
   "download.pickVersionFirst": "请先选择版本，再下载。",
 

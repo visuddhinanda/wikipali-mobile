@@ -213,7 +213,10 @@ const th: Messages = {
   "download.delete": "ลบ",
   "download.deleteConfirm":
     "หลังจากลบแล้วจะอ่านหนังสือเล่มนี้แบบออฟไลน์ไม่ได้ ต้องดาวน์โหลดใหม่",
-  "download.paraCount": "{done} / {total} ย่อหน้า",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "{done} / {total} ย่อหน้า",
   "download.pickVersionFirst": "กรุณาเลือกฉบับก่อนดาวน์โหลด",
 
   "scan.title": "สแกน",

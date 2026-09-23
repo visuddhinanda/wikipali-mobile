@@ -218,7 +218,10 @@ const my: Messages = {
   "download.delete": "ဖျက်ရန်",
   "download.deleteConfirm":
     "ဖျက်ပြီးလျှင် ဤစာအုပ်ကို အော့ဖ်လိုင်းဖြင့် ဖတ်၍မရတော့ဘဲ ပြန်လည်ဒေါင်းလုဒ်ရန် လိုအပ်ပါမည်။",
-  "download.paraCount": "စာပိုဒ် {done} / {total}",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "စာပိုဒ် {done} / {total}",
   "download.pickVersionFirst": "ဒေါင်းလုဒ်မဆွဲမီ ဗားရှင်းကို ရွေးပါ။",
 
   "scan.title": "ကုဒ်ဖတ်ရန်",

@@ -12,7 +12,7 @@ import { bookApiChapters, type ApiChapter } from "./chapter";
 import { cachedParaCount, fetchChapterBlock, resolvedParas } from "./cache";
 import { openReadingDb, tipitakaRunner } from "./db";
 import { firstReadingParagraph, level1ParagraphOf } from "./unit";
-import { localKey, outboxUpsert } from "../data/queue";
+import { localKey, outboxDelete, outboxUpsert } from "../data/queue";
 import { t } from "../i18n";
 
 export type DownloadStatus =
@@ -156,6 +156,56 @@ export async function getDownloadProgress(
     done,
     updatedAt: 0,
   };
+}
+
+/**
+ * 仅删除下载的正文数据：清 `para_html`，`download_state` 改回 `pending`（保留记录）。
+ * 服务器上的 download reaction **不动**。
+ */
+export async function clearDownloadData(
+  channelId: string,
+  book: number,
+): Promise<void> {
+  const db = await openReadingDb();
+  await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
+    channelId,
+    book,
+  ]);
+  await db.runAsync(
+    `UPDATE download_state SET status = 'pending', total = 0, done = 0, error = NULL
+      WHERE channel = ? AND book = ?`,
+    [channelId, book],
+  );
+}
+
+/**
+ * 删除下载数据 + 下载记录：清 `para_html`、删 `download_state`，并入队服务器
+ * download reaction 的 delete 墓碑（登录后由 `syncNow` 删除服务器记录）。
+ */
+export async function removeDownload(
+  channelId: string,
+  book: number,
+): Promise<void> {
+  const db = await openReadingDb();
+  await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
+    channelId,
+    book,
+  ]);
+  const prev = await db.getFirstAsync<{ server_id: string | null }>(
+    "SELECT server_id FROM download_state WHERE channel = ? AND book = ?",
+    [channelId, book],
+  );
+  await db.runAsync("DELETE FROM download_state WHERE channel = ? AND book = ?", [
+    channelId,
+    book,
+  ]);
+  await outboxDelete(
+    db,
+    localKey("download", book, undefined, channelId),
+    "download",
+    { channel: channelId, book },
+    prev?.server_id ?? null,
+  );
 }
 
 /** 全部下载记录（书架「已下载」列表）。 */

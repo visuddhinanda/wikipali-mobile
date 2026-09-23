@@ -214,7 +214,10 @@ const si: Messages = {
   "download.delete": "මකන්න",
   "download.deleteConfirm":
     "මකා දැමූ පසු මෙම පොත නොබැඳිව කියවිය නොහැක; නැවත බාගත යුතුය.",
-  "download.paraCount": "ඡේද {done} / {total}",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "ඡේද {done} / {total}",
   "download.pickVersionFirst": "බාගැනීමට පෙර සංස්කරණයක් තෝරන්න.",
 
   "scan.title": "පරිලෝකනය",

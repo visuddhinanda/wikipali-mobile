@@ -12,12 +12,13 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ProgressRing } from "./ProgressRing";
 import {
-  clearBookCache,
+  clearDownloadData,
   downloadBook,
   getDownloadProgress,
   isDownloading,
   pauseDownload,
   percent,
+  removeDownload,
   type DownloadProgress,
 } from "../reading";
 import { useT } from "../i18n/I18nContext";
@@ -119,14 +120,23 @@ export function DownloadControl({
   };
 
   const remove = () => {
-    Alert.alert(t("download.delete"), t("download.deleteConfirm"), [
+    Alert.alert(t("download.delete"), t("download.deleteChoose"), [
       { text: t("common.cancel"), style: "cancel" },
       {
-        text: t("download.delete"),
+        text: t("download.deleteDataOnly"),
+        onPress: async () => {
+          if (isDownloading(channelId, book)) pauseDownload(channelId, book);
+          await clearDownloadData(channelId, book);
+          await refresh();
+          onDeleted?.();
+        },
+      },
+      {
+        text: t("download.deleteDataAndRecord"),
         style: "destructive",
         onPress: async () => {
           if (isDownloading(channelId, book)) pauseDownload(channelId, book);
-          await clearBookCache(channelId, book);
+          await removeDownload(channelId, book);
           await refresh();
           onDeleted?.();
         },

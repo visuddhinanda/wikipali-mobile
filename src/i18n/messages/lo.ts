@@ -213,7 +213,10 @@ const lo: Messages = {
   "download.delete": "ລຶບ",
   "download.deleteConfirm":
     "ຫຼັງຈາກລຶບແລ້ວຈະອ່ານປຶ້ມນີ້ແບບອອບໄລນ໌ບໍ່ໄດ້ ຕ້ອງດາວໂຫຼດໃໝ່.",
-  "download.paraCount": "{done} / {total} ວັກ",
+    "download.deleteChoose": "Choose what to delete.",
+  "download.deleteDataOnly": "Delete data only",
+  "download.deleteDataAndRecord": "Delete data & record",
+"download.paraCount": "{done} / {total} ວັກ",
   "download.pickVersionFirst": "ກະລຸນາເລືອກສະບັບກ່ອນດາວໂຫຼດ.",
 
   "scan.title": "ສະແກນ",
