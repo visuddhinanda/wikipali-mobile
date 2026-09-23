@@ -10,6 +10,7 @@
  * 这里两种都当成「用户名或密码错误」处理。
  */
 import { getApiClient } from "./openapi-client";
+import { resolveAssetUrl } from "./config";
 import { ApiError } from "./client";
 import { getTokenSync, type AuthUser } from "../auth/session";
 import { t } from "../i18n";
@@ -43,5 +44,8 @@ export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
   if (!data?.ok || !data.data) {
     throw new ApiError(data?.message || t("signIn.expired"));
   }
-  return data.data as AuthUser;
+  const user = data.data as AuthUser;
+  // 后端 avatar 是相对路径（`/storage/...`），RN 的 <Image> 解析不了相对地址，
+  // 这里按当前 API 服务器补成绝对 URL 再交给 UI（见 config.ts `resolveAssetUrl`）。
+  return { ...user, avatar: await resolveAssetUrl(user.avatar) };
 }

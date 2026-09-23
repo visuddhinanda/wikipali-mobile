@@ -27,7 +27,8 @@ export interface AuthUser {
   id: string;
   nickName: string;
   realName: string;
-  avatar: string;
+  /** 后端可能是相对路径（已由 `fetchCurrentUser` 补成绝对 URL），也可能缺省。 */
+  avatar?: string;
   roles: string[] | null;
 }
 

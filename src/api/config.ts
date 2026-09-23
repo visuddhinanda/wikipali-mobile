@@ -31,4 +31,21 @@ export async function resolveApiRoot(): Promise<string> {
   return toApiRoot(await resolveBaseUrl());
 }
 
+/**
+ * 把后端返回的资源路径补成绝对 URL。
+ *
+ * 后端头像字段是相对路径（如 `/storage/attachments-staging/xxx.jpg`），
+ * RN 的 `<Image>` 没有浏览器的「页面根」去解析相对地址，直接当 `uri`
+ * 会加载失败；已是 `http(s)://` 的（如签名的 S3 链接）原样返回，避免破坏。
+ */
+export async function resolveAssetUrl(
+  path: string | null | undefined,
+): Promise<string | undefined> {
+  if (!path) return undefined;
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = await resolveBaseUrl();
+  const origin = base.replace(/\/api\/v\d+\/?$/, "").replace(/\/+$/, "");
+  return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
 export const ENV_API_URL = envUrl;
