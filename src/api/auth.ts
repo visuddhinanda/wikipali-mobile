@@ -1,78 +1,32 @@
 /**
- * 登录 / 当前用户接口（对应 mint 后端 `/api/v2/sign-in`、`/api/v2/auth/current`，
+ * 登录 / 当前用户接口（对应 mint 后端 `/v2/sign-in`、`/v2/auth/current`，
  * 与 Web 端 `dashboard-v6/src/components/users/SignIn.tsx` 同一套流程）：
  *
- *   POST /sign-in  { username, password }  ->  { ok, data: <token> }
- *   GET  /auth/current  (Bearer token)     ->  { ok, data: <user> }
+ *   POST /v2/sign-in  { username, password }  ->  { ok, data: <token> }
+ *   GET  /v2/auth/current  (Bearer token)     ->  { ok, data: <user> }
  *
- * 登录失败时后端可能返回 200 + `ok:false`，也可能直接 401，
- * 这里两种都当成「用户名或密码错误」处理，所以不复用会在 HTTP 错误上抛异常的 `request()`。
+ * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`），token 由 `authMiddleware`
+ * 统一注入。登录失败时后端可能返回 200 + `ok:false`，也可能直接 401，
+ * 这里两种都当成「用户名或密码错误」处理。
  */
-import { resolveBaseUrl } from "./config";
+import { getApiClient } from "./openapi-client";
 import { ApiError } from "./client";
 import { getTokenSync, type AuthUser } from "../auth/session";
 import { t } from "../i18n";
-
-interface Envelope<T> {
-  ok: boolean;
-  data: T;
-  message?: string;
-}
-
-/** 已登录时附带的鉴权头；未登录返回空对象。 */
-export function authHeaders(): Record<string, string> {
-  const token = getTokenSync();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-const TIMEOUT = 12_000;
-
-async function callJson<T>(url: string, init: RequestInit): Promise<Envelope<T>> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT);
-  // 超时要覆盖到读完 body —— 只包住 fetch 的话，服务端发完响应头后卡住
-  // 就会永久挂起（同 src/api/client.ts）。
-  let res: Response;
-  let text: string;
-  try {
-    res = await fetch(url, { ...init, signal: controller.signal });
-    text = await res.text();
-  } catch (err) {
-    throw new ApiError(err instanceof Error ? err.message : t("error.network"));
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!text) {
-    // 没有 body 时只能靠状态码判断
-    return { ok: res.ok, data: undefined as T };
-  }
-  try {
-    return JSON.parse(text) as Envelope<T>;
-  } catch {
-    throw new ApiError(t("error.badJson"), res.status);
-  }
-}
 
 /** 用用户名（或邮箱）+ 密码换取 token。失败时抛 `ApiError`。 */
 export async function signIn(
   username: string,
   password: string,
 ): Promise<string> {
-  const base = await resolveBaseUrl();
-  const env = await callJson<string>(`${base}/sign-in`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify({ username, password }),
+  const client = await getApiClient();
+  const { data, error } = await client.POST("/v2/sign-in", {
+    body: { username, password },
   });
-  if (!env.ok || !env.data) {
-    // 服务端的原文（如 `invalid token`）对用户没有意义，一律显示统一文案。
-    throw new ApiError(t("signIn.badCredentials"));
-  }
-  return env.data;
+  if (error) throw new ApiError(t("signIn.badCredentials"));
+  // 服务端的原文（如 `invalid token`）对用户没有意义，一律显示统一文案。
+  if (!data?.ok || !data.data) throw new ApiError(t("signIn.badCredentials"));
+  return data.data;
 }
 
 /**
@@ -80,17 +34,14 @@ export async function signIn(
  * `token` 省略时用已保存的会话 token（用于冷启动校验）。
  */
 export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
-  const base = await resolveBaseUrl();
+  const client = await getApiClient();
   const bearer = token ?? getTokenSync();
-  const env = await callJson<AuthUser>(`${base}/auth/current`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-    },
+  const { data, error, response } = await client.GET("/v2/auth/current", {
+    headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
   });
-  if (!env.ok || !env.data) {
-    throw new ApiError(env.message || t("signIn.expired"));
+  if (error) throw new ApiError(t("signIn.expired"), response.status);
+  if (!data?.ok || !data.data) {
+    throw new ApiError(data?.message || t("signIn.expired"));
   }
-  return env.data;
+  return data.data as AuthUser;
 }

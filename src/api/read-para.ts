@@ -9,9 +9,10 @@
  * 但这个接口**不能删**：它是唯一能**精确取某一段**的口子。章节接口的游标落在
  * 没有译文的段上会自动顺延到下一段有译文的，问「9102-7 有没有」它回的可能是
  * 9102-350 —— 引文角标要的就是「这一段，有就是有、没有就是没有」。
+ *
+ * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`）。
  */
-import { resolveBaseUrl, toApiV3Base } from "./config";
-import { ApiError, request } from "./client";
+import { getApiClient, throwHttpError } from "./openapi-client";
 import { mockReadParas } from "./mock";
 import { unwrapV3Collection } from "./v3";
 
@@ -36,9 +37,6 @@ export interface ReadParaResult {
  *
  * ⚠️ 服务端会跳过 `display` 为空的段落，返回的条数可能少于请求的段数 ——
  * 请求了却没回来的段，就是「该版本没有这一段」。
- *
- * 服务端是 `foreach range()` 逐段查库、没有上限保护，不能传大区间；
- * 现在唯一的调用方是单段取数（`loadOnePara`）。
  */
 export async function fetchReadParas(
   book: number,
@@ -46,22 +44,28 @@ export async function fetchReadParas(
   to: number,
   channelId: string,
 ): Promise<ReadParaResult> {
-  const base = toApiV3Base(await resolveBaseUrl());
-  const url =
-    `${base}/tipitaka-read-para?book=${book}&para=${from}&to=${to}` +
-    `&channel=${encodeURIComponent(channelId)}&format=html&view=display`;
+  const client = await getApiClient();
 
-  let raw: unknown;
+  let result;
   try {
-    raw = await request<unknown>(url);
-  } catch (err) {
-    // 仅「网络不可达」回退 mock，保证离线时 UI 走得通；
-    // 服务端明确报错（HTTP 4xx/5xx）如实抛出，避免把占位文当成真实译文缓存下来。
-    if (err instanceof ApiError && err.status === undefined) {
-      return { items: await mockReadParas(book, from, to), mock: true };
-    }
-    throw err;
+    result = await client.GET("/v3/tipitaka-read-para", {
+      params: {
+        query: {
+          book,
+          para: from,
+          to,
+          channel: channelId,
+          format: "html",
+          view: "display",
+        },
+      },
+    });
+  } catch {
+    // 网络不可达 → 回退 mock，保证离线时 UI 走得通。
+    return { items: await mockReadParas(book, from, to), mock: true };
   }
 
-  return { items: unwrapV3Collection<ReadParaItem>(raw).items, mock: false };
+  const { data, error, response } = result;
+  if (error) throwHttpError(error, response);
+  return { items: unwrapV3Collection<ReadParaItem>(data).items, mock: false };
 }

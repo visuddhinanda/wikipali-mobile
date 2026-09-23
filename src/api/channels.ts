@@ -3,24 +3,12 @@
  *
  * 一个 channel 下可能有一本或多本书；分类页拿它当推荐位，书架的「批量下载」
  * 拿它当下载单位（选一个译本，把它下的书整批缓存下来）。
+ *
+ * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`）。
  */
-import { resolveBaseUrl, toApiV3Base } from "./config";
-import { request } from "./client";
+import { getApiClient, throwHttpError, unwrapV2 } from "./openapi-client";
 import { metaInt, unwrapV3Collection } from "./v3";
 import { t } from "../i18n";
-
-interface Envelope<T> {
-  ok: boolean;
-  data: T;
-  message?: string;
-}
-
-function unwrap<T>(env: Envelope<T>): T {
-  if (!env || env.ok === false) {
-    throw new Error(env?.message ?? t("error.backend"));
-  }
-  return env.data;
-}
 
 /** 频道所属工作室 —— 只取展示要用的几个字段。 */
 export interface ChannelStudio {
@@ -66,20 +54,26 @@ export function studioLabel(s?: ChannelStudio): string {
 export async function fetchTranslationChannels(
   lang: string,
 ): Promise<ChannelSummary[]> {
-  const base = await resolveBaseUrl();
-  const env = await request<
-    Envelope<{
-      rows: {
-        channel_id: string;
-        count: number;
-        studio?: ChannelStudio;
-        channel?: { name?: string; summary?: string | null; lang?: string };
-      }[];
-    }>
-  >(
-    `${base}/progress?view=channel&channel_type=translation&lang=${encodeURIComponent(lang)}`,
-  );
-  return unwrap(env).rows.map((r) => ({
+  const client = await getApiClient();
+  const { data, error, response } = await client.GET("/v2/progress", {
+    params: {
+      query: {
+        view: "channel",
+        channel_type: "translation",
+        lang,
+      },
+    },
+  });
+  if (error) throwHttpError(error, response);
+  const env = unwrapV2<{
+    rows: {
+      channel_id: string;
+      count: number;
+      studio?: ChannelStudio;
+      channel?: { name?: string; summary?: string | null; lang?: string };
+    }[];
+  }>(data, t("error.backend"));
+  return env.rows.map((r) => ({
     id: r.channel_id,
     name: r.channel?.name ?? "",
     summary: r.channel?.summary ?? null,
@@ -91,9 +85,12 @@ export async function fetchTranslationChannels(
 
 /** 频道详情（含工作室头像）。 */
 export async function fetchChannel(uid: string): Promise<ChannelInfo> {
-  const base = await resolveBaseUrl();
-  const env = await request<Envelope<ChannelInfo>>(`${base}/channel/${uid}`);
-  return unwrap(env);
+  const client = await getApiClient();
+  const { data, error, response } = await client.GET("/v2/channel/{channel}", {
+    params: { path: { channel: uid } },
+  });
+  if (error) throwHttpError(error, response);
+  return unwrapV2<ChannelInfo>(data, t("error.backend"));
 }
 
 /** 频道下的一本书（level=1 的作品条目 + 翻译进度）。 */
@@ -121,21 +118,26 @@ const BOOKS_MAX_PAGES = 50;
  * 带上它之后各种页大小都是无损的。
  */
 export async function fetchChannelBooks(uid: string): Promise<ChannelBook[]> {
-  const base = toApiV3Base(await resolveBaseUrl());
+  const client = await getApiClient();
   const rows: ChannelBook[] = [];
   const seen = new Set<number>();
   let total = Infinity;
 
   for (let page = 1; page <= BOOKS_MAX_PAGES && rows.length < total; page += 1) {
-    // 翻页参数两套一起传：新契约认 `page` / `per_page`，仍在跑的旧版本认
-    // `offset` / `limit`，两者指的是同一页，谁认哪个都对。
-    const offset = (page - 1) * BOOKS_PAGE_SIZE;
-    const raw = await request<unknown>(
-      `${base}/progress?view=channel&channels=${encodeURIComponent(uid)}` +
-        `&level=1&order=updated_at&page=${page}&per_page=${BOOKS_PAGE_SIZE}` +
-        `&offset=${offset}&limit=${BOOKS_PAGE_SIZE}`,
-    );
-    const { items, meta } = unwrapV3Collection<ChannelBook>(raw);
+    const { data, error, response } = await client.GET("/v3/progress", {
+      params: {
+        query: {
+          view: "channel",
+          channels: uid,
+          level: 1,
+          order: "updated_at",
+          page,
+          per_page: BOOKS_PAGE_SIZE,
+        },
+      },
+    });
+    if (error) throwHttpError(error, response);
+    const { items, meta } = unwrapV3Collection<ChannelBook>(data);
     // 服务端忽略翻页参数时每页回的是同一批，只靠 total 会空转 50 轮 ——
     // 这一页一本新书都没有就收工。
     const fresh = items.filter((r) => !seen.has(r.book));
