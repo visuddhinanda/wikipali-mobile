@@ -2,7 +2,7 @@
  * 本地 mock 数据层：无后端（EXPO_PUBLIC_API_URL 未配置）时回退到这里，
  * 保证「目录树 → 章节列表 → 阅读器」链路离线可走通。
  *
- * 数据形状与 mint api-v13 一致（BookTitle / tipitaka-read-para）。
+ * 数据形状与 mint api-v13 一致（BookTitle / tipitaka-reading）。
  */
 import type { ReadParaItem } from "./read-para";
 import type { BookTitle, TocItem } from "../catalog";

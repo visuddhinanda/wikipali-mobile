@@ -1,15 +1,14 @@
 /**
  * 整本书离线下载（见 `docs/reading-content.md` §4.4）。
  *
- * 取数与阅读走同一条链路：`tipitaka-read-chapter` 按章节 + 游标一块块取，
- * 每块写回 `para_html`，块覆盖到但没回来的段记 `html = NULL` + 过期时间。
+ * 取数走新版 `/v3/tipitaka-reading/{channel}`：`book` 过滤 + 不透明游标一块块取，
+ * 每块写回 `para_html`。分母（本书有译文的段数）直接取 `meta.total`，不再逐章探测。
  *
- * 断点续传不需要状态机：每章开始前先查该章已解析（且未过期）的段，游标落在
- * 第一个缺口上。中断在哪都不用记，重启时自然从缺口继续。
+ * 断点续传 = 把 `meta.next_cursor` 存进 `download_state.cursor`：中断 / 重启后从
+ * 游标继续，不重下已下过的段。游标为 null 表示整本取完。
  */
 import { DOWNLOAD_PAGE_SIZE } from "../api/read-chapter";
-import { bookApiChapters, type ApiChapter } from "./chapter";
-import { cachedParaCount, fetchChapterBlock, resolvedParas } from "./cache";
+import { cachedParaCount, fetchChapterBlock } from "./cache";
 import { openReadingDb, tipitakaRunner } from "./db";
 import { firstReadingParagraph, level1ParagraphOf } from "./unit";
 import { localKey, outboxDelete, outboxUpsert } from "../data/queue";
@@ -27,7 +26,7 @@ export interface DownloadProgress {
   book: number;
   status: DownloadStatus;
   /**
-   * 分母：该版本在本书**有译文**的段落总数（章节接口的 `total_para` 逐章累加）。
+   * 分母：该版本在本书**有译文**的段落总数（游标接口的 `meta.total`）。
    * 还没开工、拿不到接口数字时退化成本书的段落总数，开工后立刻被真值替换。
    */
   total: number;
@@ -44,20 +43,10 @@ export function percent(p: Pick<DownloadProgress, "total" | "done">): number {
 }
 
 /**
- * 探分母用的块大小：1 段。
- *
- * 每章的第一次调用只为拿 `total_para`（该章有多少段有译文），内容顺带存下来，
- * 所以块开到最小。一本书顶层章节最多 8 个，探完分母就固定了，进度条不会
- * 边下边变分母。
- */
-const PROBE_PAGE_SIZE = 1;
-const PROBE_PAGE_UNIT = "para";
-
-/**
  * 该书段落总数（只读库，离线可算）——**分母的兜底值**。
  *
- * 真正的分母是「该版本有译文的段数」，只有联网问过章节接口才知道；一次都没
- * 下载过的书拿不到，先用本书段落总数顶着，开工后第一轮探测就会换成真值。
+ * 真正的分母是「该版本有译文的段数」，只有联网问过游标接口才知道；一次都没
+ * 下载过的书拿不到，先用本书段落总数顶着，开工后第一块就会换成真值。
  */
 async function totalParas(book: number): Promise<number> {
   const sql = await tipitakaRunner();
@@ -71,19 +60,30 @@ async function totalParas(book: number): Promise<number> {
 async function writeState(
   p: DownloadProgress,
   anchorParagraph?: number,
+  cursor?: string | null,
 ): Promise<void> {
   const db = await openReadingDb();
   // 用 upsert 保留 server_id（同步回填的服务器 like.id），下载进度更新不覆盖它。
   await db.runAsync(
-    `INSERT INTO download_state (channel, book, status, total, done, error, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO download_state (channel, book, status, total, done, error, updated_at, cursor)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(channel, book) DO UPDATE SET
        status = excluded.status,
        total = excluded.total,
        done = excluded.done,
        error = excluded.error,
-       updated_at = excluded.updated_at`,
-    [p.channel, p.book, p.status, p.total, p.done, p.error ?? null, p.updatedAt],
+       updated_at = excluded.updated_at,
+       cursor = excluded.cursor`,
+    [
+      p.channel,
+      p.book,
+      p.status,
+      p.total,
+      p.done,
+      p.error ?? null,
+      p.updatedAt,
+      cursor ?? null,
+    ],
   );
   // 下载完成 = 一条「下载记录」，入队同步到服务器 likes（type=download）。
   if (p.status === "done") {
@@ -172,7 +172,7 @@ export async function clearDownloadData(
     book,
   ]);
   await db.runAsync(
-    `UPDATE download_state SET status = 'pending', total = 0, done = 0, error = NULL
+    `UPDATE download_state SET status = 'pending', total = 0, done = 0, error = NULL, cursor = NULL
       WHERE channel = ? AND book = ?`,
     [channelId, book],
   );
@@ -241,20 +241,17 @@ export function isDownloading(channelId: string, book: number): boolean {
   return running.has(runKey(channelId, book));
 }
 
-/** 暂停下载：已写入的批次全部有效，下次调用 `downloadBook` 从缺口继续。 */
+/** 暂停下载：已写入的批次全部有效，下次调用 `downloadBook` 从游标继续。 */
 export function pauseDownload(channelId: string, book: number): void {
   const flag = running.get(runKey(channelId, book));
   if (flag) flag.cancelled = true;
 }
 
-/** 章节里第一个还没解析（或占位已过期）的段；整章都齐了返回 null。 */
-function firstGap(chapter: ApiChapter, resolved: Set<number>, after = 0): number | null {
-  const from = Math.max(chapter.start, after);
-  for (let p = from; p <= chapter.end; p++) {
-    if (!resolved.has(p)) return p;
-  }
-  return null;
-}
+/**
+ * 下载循环的兜底上限：防御服务端游标不推进时空转。正常一本书按 5000 字节一块
+ * 几百块就取完了，这个上限只在数据异常时兜底。
+ */
+const MAX_DOWNLOAD_BLOCKS = 50000;
 
 /**
  * 下载整本书。已在下载中则直接返回当前进度。
@@ -279,80 +276,63 @@ export async function downloadBook(
   const flag = { cancelled: false };
   running.set(key, flag);
 
+  const db = await openReadingDb();
+  // 断点续传：上次没取完的游标与分母。
+  const stored = await db.getFirstAsync<{ total: number; cursor: string | null }>(
+    "SELECT total, cursor FROM download_state WHERE channel = ? AND book = ?",
+    [channelId, book],
+  );
+
   let progress: DownloadProgress = {
     channel: channelId,
     book,
     status: "downloading",
-    total: await totalParas(book),
+    total: stored?.total ?? (await totalParas(book)),
     done: await cachedParaCount(channelId, book),
     error: null,
     updatedAt: Date.now(),
   };
+  let cursor: string | null = stored?.cursor ?? null;
+
   const publish = async (patch: Partial<DownloadProgress>) => {
     progress = { ...progress, ...patch, updatedAt: Date.now() };
-    await writeState(progress, anchorParagraph);
+    await writeState(progress, anchorParagraph, cursor);
     onProgress?.(progress);
   };
   await publish({});
 
   try {
-    const chapters = await bookApiChapters(await tipitakaRunner(), book);
-    if (chapters.length === 0) throw new Error(`book ${book} 无段落数据`);
-
-    // ── 1. 探分母：每章问一次「有多少段有译文」，累加即本书的可下载段数 ──
-    let total = 0;
-    for (const ch of chapters) {
+    for (let n = 0; n < MAX_DOWNLOAD_BLOCKS; n++) {
       if (flag.cancelled) {
         await publish({ status: "paused" });
         return progress;
       }
-      const probe = await fetchChapterBlock(
+
+      const block = await fetchChapterBlock(
         channelId,
         book,
-        ch.start,
-        PROBE_PAGE_SIZE,
-        PROBE_PAGE_UNIT,
+        cursor,
+        DOWNLOAD_PAGE_SIZE,
       );
-      if (!probe) throw new Error(t("error.network"));
-      total += probe.total;
-    }
-    await publish({ total, done: await cachedParaCount(channelId, book) });
+      if (!block) throw new Error(t("error.network"));
+      // 分母取 meta.total（本书有译文的段数），首块拿到即固定。
+      if (block.total != null) progress.total = block.total;
 
-    // ── 2. 逐章按游标取数，缺口在哪就从哪续 ──
-    const resolved = await resolvedParas(
-      channelId,
-      book,
-      chapters[0].start,
-      chapters[chapters.length - 1].end,
-    );
-
-    for (const ch of chapters) {
-      let cursor = firstGap(ch, resolved);
-      while (cursor != null) {
-        if (flag.cancelled) {
-          await publish({ status: "paused" });
-          return progress;
-        }
-
-        const covered = await fetchChapterBlock(
-          channelId,
-          book,
-          cursor,
-          DOWNLOAD_PAGE_SIZE,
-        );
-        if (!covered) throw new Error(t("error.network"));
-        for (let p = cursor; p <= covered.to; p++) resolved.add(p);
-
-        await publish({ done: await cachedParaCount(channelId, book) });
-        cursor = firstGap(ch, resolved, covered.to + 1);
+      cursor = block.nextCursor; // null = 取完
+      if (cursor == null) {
+        // 分子按「渲染出正文的段」数，分母按服务端的「有译文的段」数 —— 个别段
+        // 在服务端有句子、渲染出来却是空的，会差上几段。整本取完就按满算，
+        // 否则进度条永远停在 99%。
+        await publish({ status: "done", done: progress.total });
+        return progress;
       }
-    }
 
-    // 分子按「渲染出正文的段」数，分母按服务端的「有译文的段」数 —— 个别段
-    // 在服务端有句子、渲染出来却是空的，会差上几段。整本取完就按满算，
-    // 否则进度条永远停在 99%。
-    await publish({ status: "done", done: total });
-    return progress;
+      await publish({
+        total: progress.total,
+        done: await cachedParaCount(channelId, book),
+      });
+    }
+    throw new Error(`download: book ${book} 取数块数超上限`);
   } catch (err) {
     await publish({
       status: "error",

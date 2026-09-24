@@ -127,7 +127,6 @@ export async function fetchChannelBooks(uid: string): Promise<ChannelBook[]> {
     const { data, error, response } = await client.GET("/v3/progress", {
       params: {
         query: {
-          view: "channel",
           channels: uid,
           level: 1,
           order: "updated_at",

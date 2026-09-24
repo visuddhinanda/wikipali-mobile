@@ -4,15 +4,19 @@
  * 按**段落**存，不按区间存：阈值可调，用户从目录 / 上一章 / 书签等不同入口
  * 进入同一片正文，产生的区间互相重叠 —— 段落是唯一稳定的复用单位。
  *
- * 补缺口走 `tipitaka-read-chapter`（§2）：给章节起点 + 游标，服务端回一块
- * **保证有内容**的段落，外加这一块实际覆盖到哪一段。覆盖区间里没回来的段
- * 就是「该版本没译」，记 `html = NULL` + 过期时间；过期前不再请求。
+ * 取数走新版 `/v3/tipitaka-reading/{channel}`（见 `docs/reading-content.md` §2）：
+ * - 阅读补缺口用 `para`/`to` 区间过滤（`fetchReadParas`）——按段号随机定位，
+ *   区间内没回来的段就是「该版本没译」，记 `html = NULL` + 过期时间；
+ * - 下载用 `book` + 游标（`fetchReadChapter`）顺序推进，分母取 `meta.total`。
  */
-import { fetchReadChapter } from "../api/read-chapter";
+import {
+  CHAPTER_PAGE_UNIT,
+  DOWNLOAD_PAGE_SIZE,
+  fetchReadChapter,
+} from "../api/read-chapter";
 import { fetchReadParas, type ReadParaItem } from "../api/read-para";
 import { mockReadParas } from "../api/mock";
-import { apiChapterAt } from "./chapter";
-import { openReadingDb, tipitakaRunner, withReadingTransaction } from "./db";
+import { openReadingDb, withReadingTransaction } from "./db";
 
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
 export const CACHE_QUOTA_BYTES = 200 * 1024 * 1024;
@@ -109,62 +113,60 @@ async function storeCovered(
   return byPara;
 }
 
-/** 一次取数覆盖到的结果：覆盖区间 + 这一块里真有正文的段。 */
-interface Covered {
-  /** 覆盖区间的最后一段（闭区间，含）。 */
-  to: number;
-  /** 本章节内 `to` 之后还剩多少段有译文；`empty` 时为 0。 */
-  remaining: number;
-  /** 该 channel 在本章节内有译文的段落总数；`empty` 时为 0。 */
-  total: number;
-  /** 本块里有正文的段。 */
-  html: Map<number, string>;
-}
-
 /**
- * 从游标 `cursor` 起取一块并写回缓存。返回覆盖到哪一段；离线（不写盘）返回 null。
+ * 用区间接口补一个缺口 `[from, to]`：按游标一块块取，每块写回缓存。
  *
- * 服务端回 404 / 422 表示「游标之后本章节没有任何译文」—— 把这一章剩下的段
- * 一次性记空，比逐段再试省掉整章的请求。
+ * 返回该区间的 `para → html`（空段为 ""）；离线返回 `mock: true`（不写盘）。
+ * 区间超过一页时用 `next_cursor` 续传，取完或 `next_cursor` 为 null 即停。
  */
-async function fetchInto(
+async function fillGap(
   channelId: string,
   book: number,
-  cursor: number,
-  pageSize?: number,
-  unit?: string,
-): Promise<Covered | null> {
-  const chapter = await apiChapterAt(await tipitakaRunner(), book, cursor);
-  if (!chapter) return null;
+  from: number,
+  to: number,
+): Promise<{ map: Map<number, string>; mock: boolean }> {
+  const map = new Map<number, string>();
+  let nextFrom = from;
+  let after: string | null = null;
+  // exhausted：服务端明说「区间取完了」（next_cursor 为 null 或空结果），
+  // 剩下的段才敢整段记空。兜底上限触达时不算取完，不记空 —— 那会被缓存层
+  // 写成「确认无内容」，下次进来看不到本该有的正文。
+  let exhausted = false;
+  for (let n = 0; n < MAX_BLOCKS_PER_FILL; n++) {
+    const { items, mock, nextCursor } = await fetchReadParas(
+      book,
+      from,
+      to,
+      channelId,
+      { after, pageSize: DOWNLOAD_PAGE_SIZE, unit: CHAPTER_PAGE_UNIT },
+    );
+    if (mock) return { map, mock: true };
+    if (items.length === 0) {
+      exhausted = true;
+      break;
+    }
 
-  const outcome = await fetchReadChapter(
-    book,
-    chapter.start,
-    channelId,
-    cursor,
-    pageSize,
-    unit,
-  );
-  if (outcome.status === "offline") return null;
-
-  if (outcome.status === "empty") {
-    await storeCovered(channelId, book, cursor, chapter.end, []);
-    return { to: chapter.end, remaining: 0, total: 0, html: new Map() };
+    const lastPara = items[items.length - 1].para;
+    // 覆盖区间 [nextFrom, lastPara]：items 里的段写正文；两条有译文段之间的
+    // 空档记 NULL —— 服务端按段号升序回，两条之间不会再有译文。
+    await storeCovered(channelId, book, nextFrom, lastPara, items);
+    for (let p = nextFrom; p <= lastPara; p++) map.set(p, "");
+    for (const item of items) {
+      if (item.display) map.set(item.para, item.display);
+    }
+    nextFrom = lastPara + 1;
+    if (!nextCursor) {
+      exhausted = true;
+      break;
+    }
+    after = nextCursor;
   }
-
-  const block = outcome.block;
-  // 覆盖区间的右端取服务端给的 last_para；游标不推进时保底推一段，
-  // 否则外层循环会原地打转。
-  //
-  // `remaining_para = 0` 时把覆盖区间一路延到章节末尾：服务端明说这一章
-  // 后面再没有译文了，那些段现在就能记空，不必等下一次进来时再问一遍
-  // （问了也只会换回一个 422）。
-  const to =
-    block.remainingPara === 0
-      ? Math.max(block.lastPara, cursor, chapter.end)
-      : Math.max(block.lastPara, cursor);
-  const html = await storeCovered(channelId, book, cursor, to, block.items);
-  return { to, remaining: block.remainingPara, total: block.totalPara, html };
+  // 区间确认取完：剩下的 [nextFrom, to] 一段译文都没有。
+  if (exhausted && nextFrom <= to) {
+    await storeCovered(channelId, book, nextFrom, to, []);
+    for (let p = nextFrom; p <= to; p++) map.set(p, "");
+  }
+  return { map, mock: false };
 }
 
 /**
@@ -175,9 +177,7 @@ async function fetchInto(
  * - 空段占位且在 48 小时过期时间内 → 命中，不重复请求；
  * - 空段占位且已过期（或旧数据无过期时间）→ 视为缺失，重新走网络。
  *
- * 空段在返回的 Map 里值为空串，拼接时由调用方跳过。返回的 Map 可能**超出**
- * `[from, to]`：章节接口按内容量切块，一块常常盖到区间之外，顺手带回来的
- * 段也一并给出去（已经写进缓存了，丢掉反而浪费）。
+ * 空段在返回的 Map 里值为空串，拼接时由调用方跳过。
  */
 export async function loadParasMap(
   channelId: string,
@@ -192,29 +192,26 @@ export async function loadParasMap(
     if (isValid(r, now)) byPara.set(r.para, r.html ?? "");
   }
 
-  const missing: number[] = [];
-  for (let p = from; p <= to; p++) {
-    if (!byPara.has(p)) missing.push(p);
-  }
-
-  let i = 0;
-  for (let n = 0; i < missing.length && n < MAX_BLOCKS_PER_FILL; n++) {
-    const cursor = missing[i];
-    const covered = await fetchInto(channelId, book, cursor);
-    if (!covered) {
-      // 离线：占位文只用于当次显示，不写盘 —— 否则会冒充真经永久留在缓存里
-      for (const item of await mockReadParas(book, cursor, missing[missing.length - 1])) {
+  let p = from;
+  while (p <= to) {
+    if (byPara.has(p)) {
+      p += 1;
+      continue;
+    }
+    // 找连续缺口 [p, gapEnd]，一次区间取数补齐。
+    let q = p;
+    while (q <= to && !byPara.has(q)) q += 1;
+    const gapEnd = q - 1;
+    const { map, mock } = await fillGap(channelId, book, p, gapEnd);
+    if (mock) {
+      // 离线：占位文只用于当次显示，不写盘 —— 否则会冒充真经永久留在缓存里。
+      for (const item of await mockReadParas(book, p, gapEnd)) {
         byPara.set(item.para, item.display);
       }
       return byPara;
     }
-    // 空段只填回请求区间之内：整章没译时覆盖区间可达上万段，全塞进 Map 没意义
-    const fillTo = Math.min(covered.to, to);
-    for (let p = cursor; p <= fillTo; p++) byPara.set(p, "");
-    // 有正文的段一律给出去，包括越过 `to` 的部分 —— 已经写进缓存了，丢掉反而浪费
-    for (const [p, html] of covered.html) byPara.set(p, html);
-    // 已覆盖的段全部跳过（缺口中间夹着的已缓存段也一并跨过去）
-    while (i < missing.length && missing[i] <= covered.to) i++;
+    for (const [para, html] of map) byPara.set(para, html);
+    p = gapEnd + 1;
   }
 
   return byPara;
@@ -224,9 +221,9 @@ export async function loadParasMap(
  * 取**精确一段**的正文（AI 回答里的引文角标用）：查缓存 → 缺了就联网取这一段。
  * 该版本没有这一段、或离线取不到，返回 null。
  *
- * 这里走的是段落区间接口（`fetchReadParas`）而不是章节接口：章节接口的游标
- * 落在没有译文的段上会**顺延到下一段有译文的**，问「9102-7」可能回 9102-350。
- * 引文要的是「这一段，有就是有、没有就是没有」，只能用不顺延的那个口子。
+ * 走区间接口（`fetchReadParas`）而不是游标接口：游标会**顺延到下一段有译文的**，
+ * 问「9102-7」可能回 9102-350。引文要的是「这一段，有就是有、没有就是没有」，
+ * 只能用不顺延的那个口子。
  *
  * 写回规则与阅读完全一致（有正文写 HTML、没有写 NULL + 过期时间），缓存因此
  * 是共用的：读过的段点角标不再联网，点过角标的段进阅读器也直接命中。
@@ -247,11 +244,12 @@ export async function loadOnePara(
 }
 
 /**
- * 从 `from` 起找第一个有正文的段落号，沿途的取数结果一并写进缓存。
- * 到 `hi` 为止都没有内容（或离线）返回 null。
+ * 从 `from` 起找第一个有正文的段落号；到 `hi` 为止都没有内容（或离线）返回 null。
  *
  * 用于「点开书什么都看不到」：译文残缺的版本前面整段没有内容，窗口停在书首
  * 只会看到一串标题。阅读器据此把窗口挪到真有正文的地方。
+ *
+ * 直接用 `page_size=1` 让服务端回该区间最小段号的有译文段，一次取到目标。
  */
 export async function findFirstContent(
   channelId: string,
@@ -259,24 +257,25 @@ export async function findFirstContent(
   from: number,
   hi: number,
 ): Promise<number | null> {
-  let p = from;
-  for (let n = 0; p <= hi && n < MAX_BLOCKS_PER_FILL; n++) {
-    const scan = await scanCached(channelId, book, p, hi);
-    // 缓存里从 p 起连续解析过的那一段就有正文 → 不必联网
-    if (scan.content != null) return scan.content;
-    if (scan.gap == null) return null; // 到 hi 为止都解析过且都没有正文
-    p = scan.gap;
+  const scan = await scanCached(channelId, book, from, hi);
+  // 缓存里从 from 起连续解析过的那一段就有正文 → 不必联网
+  if (scan.content != null) return scan.content;
+  if (scan.gap == null) return null; // 到 hi 为止都解析过且都没有正文
+  const p = scan.gap;
 
-    const covered = await fetchInto(channelId, book, p);
-    if (!covered) return null; // 离线
-    let first: number | null = null;
-    for (const [para, html] of covered.html) {
-      if (html && (first == null || para < first)) first = para;
-    }
-    if (first != null) return first;
-    p = covered.to + 1;
+  const { items, mock } = await fetchReadParas(book, p, hi, channelId, {
+    pageSize: 1,
+    unit: "para",
+  });
+  if (mock) return null;
+  if (items.length === 0) {
+    // 该区间一段译文都没有，整段记空，下次不再重问。
+    await storeCovered(channelId, book, p, hi, []);
+    return null;
   }
-  return null;
+  const first = items[0];
+  await storeCovered(channelId, book, p, first.para, items);
+  return first.para;
 }
 
 /**
@@ -351,39 +350,36 @@ export async function cachedParaCount(
 }
 
 /**
- * 该书该频道**已解析且未过期**的段落号（下载时跳过，即断点续传）。
- * 过期的空段占位不算已解析 —— 它们要重新试一次。
- */
-export async function resolvedParas(
-  channelId: string,
-  book: number,
-  from: number,
-  to: number,
-): Promise<Set<number>> {
-  const db = await openReadingDb();
-  const rows = await db.getAllAsync<{ para: number }>(
-    `SELECT para FROM para_html
-      WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
-        AND (html IS NOT NULL OR expires_at > ?)`,
-    [channelId, book, from, to, Date.now()],
-  );
-  return new Set(rows.map((r) => r.para));
-}
-
-/**
- * 下载用：取一块并写回缓存，返回覆盖到哪一段与本章节的进度数字。
- * 离线 / 取不到章节返回 null（调用方当作一次失败）。
+ * 下载用：按游标取一块并写回缓存，返回下一块游标与分母。
+ * 离线返回 null（调用方当作一次失败）。
  */
 export async function fetchChapterBlock(
   channelId: string,
   book: number,
-  cursor: number,
+  after: string | null,
   pageSize?: number,
-  unit?: string,
-): Promise<{ to: number; remaining: number; total: number } | null> {
-  const covered = await fetchInto(channelId, book, cursor, pageSize, unit);
-  if (!covered) return null;
-  return { to: covered.to, remaining: covered.remaining, total: covered.total };
+  unit?: "para" | "byte",
+): Promise<{ nextCursor: string | null; total?: number } | null> {
+  const outcome = await fetchReadChapter(book, channelId, after, {
+    pageSize,
+    unit,
+  });
+  if (outcome.status === "offline") return null;
+  if (outcome.status === "empty") return { nextCursor: null };
+
+  const block = outcome.block;
+  if (block.items.length > 0) {
+    // 只写 items 的正文与它们之间的空档；块外（书首到首条、末条到书尾）的
+    // 空段不在这里记，留给阅读路径按需补齐。
+    await storeCovered(
+      channelId,
+      book,
+      block.items[0].para,
+      block.items[block.items.length - 1].para,
+      block.items,
+    );
+  }
+  return { nextCursor: block.nextCursor, total: block.total };
 }
 
 export interface CacheUsage {
@@ -498,7 +494,7 @@ export async function localChannelsFor(book: number): Promise<LocalChannel[]> {
              HAVING COUNT(html) > 0) c
        LEFT JOIN channels n ON n.uid = c.channel
        LEFT JOIN download_state d
-              ON d.channel = c.channel AND d.book = ? AND d.done > 0
+               ON d.channel = c.channel AND d.book = ? AND d.done > 0
       ORDER BY downloaded DESC, cached DESC`,
     [book, book],
   );

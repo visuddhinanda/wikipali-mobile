@@ -200,6 +200,7 @@ export async function openReadingDbFor(
   await db.execAsync(SCHEMA);
   await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
   await ensureColumn(db, "download_state", "server_id", "server_id TEXT");
+  await ensureColumn(db, "download_state", "cursor", "cursor TEXT");
   await migrateParaHtmlNullable(db);
   return db;
 }
@@ -290,6 +291,7 @@ CREATE TABLE IF NOT EXISTS channels (
 
 -- 用户显式下载过的书，区别于阅读时被动产生的缓存（清理时不误删）。
 -- server_id：同步后回填的服务器 like.id（type=download）。
+-- cursor：断点续传游标（tipitaka-reading 的 meta.next_cursor），null 表示从头 / 取完。
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
@@ -299,6 +301,7 @@ CREATE TABLE IF NOT EXISTS download_state (
   error      TEXT,
   updated_at INTEGER NOT NULL,
   server_id  TEXT,
+  cursor     TEXT,
   PRIMARY KEY (channel, book)
 );
 

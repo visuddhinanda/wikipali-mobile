@@ -995,7 +995,7 @@ export function ReaderLayerPane({
           if (!picked) {
             // 列表为空但明确知道上一层用的版本（义注/复注层沿用原文层的版本 uid）：
             // 部分后端/测试库缺「版本列表」接口数据时，仍直接沿用该 uid 取正文，
-            // 而不是报「无版本」。正文接口（tipitaka-read-chapter）按 channel 直接可用。
+            // 而不是报「无版本」。正文接口（tipitaka-reading）按 channel 直接可用。
             if (preferredChannelUid) {
               setChannelId(preferredChannelUid);
               setChannelName(preferredChannelName ?? undefined);
