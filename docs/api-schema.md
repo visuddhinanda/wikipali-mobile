@@ -49,17 +49,17 @@
 | 8 | `GET/POST /v2/recent` | `id` / `type` / `article_id` 标成 `number` | 三者都是 `string`（`article_id` 形如 `"<book>-<para>"`） |
 | 9 | `GET /v2/recent` | 查询参数缺 `view` | 补 `view?: "user" | ...`（移动端用 `view=user` 拉某用户记录） |
 
-### C. v3 阅读链路 meta 缺手工分页字段
+### C. v3 阅读链路（已随端点合并重做）
 
-| # | 接口 | 问题 | 应改为 |
-|---|---|---|---|
-| 10 | `GET /v3/tipitaka-read-chapter` | `data[]` 是空对象；`meta` 套通用 `PaginationMeta` | `data[]` = `{para:int, display:string}`；`meta` 用专用 schema（如 `ReadChapterMeta`）补 `first_para`、`last_para`、`total_para`、`remaining_para`、`page_size` |
-| 11 | `GET /v3/tipitaka-read-para` | `data[]` 是空对象 | `data[]` = `{para:int, display:string}` |
+旧的 `GET /v3/tipitaka-read-chapter` 与 `GET /v3/tipitaka-read-para` 已合并为
+`GET /v3/tipitaka-reading/{channel}`，并补齐了类型（`data[] = {para, display, book}`、
+`meta = {page_size, page_size_unit, next_cursor, total, remaining}`），原清单 #10/#11
+随之关闭。
 
 ### D. 已达标（无需改，供核对）
 
-- `GET /v3/progress?view=channel`：`data[]` 已逐字段类型化（`book/para/lang/progress/channel_id/title/last_chapter_completed_at/completed_at/updated_at`），对齐移动端 `ChannelBook`。✅
-- `GET/POST/DELETE /v3/me/reactions`：`data` / `requestBody` 已类型化（含 `type`/`target_type` 枚举、`user` 嵌套）。✅
+- `GET /v3/progress`：`data[]` 已逐字段类型化（`book/para/lang/progress/channel_id/title/last_chapter_completed_at/completed_at/updated_at`），对齐移动端 `ChannelBook`（`view` 参数已删，channel 是唯一口径）。✅
+- `GET/POST/DELETE /v3/me/reactions`：`data` / `requestBody` 已类型化（含 `type`/`target_type` 枚举、`user` 嵌套）；POST 返回完整 reaction 资源、DELETE 返回 204。✅
 
 ---
 

@@ -43,7 +43,7 @@
    │   <cite class="anno-jump">义注</cite> 追加在 .sidenote 内（点它跳义注/复注整页）
    │
    ▼ 段落后追加 renderFootnoteList()（.anno-footnotes 脚注列表，每条默认收起 1 行）
-   └─ 返回给 App（tipitaka-read-chapter 的 display 字段）
+   └─ 返回给 App（tipitaka-reading 的 display 字段）
 ```
 
 要点：**译文内嵌**（义注只显示译文，不显示巴利原文）；**模板复用**（sidenote 外壳由 `render_note()` 统一生成，`injectAnnotationNotes` 不再手拼 `<label>/<input>/<span>`）。
@@ -113,7 +113,7 @@ quote_suffix text,         -- 可为空：后缀上下文
 
 ## 6. 渲染管线：`{{note|text=…|cite=…|citelink=…}}`
 
-App 用 `TipitakaReadChapterController`（`GET /api/v3/tipitaka-read-chapter`，见 `docs/reading-content.md` §2）拿 HTML；两个接口共用 `PaliContentService::readParagraph`，注释是在**渲染句子**时注入的，与走哪个接口无关，流程：
+App 用 `V3\TipitakaReadingController`（`GET /api/v3/tipitaka-reading/{channel}`，见 `docs/reading-content.md` §2）拿 HTML；接口共用 `PaliContentService::readParagraph`，注释是在**渲染句子**时注入的，与走哪个过滤无关，流程：
 
 1. `PaliContentService::renderReadSentences()` 逐句渲染（见 `docs/reading-content.md` §2）。
 2. 渲染某句时，查该句的注释记录：`Discussion::where('res_type','sentence')->where('res_id', $sentence->uid)->where('type','note')->orderByDesc('pos_end')`。
@@ -350,7 +350,7 @@ INSERT INTO discussions (
 ## 16. 与既有功能的关系 / 边界
 
 - **与层级标签栏不冲突**：标签栏是整页对读（章级），本功能是段级内嵌；`<cite>` 跳转把它们串起来（§9.3）。
-- **正文获取复用**：注释内容走 `docs/reading-content.md` 的同一条链路（`tipitaka-read-chapter` + `para_html` 缓存），App 侧无需新接口；注释记录存在 mint 的 `discussions` 表（§3）。
+- **正文获取复用**：注释内容走 `docs/reading-content.md` 的同一条链路（`tipitaka-reading` + `para_html` 缓存），App 侧无需新接口；注释记录存在 mint 的 `discussions` 表（§3）。
 - **缓存失效**：`renderReadSentences` 按 `(book, para, channel)` 缓存（`PaliContentService`），注释注入发生在缓存内容里。因此**改/删 `discussions` 注释记录后，须失效对应段落的缓存**（`PaliContentService::forgetParagraph`），否则旧缓存里还是旧注释。
 - **无对应注释的段落**：查不到注释记录 → 不显示角标/脚注，段落外观与现状一致；把「无注释」当正常结果而非错误。
 - **锚点定位失败**：`pos_start/pos_end` 与 `quote_exact` 均未命中（正文被大改）时，退化为「不插入」或「挂到句尾」，不阻断正文渲染。

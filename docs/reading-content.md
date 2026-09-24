@@ -9,8 +9,8 @@
 用户点书名
   └─ 本地 SQLite（pali_text）算出阅读单元区间 [from, to]      ← §3
       └─ 查缓存库（para_html），列出缺口段落                  ← §4
-          └─ 缺口走 tipitaka-read-chapter 接口按游标取块      ← §2
-              └─ 块里回来的段写 HTML、块覆盖到但没回来的段写 NULL
+          └─ 缺口走 tipitaka-reading 接口（para/to 区间过滤）取数   ← §2
+              └─ 区间里回来的段写 HTML、没回来的段写 NULL
                  （带过期时间），拼成 HTML 灌进 WebView
 ```
 
@@ -43,133 +43,91 @@
 | 章节树读 `src/data/tipitaka_heading.json` | `src/catalog/headings.ts` | 改读 SQLite `pali_text`（JSON 只有标题行，缺 `level=100` 正文行，算不出区间字符数） |
 
 
-## 2. 数据接口：`tipitaka-read-chapter`
+## 2. 数据接口：`tipitaka-reading`
 
-后端实现：`mint/api-v13/app/Http/Controllers/TipitakaReadChapterController.php`
-客户端：`src/api/read-chapter.ts`
+后端实现：`mint/api-v13` `V3\TipitakaReadingController`（合并了旧的
+`TipitakaReadChapterController` 与 `TipitakaReadParaController`）
+客户端：`src/api/read-chapter.ts`（游标取数）、`src/api/read-para.ts`（区间取数）
+
+一个端点两种用法。`book` / `chapter` / `para` / `to` 是**过滤**（都可选），
+`after` / `page_size` / `unit` 是**游标分块**，`format` / `include` 是**渲染**：
 
 ```
-GET /api/v3/tipitaka-read-chapter
-    ?book=94&para=3&from=3
-    &channel=19f53a65-81db-4b7d-8144-ac33f1217d34
-    &format=html&view=display&pagesize=3000&unit=byte
+GET /api/v3/tipitaka-reading/{channel}
+    ?book=94             过滤：书（下载按书取整本）
+    &chapter=3           过滤：章节起始段号（服务端按 chapter_len 展开）
+    &para=7&to=7         过滤：段落区间（精确取段，与 chapter 互斥）
+    &after=<cursor>      游标：取 meta.next_cursor 原样回传（不透明，勿自己拼）
+    &page_size=3000&unit=byte
+    &format=html&include=display
 ```
 
-### 2.1 为什么成片取数换掉了 `tipitaka-read-para`
+### 2.1 游标：`from` 换成 `after`
 
-段落区间接口的语义是「给一段区间，**期待里面都有内容**」。可多数译本是残缺的
-—— 译到哪算哪，中间大段大段没有。于是：
+`from`（段号）不是被删掉，而是**换成** `after`（不透明游标）。四个原因按
+重要性排：
 
-- 区间落在没译的地方 → 整批回空，客户端只能记下「这一段没有」再往后试；
-- 一本书只有后半部有译文 → 从书首进去，前面每一批都是空的，
-  **用户第一次点开书什么都看不到**。
+1. **`from` 是「书内坐标」，新端点能跨书**。旧接口路径带 `book`，结果必在
+   一本书内，`from=123` 唯一；新端点 `book` 降级成可选 filter —— 不带 `book`
+   就是「取该 channel 全部译文」（下载场景要的正是这个），此时 `from=123` 问
+   的是哪本书？游标必须是二元组，所以是 `after={book}-{para}`。
+2. **`after` 不要求客户端做算术**。旧约定是 `last_para + 1` 当下次 `from`，
+   但段号不连续（没译文的段被跳过），`+1` 只是碰巧能用、服务端还得顺延；新的
+   是排他式游标，服务端在 `meta.next_cursor` 直接给字符串、客户端**原样回传**
+   （不要自己拼）。
+3. **实现从 offset 变 keyset，这是性能前提**。旧代码把整章译文段号拉成数组再
+   找下标、`array_slice`，章节几百段能扛；去掉 `book` 过滤后结果集最大 52 万段
+   （实测），那种做法就是 821ms / 281MB。`after` 直接翻译成一条行值比较
+   `(book_id, paragraph) > (?, ?)`，走 `(book_id, paragraph, …)` 复合索引，3ms。
+4. **顺带消掉两条 422**。旧 `from` 超出章节区间、或其后已无译文 → 422；`after`
+   不需要这两条特例：它只是「排在它之后」的比较基准，指向的段存不存在、有没有
+   译文都无所谓，取不到就是空 `data` + `next_cursor: null`。
 
-实测书 94 配「庄春江工作站」频道：章节从段 3 起，第一段译文在 **287**。
-旧链路从段 3 开窗口，前面 284 段一个字都没有。
+`meta` 的 `first_para` / `last_para` / `remaining_para` / `current_para` /
+`total_para` 换成 `next_cursor` / `total` / `remaining`：
 
-章节接口把方向反过来：由服务端在章节范围内**只数有译文的段落**、按内容量
-切块，每块都保证有内容；客户端要做的是从块的**覆盖区间**反推「哪些段确认
-没有译文」。
+- `next_cursor`：下一块游标，**为 null 表示取完**；
+- `total` / `remaining`：过滤范围内已翻译的段数 / 本块之后还剩多少段有译文，
+  **只在带 `book` 过滤时给**。
 
-### 2.2 参数
+### 2.2 成片取数：整本书 / 整章节走游标（下载逻辑）
 
-| 参数 | 必填 | 说明 |
-|---|---|---|
-| `book` | ✅ | 书 id |
-| `para` | ✅ | **章节起始段号**。取数范围 = `[para, para + chapter_len - 1]` |
-| `from` | | 游标，从这一段开始取；缺省 = `para`。落在没有译文的段上服务端顺延到其后第一段 |
-| `channel` | ✅ | 频道 uuid |
-| `format` | | `html` \| `markdown` \| `react` \| `text`，缺省 `html` |
-| `view` | | `display`（整段合并）\| `sentences` \| `all`，缺省 `display` |
-| `pagesize` | | 每块大小，本 App 固定 **3000**（服务端上限 5000 字节 / 200 段）|
-| `unit` | | `para` 按段数、`byte` 按段落原文字节数累加；本 App 固定 **`byte`** |
+**阅读的成片情况只有两种**，其一就是「整本书 / 整章节」——用游标，与下载同
+一条逻辑：`after=null` 从头取，之后把 `next_cursor` 原样传回，直到它为 null。
+整本书用 `book` 过滤（分母直接取首块 `meta.total`，**不再逐章探测**；断点续传
+把 `next_cursor` 存进 `download_state.cursor`）；只取某个章节就再加 `chapter`
+过滤，服务端按 `chapter_len` 展开。
 
-**`para` 取哪一层**：本地 `pali_text` 里 `parent = -1` 的**顶层行**
-（`src/reading/chapter.ts`）。全库 217 本校验过，顶层行首尾相接、
-**不重不漏地平铺整本书**，每本 1–8 行，最长的一章 15943 段。
+### 2.3 精确取一段：`para=<para>`
 
-取最粗的一层而不是末层章节：接口每次调用都要在整个章节范围里数一遍
-「该 channel 有多少段有译文」（进度条的分母），章节越碎调用次数越多。
-顶层一本书最多 8 章，游标在章内一路推进，**块数由内容量决定而不是由目录
-结构决定**。
+其二是「单个 para」——用 `para=<para>`（`to` 缺省即等于 `para`，只取一段），
+AI 引文角标走的就是它：请求那段**有译文**才回、没有就是空，**不顺延**，问
+`9102-7` 就只会回答 9102-7。阅读窗口补缺口是它的区间泛化（`para=from&to=to`，
+按段号随机定位到窗口，同样不顺延），两者共用 `src/api/read-para.ts`。
 
-### 2.3 响应
+### 2.4 响应
 
 ```json
 {
   "data": [
-    { "para": 287, "display": "<div id='para-287' class='translation' …>…</div>" },
-    { "para": 288, "display": "…" }
+    { "para": 287, "book": 94, "display": "<div id='para-287' class='translation' …>…</div>" }
   ],
   "meta": {
-    "current_para": 3, "total_para": 427,
     "page_size": 3000, "page_size_unit": "byte",
-    "book": 94, "chapter": 3,
-    "first_para": 287, "last_para": 295, "remaining_para": 418
+    "next_cursor": "94-295",
+    "total": 427, "remaining": 418
   }
 }
 ```
 
-meta 各键：
-
-| 键 | 含义 |
-|---|---|
-| `current_para` | 请求的游标 `from` 原样回显 |
-| `total_para` | 该 channel 在本章节内**有译文**的段落总数 —— 进度条的分母 |
-| `page_size` / `page_size_unit` | 实际生效的块大小（超上限不报错，按上限算）|
-| `book` / `chapter` | 回显 |
-| `first_para` / `last_para` | 本块实际**覆盖**的段落闭区间 |
-| `remaining_para` | `last_para` 之后本章节内还剩多少段有译文；0 即本章取完 |
+`data` 里每段是 `{ para, display, book }`；`display` 为空的段会被服务端剔除。
+`total` / `remaining` 只在带 `book` 过滤时出现。
 
 > **信封**：新契约是 Laravel 资源集合原样输出（`{data, meta}`），错误走
 > RFC 9457 Problem Details；仍在跑旧版本的实例外面还包一层
 > `{ ok, data: { items, pagination }, message }`。`src/api/v3.ts` 的
-> `unwrapV3Collection` 两种都认，拿不到 `first_para` / `last_para` 就当契约
-> 不符报错 —— **不能静默当成空结果**，那会被缓存层写成「确认无内容」。
-
-### 2.4 覆盖区间：客户端的立足点
-
-`data` 可能比 `[first_para, last_para]` **短**：区间内渲染出来是空的段会被
-剔出 `data`，但仍算在本块之内。续传必须按 `last_para` 推进，否则会卡在那一段
-上原地打转。
-
-客户端据此得到一条硬结论：
-
-> **`[from, last_para]` 里没出现在 `data` 中的段，就是「该版本没有这一段」。**
-
-游标与 `first_para` 之间那一截（例：`from=3`、`first_para=287`）同理 ——
-服务端顺延过去了，说明中间全都没有译文。
-
-`remaining_para = 0` 时再补一刀：本章节后面不会再有译文了，从 `last_para + 1`
-到章节末尾一并记空，省掉下一次进来时那个只会换回 422 的请求。
-
-### 2.5 两种「没有」
-
-| 响应 | 含义 | 客户端动作 |
-|---|---|---|
-| `404` | 整个章节该 channel 一段译文都没有 | 整章记空 |
-| `422` + `errors.from` | 游标在章节区间内，但它之后没有译文了 | 游标到章节末尾记空 |
-
-两者都不是参数错误，是取数的正常终点。`src/api/client.ts` 的 `ApiError` 因此
-带上了错误响应的 `body` —— 只看状态码分不出「参数写错了」和「这是边界」。
-
-### 2.6 精确取一段仍然用 `tipitaka-read-para`
-
-章节接口**不能回答「这一段有没有」**：游标落在没有译文的段上它会顺延到下一段
-有译文的，问 `9102-7` 回的可能是 `9102-350`。
-
-AI 回答里的引文角标要的恰好是「这一段，有就是有、没有就是没有」，所以
-`src/api/read-para.ts` 保留，`loadOnePara`（`src/reading/cache.ts`）用它取单段：
-
-```
-GET /api/v3/tipitaka-read-para?book=9102&para=7&to=7&channel=…
-```
-
-区间接口不顺延，请求了却没回来就是「该版本没有这一段」。写回规则与阅读完全
-一致（有正文写 HTML、没有写 NULL + 过期时间），两条路共用同一份 `para_html`：
-读过的段点角标不再联网，点过角标的段进阅读器也直接命中。
-
-它**只**用于单段取数 —— 成片取正文走章节接口，理由见 §2.1。
+> `unwrapV3Collection` 两种都认，拿不到期望的键就当契约不符报错 ——
+> **不能静默当成空结果**，那会被缓存层写成「确认无内容」。
 
 ## 3. 阅读单元切分算法
 
@@ -419,17 +377,13 @@ CREATE TABLE IF NOT EXISTS download_state (
   1. SELECT para, html, expires_at FROM para_html
       WHERE channel=? AND book=? AND para BETWEEN ? AND ? ORDER BY para
      —— 非空正文直接命中；空段占位只在过期时间内算命中
-  2. 与 [from, to] 求差，得到缺口段落
-  3. 游标落在第一个缺口上，反复调 §2 的章节接口取块：
-       block → [游标, last_para] 里回来的段写 HTML，其余写 NULL + 过期时间
-       empty → [游标, 章节末尾] 整段写 NULL + 过期时间
-       游标推到 last_para + 1，跳过中间已缓存的段，直到盖过 to
-  4. 每块一个事务（多值 INSERT 批量写：整章记空可达上万段，逐段过桥要好几秒）
+  2. 与 [from, to] 求差，得到连续缺口
+  3. 对每个缺口 [a, b] 调 §2 的区间接口（`para=a&to=b`）取数：
+       区间里回来的段写 HTML，其余段写 NULL + 过期时间；
+       区间超过一页就按 `next_cursor` 续传
+  4. 每块一个事务（多值 INSERT 批量写：整段记空可达上万段，逐段过桥要好几秒）
   5. 按 para 升序拼接所有非空 html，交给 WebView
 ```
-
-一块常常盖到 `to` 之外 —— 那些段已经写进缓存了，也一并返回给调用方，
-省下一次滚动扩窗的往返。
 
 **首屏一段正文都没有怎么办**（`findFirstContent`）：残缺译本书首整片是空的，
 窗口停在那里只有一串目录标题。用户正在读的那一层（`ReaderLayerPane` 的
@@ -439,33 +393,29 @@ CREATE TABLE IF NOT EXISTS download_state (
 
 ### 4.4 整本下载与断点续传
 
-下载与阅读走同一条链路，只有块大小不同：阅读 3000 字节（跟着窗口走，首屏要
-快），下载 **5000 字节**（服务端的字节上限，块越大往返越少）。实测书 94
-的 1557 段：3000 要 142 块 13.8 秒，5000 只要 91 块 10.8 秒。
+下载与阅读走同一端点，只是过滤与块大小不同：下载用 `book` 过滤 + 游标，
+每块 **5000 字节**（服务端的字节上限，块越大往返越少）。
 
 **进度条的分子分母**（`src/reading/download.ts`）：
 
 | | 取值 | 为什么 |
 |---|---|---|
-| 分母 `total` | Σ 各章节的 `meta.total_para` | 该版本在本书**有译文**的段数 |
+| 分母 `total` | 首块的 `meta.total` | 该版本在本书**有译文**的段数 |
 | 分子 `done` | `SELECT count(html) …`（非空段数）| 已经下到手的正文段数 |
 
-分母不能用「本书段落总数」：残缺译本里多数段没有译文，下载时它们只是被记成
-空段，一个请求就能扫掉上千段 —— 进度条会瞬间冲到 90% 再原地不动，完全不反映
-实际下了多少内容。同理分子只数非空段。
-
-分母在开工时一次探清：每个顶层章节发一个 `pagesize=1&unit=para` 的小请求，
-拿它的 `total_para` 累加（一本书最多 8 个章节）。**先探完再开下**，进度条的
-分母就不会边下边变。探回来的那一段内容顺手也存下来。
+分母不能用「本书段落总数」：残缺译本里多数段没有译文，按它算进度条会瞬间
+冲到 90% 再原地不动，完全不反映实际下了多少内容。同理分子只数非空段。
 
 下载循环：
 
-1. 查该书**已解析且未过期**的段（`resolvedParas`），算出还缺哪些 ——
-   这就是断点续传，中断在哪都不用记，重启时自然从缺口继续；
-2. 逐章把游标落在第一个缺口上，按 §2 取块、写回，游标推到 `last_para + 1`；
+1. 读 `download_state.cursor`（上次的 `next_cursor`）作为起点 —— 这就是断点
+   续传：中断在哪都不用扫，重启后从游标继续；
+2. `after` 取块、写回（items 写 HTML、两条译文之间的空档写 NULL），游标推进
+   到 `next_cursor`；
 3. 每块写入是一个事务，进程被杀不会留下半截数据；
-4. 每块结束更新 `download_state.done`，UI 据此显示百分比；
-5. 暂停 / 取消 = 停止循环，已写入的数据全部有效，`status` 置 `paused`。
+4. 每块结束更新 `download_state.done` 与 `cursor`，UI 据此显示百分比；
+5. `next_cursor == null` 即取完；暂停 / 取消 = 停止循环，已写入的数据全部
+   有效，`status` 置 `paused`、游标保留。
 
 整本取完时把 `done` 按 `total` 写满：服务端数的是「有句子的段」，客户端数的是
 「渲染出正文的段」，个别段两边会差一点，不补的话进度条永远停在 99%。
@@ -502,10 +452,10 @@ SELECT channel, count(html) paras, sum(length(html)) bytes
 批次体量在 24 K 到 321 K 字符之间摆动，1 MB 的 HTML 必然撞上
 `src/api/client.ts` 的 12 秒超时。
 
-章节接口自带这件事：`pagesize` + `unit=byte` 就是「按段落原文字节数累加到
-上限即断块」，且服务端另有每块 200 段的硬上限管住偈颂类的书。客户端只要给
-一个块大小，分批算法（`src/reading/batch.ts` 的 `planRanges`）与它的校验脚本
-`scripts/check-batch.mjs` 一并删除。
+`tipitaka-reading` 自带这件事：`page_size` + `unit=byte` 就是「按段落原文字节
+数累加到上限即断块」，且服务端另有每块 200 段的硬上限管住偈颂类的书。客户端
+只要给一个块大小，分批算法（`src/reading/batch.ts` 的 `planRanges`）与它的
+校验脚本 `scripts/check-batch.mjs` 一并删除。
 
 段落字符数（`pali_text.length`）仍然要用，但只用于**划阅读窗口**
 （`src/reading/window.ts` 的 `paragraphLengths`），与取数无关。
@@ -587,9 +537,9 @@ SELECT channel, count(html) paras, sum(length(html)) bytes
 2. ✅ `src/reading/db.ts`：拷贝 assets 里的只读库、打开 `reading.db3`、建表。
 3. ✅ `src/reading/unit.ts`：§3.2 算法（纯函数 + 按书的内存索引）。
 4. ✅ `src/reading/cache.ts`：§4.3 读取流程（查缓存 → 补缺口 → 事务写回）。
-5. ✅ `src/api/read-chapter.ts`：`tipitaka-read-chapter` 客户端（§2）；
+5. ✅ `src/api/read-chapter.ts`：`tipitaka-reading` 游标客户端（§2.2）；
    `src/api/v3.ts` 统一拆 v3 列表信封。`src/api/read-para.ts` **保留**，
-   见 §2.6：它是唯一能精确取某一段的口子，引文角标要用。
+   见 §2.3：区间过滤是唯一能精确取某一段的口子，引文角标要用。
 6. ✅ `src/reading/index.ts` 作为门面；`src/api/index.ts` 与 §1.2 列出的旧代码
    全部删除（`fetchChapterContent` / `fetchChapterByChannel` / `flattenReadHtml` /
    `getChapterContent` / `getChapterByChannel` / `mockGetChapterContent` /
@@ -604,9 +554,9 @@ SELECT channel, count(html) paras, sum(length(html)) bytes
 9. ✅ 下载 UI 与入口：`DownloadControl`（进度环 + 状态 + 管理操作）与
    `DownloadIconButton`（图标 + 百分比）；入口三处 —— 版本列表每行、
    阅读器顶栏、阅读器设置弹层 / 书架「已下载」。
-10. ✅ 取数改走章节接口（§2）：`src/reading/chapter.ts` 给出取数章节
-    （`parent = -1` 的顶层行），`cache.ts` 按游标补缺口、按覆盖区间记空段
-    （带 48 小时过期时间），`download.ts` 按 `total_para` 算进度。
+10. ✅ 取数改走 `tipitaka-reading`（§2）：`cache.ts` 用 `para`/`to` 区间补缺口、
+    按区间记空段（带 48 小时过期时间），`download.ts` 用 `book` + 游标推进、
+    按 `meta.total` 算进度、以 `next_cursor` 断点续传。
     客户端分批（`batch.ts` / `check-batch.mjs`）随之删除（§4.6）。
 11. ✅ 首屏没有正文时挪到第一段真有正文的地方（§4.3 `findFirstContent`），
     只对用户正在读的那一层生效。
@@ -632,7 +582,7 @@ node scripts/check-reading-unit.mjs 59       # 某本书连续翻页
 
 ### 离线占位数据不入库
 
-网络不可达时 `fetchReadChapter` 回 `status: "offline"`，缓存层据此改用
-`mockReadParas` 的占位文**只供当次显示、不写盘** —— 否则占位文会冒充真经
-永久留在 `para_html` 里，比一次加载失败糟得多。引文角标走的 `loadOnePara`
-（§2.6）连显示都不显示，直接回 null 提示取不到。
+网络不可达时 `fetchReadParas` 回 `mock: true`（`fetchReadChapter` 回
+`status: "offline"`），缓存层据此改用 `mockReadParas` 的占位文**只供当次显示、
+不写盘** —— 否则占位文会冒充真经永久留在 `para_html` 里，比一次加载失败糟得多。
+引文角标走的 `loadOnePara`（§2.3）连显示都不显示，直接回 null 提示取不到。

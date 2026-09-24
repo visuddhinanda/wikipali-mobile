@@ -358,10 +358,10 @@ chapter_len, chapter_strlen, parent, tags, cs_para, book_name`。
 用户点书名
   └─ 本地 SQLite(pali_text) 算阅读单元区间 [from,to]   src/reading/unit.ts
       └─ 查缓存 para_html，列出缺口段落                src/reading/cache.ts
-          └─ 缺口按「章节 + 游标」取块                 src/reading/chapter.ts
-              └─ api/v3/tipitaka-read-chapter          src/api/read-chapter.ts
-                  └─ 回来的段写 HTML、覆盖到但没回来的
-                     段写 NULL(48h 过期)，拼 HTML 进 WebView
+          └─ 缺口用 para/to 区间过滤取数               src/api/read-para.ts
+              └─ api/v3/tipitaka-reading/{channel}
+                  └─ 回来的段写 HTML、没回来的段写 NULL
+                     (48h 过期)，拼 HTML 进 WebView
 ```
 
 **已删除的旧路径**（别再找了）：`chapter-content/{book}-{para}?mode=read`、
@@ -401,26 +401,21 @@ App 与脚本共用同一份实现）。
   「没有」不是永久结论，译者随时可能补上。
 - 离线时 mock 占位数据带 `mock: true` **不写盘**，否则会冒充真经留在库里。
 
-### 11.4 取数：章节 + 游标（`tipitaka-read-chapter`）
+### 11.4 取数：`tipitaka-reading`（一个端点两种用法）
 
-段落区间接口 `tipitaka-read-para` 的语义是「给一段区间、期待里面都有内容」。
-译本大多残缺，区间落在没译的地方就整批回空；一本书只有后半部有译文时，
-**用户点开书什么都看不到**（书 94 配「庄春江工作站」：章节从段 3 起，
-第一段译文在 287）。
+旧 `tipitaka-read-chapter` 与 `tipitaka-read-para` 合并成
+`/v3/tipitaka-reading/{channel}`。阅读用 `para`/`to` 区间过滤补缺口（按段号随机
+定位、不顺延），下载用 `book` + 游标整本推进。要点：
 
-章节接口由服务端只数有译文的段、按内容量切块，每块都保证有内容，
-并给出这一块的**覆盖区间**——区间里没回来的段就是「该版本没有」，记 NULL。
-要点：
-
-- `para` 传 `parent = -1` 的**顶层行**（`src/reading/chapter.ts`）。全库校验过
-  顶层行平铺整本书，每本 1–8 章，取最粗的一层才不会为了数分母反复调用。
-- 块大小：阅读 3000 字节、下载 5000 字节（服务端上限）。书 94 的 1557 段，
-  3000 要 142 块 13.8 秒，5000 只要 91 块 10.8 秒。
-- 404 = 整章没译，422+`errors.from` = 游标之后没译了 —— 都不是参数错误，
-  是取数终点，整段记空。`ApiError` 因此带上了错误响应的 body。
-- **进度条分母是 `total_para`（有译文的段数）累加，分子是非空段数**。
+- 游标从「段号 `from`」换成「不透明 `after`」：取 `meta.next_cursor` 原样回传，
+  为 null 表示取完。`meta` 的 `first_para`/`last_para`/`total_para`/`remaining_para`
+  换成 `next_cursor`/`total`/`remaining`，后两者只在带 `book` 过滤时给。
+- 没有译文 / 游标越界都是 200 空集合，不再是 404/422（特判已删）。
+- 块大小：下载 5000 字节（服务端上限）。
+- **进度条分母 = `meta.total`（本书有译文的段数），分子 = 非空段数**。
   用「本书段落总数」当分母的话，残缺译本一个请求扫掉上千空段，
   进度条瞬间冲到 90% 再原地不动。
+- 断点续传 = 把 `next_cursor` 存进 `download_state.cursor`，中断后从游标继续。
 - 客户端分批（`batch.ts` / `check-batch.mjs`）已删除，分块交给服务端。
 - **`tipitaka-read-para` 不能删**：章节接口的游标会顺延，问某一段有没有它回的
   是「往后第一段有的」。引文角标要精确到段，`loadOnePara` 仍走区间接口取单段，
