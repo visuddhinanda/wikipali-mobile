@@ -2,7 +2,7 @@
 # API 全功能测试（连本地开发 server）
 #
 # 覆盖书架/阅读链路用到的全部接口：登录、当前用户、阅读记录(recent)、
-# 收藏/书签/下载(reactions)、progress 正向解析+反查、tipitaka-read-chapter/para。
+# 收藏/书签/下载(reactions)、progress 正向解析+反查、tipitaka-reading（游标+区间）。
 # 用法：scripts/test-api.sh [SERVER]  默认 http://127.0.0.1:8000
 set -u
 
@@ -58,17 +58,17 @@ CC=$(curl -s -m 8 "$SERVER/api/v2/progress?view=chapter_channels&book=$BOOK&par=
   | py "len(d.get('data',{}).get('rows',[]) if d.get('ok') else [])")
 [ "${CC:-0}" -gt 0 ] 2>/dev/null && pass "progress chapter_channels（$CC 个版本）" || fail "progress chapter_channels"
 
-# 6. tipitaka-read-chapter —— 章节正文取数
-CH_RAW=$(curl -s -m 10 "$SERVER/api/v3/tipitaka-read-chapter?book=$BOOK&para=$PARA&from=$PARA&channel=$CHANNEL&format=html&view=display&pagesize=5000&unit=byte")
+# 6. tipitaka-reading —— 整本游标取数（book 过滤）
+CH_RAW=$(curl -s -m 10 "$SERVER/api/v3/tipitaka-reading/$CHANNEL?book=$BOOK&format=html&include=display&page_size=5000&unit=byte")
 CH_N=$(echo "$CH_RAW" | py "len(d.get('data',[]))")
-CH_FIRST=$(echo "$CH_RAW" | py "d.get('meta',{}).get('first_para')")
-CH_LAST=$(echo "$CH_RAW" | py "d.get('meta',{}).get('last_para')")
-[ "${CH_N:-0}" -gt 0 ] 2>/dev/null && pass "tipitaka-read-chapter（items=$CH_N first=$CH_FIRST last=$CH_LAST）" || fail "tipitaka-read-chapter"
+CH_CURSOR=$(echo "$CH_RAW" | py "d.get('meta',{}).get('next_cursor')")
+CH_TOTAL=$(echo "$CH_RAW" | py "d.get('meta',{}).get('total')")
+[ "${CH_N:-0}" -gt 0 ] 2>/dev/null && pass "tipitaka-reading book=$BOOK（items=$CH_N total=$CH_TOTAL next=${CH_CURSOR:-null}）" || fail "tipitaka-reading"
 
-# 7. tipitaka-read-para —— 单段精确取数
-RP=$(curl -s -m 8 "$SERVER/api/v3/tipitaka-read-para?book=$BOOK&para=$PARA&to=$PARA&channel=$CHANNEL&format=html&view=display" \
+# 7. tipitaka-reading —— 单段精确取数（para/to）
+RP=$(curl -s -m 8 "$SERVER/api/v3/tipitaka-reading/$CHANNEL?book=$BOOK&para=$PARA&to=$PARA&format=html&include=display" \
   | py "len(d.get('data',[]))")
-[ "${RP:-0}" -ge 0 ] 2>/dev/null && pass "tipitaka-read-para（items=$RP）" || fail "tipitaka-read-para"
+[ "${RP:-0}" -ge 0 ] 2>/dev/null && pass "tipitaka-reading para/to（items=$RP）" || fail "tipitaka-reading para/to"
 
 # 8. POST /v3/me/reactions —— 写收藏（幂等）
 if [ -n "$PC_UID" ]; then
@@ -82,11 +82,10 @@ if [ -n "$PC_UID" ]; then
     | py "len(d.get('data',[]))")
   [ "${FRN:-0}" -gt 0 ] 2>/dev/null && pass "GET me/reactions（favorite=$FRN 条）" || fail "GET me/reactions"
 
-  # 10. DELETE /v3/me/reactions/{id} —— 删除
+  # 10. DELETE /v3/me/reactions/{id} —— 删除（204 空体）
   if [ -n "$FAV" ]; then
-    DEL=$(curl -s -m 8 -X DELETE "$SERVER/api/v3/me/reactions/$FAV" -H "$AUTH" \
-      | py "str(d.get('data',{}).get('selected'))")
-    [ "$DEL" = "False" ] && pass "DELETE me/reactions（selected=false）" || fail "DELETE me/reactions（$DEL）"
+    DEL_CODE=$(curl -s -m 8 -o /dev/null -w "%{http_code}" -X DELETE "$SERVER/api/v3/me/reactions/$FAV" -H "$AUTH")
+    [ "$DEL_CODE" = "204" ] && pass "DELETE me/reactions（204）" || fail "DELETE me/reactions（HTTP $DEL_CODE）"
   fi
 else
   fail "me/reactions 写/列/删（无 progress_chapter uid）"
