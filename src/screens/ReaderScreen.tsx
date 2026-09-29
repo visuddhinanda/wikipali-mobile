@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -104,11 +110,19 @@ export function ReaderScreen({ route, navigation }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(() => new Set([0]));
   const pagerRef = useRef<PagerView>(null);
+  // 同层跨章时相关层集合变了、self 层下标随之移动（复注层常见），需要在 commit
+  // 之后把 PagerView 无动画挪到新下标，见下面的 useLayoutEffect 与 lighter path。
+  const pendingPagerSyncRef = useRef(false);
   // 驱动重算的是「用户所在的那一层」，不再固定是第 0 页。
   const selfIndexRef = useRef(0);
   // 手势回调里读页数：Pan 只随 activeIndex 重建，闭包里的 pages 会过期。
   const pagesLenRef = useRef(1);
   pagesLenRef.current = pages.length;
+  // handleChapterAnchor 是 useCallback([]) 的稳定闭包，读到的 `pages` 永远是挂载时的
+  // 旧数组（长度 1），导致 `pages[selfIndexRef.current]` 取 undefined、把同层跨章误判成
+  // 「层变了」而 collapse。这里用 ref 始终指向最新 pages。
+  const pagesRef = useRef<PageMeta[]>(pages);
+  pagesRef.current = pages;
   // 该层当前锚点，用来判断「章节锚点上报」是真换章了、还是同一章内 unit 细化。
   const selfAnchorRef = useRef<{ book: number; paragraph: number } | null>(
     null,
@@ -254,7 +268,7 @@ export function ReaderScreen({ route, navigation }: Props) {
 
       // 当前层真的换章了。
       const selfLayer = bookLayerAt(b, para) ?? "mula";
-      const prevLayer = pages[selfIndexRef.current]?.layer;
+      const prevLayer = pagesRef.current[selfIndexRef.current]?.layer;
 
       if (selfLayer !== prevLayer) {
         // 层变了（跳进义注/复注或另一本书）：收成单层、跳回它，再重新算各层。
@@ -318,6 +332,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         )
           return;
         if (chapters.length === 0) return;
+        const prevSelfIndex = selfIndexRef.current;
         setPages((prev) =>
           chapters.map((ch, i) => {
             const existing = prev.find((p) => p.layer === ch.layer);
@@ -341,10 +356,30 @@ export function ReaderScreen({ route, navigation }: Props) {
           }),
         );
         selfIndexRef.current = selfIndex;
+        // 相关层集合变了（如 [mula,atthakatha,tika] ↔ [atthakatha,tika] ↔ [tika]），
+        // self 层下标随之移动：同步 activeIndex，并把新下标标为已挂载（否则增长场景
+        // 会看到 spinner），最后在 useLayoutEffect 里把 PagerView 无动画挪过去 ——
+        // 否则 PagerView 停在旧下标（已变成别的层或越界），跨章时从右侧重拉当前页。
+        if (selfIndex !== prevSelfIndex) {
+          setActiveIndex(selfIndex);
+          setVisited((prev) =>
+            prev.has(selfIndex) ? prev : new Set(prev).add(selfIndex),
+          );
+          pendingPagerSyncRef.current = true;
+        }
       });
     },
     [],
   );
+
+  // 同层跨章导致 self 层下标移动时，等 pages/activeIndex 提交到 PagerView 之后
+  // 再无动画同步到新下标。不能同步调用：那时 PagerView 还是旧 children，增长场景
+  // （如 [tika] → [mula,atthakatha,tika]）会越界、落在别的层上。
+  useLayoutEffect(() => {
+    if (!pendingPagerSyncRef.current) return;
+    pendingPagerSyncRef.current = false;
+    pagerRef.current?.setPageWithoutAnimation(activeIndex);
+  }, [pages, activeIndex]);
 
   const onPageSelected = (e: PagerViewOnPageSelectedEvent) => {
     const idx = e.nativeEvent.position;
