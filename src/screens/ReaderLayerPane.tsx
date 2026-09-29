@@ -9,7 +9,15 @@
  * 字号 / 主题（`settings`）是全局偏好，由外层统一加载、下发，三个面板共享；
  * 章节位置、频道、目录展开状态等其余状态都是面板自己的。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -62,11 +70,9 @@ import {
   removeBookmark,
   saveBookmark,
 } from "../data/bookmarks";
-import { ChapterDrawer, ChapterTree } from "../components/ChapterDrawer";
+import { ChapterDrawer } from "../components/ChapterDrawer";
 import { serifFont } from "../theme";
-import { useLayout } from "../hooks/useLayout";
 import {
-  LIST_PANE_WIDTH,
   MAX_CONTENT_WIDTH,
   SIDENOTE_MARGIN_MIN_WIDTH,
   SIDENOTE_WIDTH,
@@ -160,6 +166,15 @@ function hasContent(map: Map<number, string>, win: ParaWindow): boolean {
   return false;
 }
 
+/** 暴露给外层的命令：底部工具栏（在 ReaderScreen 只渲染一份）据此操作焦点栏。 */
+export interface ReaderLayerPaneHandle {
+  goPrev: () => void;
+  goNext: () => void;
+  openToc: () => void;
+  openVersion: () => void;
+  openMore: () => void;
+}
+
 export interface ReaderLayerPaneProps {
   book: number;
   /** 初始定位段。原文层缺省时按阅读记录/本书首章续读；义注/复注层由对应算法给出，一定有值。 */
@@ -201,8 +216,12 @@ export interface ReaderLayerPaneProps {
   onCrossHighlight: (book: number, para: number, start: number, end: number) => void;
   /** 需要滚动到并高亮的句子 data-sid（如 "101-507-2-23"）；仅命中的那一层有值。 */
   highlightSid?: string | null;
-  /** 打开阅读设置（底部导航「设置」触发，由外层控制 SettingsSheet）。 */
-  onOpenSettings: () => void;
+  /** 本栏是否获得焦点：只有焦点栏显示「就此段落提问」浮动按钮。 */
+  focused?: boolean;
+  /** 点击本栏正文（WebView click）触发：外层把焦点切到本栏。 */
+  onFocus?: () => void;
+  /** 本栏上/下一章可用性变化：外层底部工具栏据此禁用「上一章/下一章」。 */
+  onNavState?: (hasPrev: boolean, hasNext: boolean) => void;
   /** 分享当前章节链接（「更多」里的分享，复用外层的 shareCurrent）。 */
   onShare: () => void;
   navigation: ReaderNavigation;
@@ -454,6 +473,11 @@ function buildReaderHtml(
   // <cite class="anno-jump"> 点击 → 通知 RN 跳到义注/复注对应句
   // <label class="sidenote-number"> 点击 → 通知 RN 跨栏高亮对应句（同时仍会展开本行边注）
   document.addEventListener("click", function (e) {
+    // 任何点击都先告诉 RN「这栏获得焦点」：底部工具栏 / 顶部栏随之切换到本栏。
+    // click 只在「点一下」时触发，滑动翻正文不会误报（滚动会取消 click）。
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: "pane-focus" }));
+    }
     var t = e.target && e.target.closest ? e.target.closest(".anno-jump") : null;
     if (t) {
       e.preventDefault();
@@ -732,7 +756,7 @@ function buildReaderHtml(
 </html>`;
 }
 
-function NavBtn({
+export function NavBtn({
   icon,
   label,
   iconPosition = "left",
@@ -778,26 +802,34 @@ function NavBtn({
   );
 }
 
-export function ReaderLayerPane({
-  book,
-  paragraph,
-  title,
-  initialToc,
-  seekContent = false,
-  initialChannelId,
-  initialChannelName,
-  preferredChannelUid,
-  preferredChannelName,
-  settings,
-  onChapterAnchor,
-  onChannelChange,
-  onAnnoJump,
-  onCrossHighlight,
-  highlightSid,
-  onOpenSettings,
-  onShare,
-  navigation,
-}: ReaderLayerPaneProps) {
+export const ReaderLayerPane = forwardRef<
+  ReaderLayerPaneHandle,
+  ReaderLayerPaneProps
+>(function ReaderLayerPane(
+  {
+    book,
+    paragraph,
+    title,
+    initialToc,
+    seekContent = false,
+    initialChannelId,
+    initialChannelName,
+    preferredChannelUid,
+    preferredChannelName,
+    settings,
+    onChapterAnchor,
+    onChannelChange,
+    onAnnoJump,
+    onCrossHighlight,
+    highlightSid,
+    focused,
+    onFocus,
+    onNavState,
+    onShare,
+    navigation,
+  }: ReaderLayerPaneProps,
+  ref,
+) {
   const t = useT();
 
   const [unit, setUnit] = useState<ReadingUnit | null>(null);
@@ -809,8 +841,6 @@ export function ReaderLayerPane({
   );
   const [doc, setDoc] = useState<ReaderDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasPrev, setHasPrev] = useState(false);
-  const [hasNext, setHasNext] = useState(false);
   /** 当前滚动位置所在的最深层章节标题（随滚动更新，供顶部标题跟随）。 */
   const [headingToc, setHeadingToc] = useState<string | null>(null);
   const headingTocRef = useRef<string | null>(null);
@@ -818,9 +848,6 @@ export function ReaderLayerPane({
   const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const { listDetail } = useLayout();
-  const [paneOpen, setPaneOpen] = useState(false);
-  const [panePinned, setPanePinned] = useState(false);
   const [versionVisible, setVersionVisible] = useState(false);
   const [channels, setChannels] = useState<ChapterChannel[] | null>(null);
   const [channelsError, setChannelsError] = useState<string | null>(null);
@@ -1132,22 +1159,22 @@ export function ReaderLayerPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, channelId, jumpNonce]);
 
-  // 上一 / 下一单元是否存在（异步算，用于禁用导航按钮）
+  // 上一 / 下一单元是否存在（异步算，上报给外层底部工具栏禁用「上一章/下一章」）。
   useEffect(() => {
     if (!unit) {
-      setHasPrev(false);
-      setHasNext(false);
+      onNavState?.(false, false);
       return;
     }
     let alive = true;
     Promise.all([getPrevUnit(unit), getNextUnit(unit)]).then(([prev, next]) => {
       if (!alive) return;
-      setHasPrev(!!prev);
-      setHasNext(!!next);
+      onNavState?.(!!prev, !!next);
     });
     return () => {
       alive = false;
     };
+    // onNavState 由外层 useCallback 保持稳定，不必入依赖（入依赖会连锁重跑本 effect）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit]);
 
   const [readerWidth, setReaderWidth] = useState(0);
@@ -1560,6 +1587,10 @@ export function ReaderLayerPane({
       if (msg.type === "wl-unload" && (msg.dir === "up" || msg.dir === "down")) {
         return;
       }
+      if (msg.type === "pane-focus") {
+        onFocus?.();
+        return;
+      }
       const book = Number(msg.book);
       const para = Number(msg.para);
       const start = Number(msg.start);
@@ -1581,32 +1612,22 @@ export function ReaderLayerPane({
     injectHighlight(sid);
   };
 
+  // 底部工具栏在 ReaderScreen 只渲染一份，通过 ref 调用焦点栏的这些命令。
+  useImperativeHandle(
+    ref,
+    () => ({
+      goPrev,
+      goNext,
+      openToc: () => setDrawerVisible(true),
+      openVersion,
+      openMore,
+    }),
+    [goPrev, goNext, openVersion, openMore],
+  );
+
   return (
     <View style={[styles.pane, { backgroundColor: c.paper }]}>
       <View style={styles.bodyRow}>
-        {listDetail && paneOpen ? (
-          <View
-            style={[
-              styles.listPane,
-              {
-                width: LIST_PANE_WIDTH,
-                backgroundColor: c.paperRaised,
-                borderRightColor: c.hairline,
-              },
-            ]}
-          >
-            <ChapterTree
-              book={book}
-              currentParagraph={p}
-              titles={headingTexts}
-              c={c}
-              onSelect={(b, para) => {
-                navigateTo(b, para);
-                if (!panePinned) setPaneOpen(false);
-              }}
-            />
-          </View>
-        ) : null}
         <View
           style={styles.body}
           onLayout={(e) =>
@@ -1637,76 +1658,22 @@ export function ReaderLayerPane({
               onLoadEnd={handleAnnoLoadEnd}
             />
           )}
-          <Pressable
-            style={[styles.askFab, { backgroundColor: c.vermilion }]}
-            onPress={() => void askAboutParagraph()}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={17}
-              color="#fdfaf1"
-            />
-            <Text style={styles.askFabText}>{t("reader.askAboutPassage")}</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* 经文导航（底部两行）：上一行翻章，下一行工具（目录 / 版本 / 设置 / 更多）。 */}
-      <View
-        style={[
-          styles.navBar,
-          { backgroundColor: c.paperRaised, borderTopColor: c.hairline },
-        ]}
-      >
-        <View style={styles.navRow}>
-          <NavBtn
-            icon="chevron-back"
-            label={t("reader.prevChapter")}
-            disabled={!hasPrev}
-            c={c}
-            onPress={goPrev}
-          />
-          <NavBtn
-            icon="chevron-forward"
-            label={t("reader.nextChapter")}
-            iconPosition="right"
-            disabled={!hasNext}
-            c={c}
-            onPress={goNext}
-          />
-        </View>
-        <View style={styles.navRow}>
-          <NavBtn
-            icon="list-outline"
-            label={t("reader.toc")}
-            c={c}
-            onPress={() => {
-              if (listDetail) {
-                if (!paneOpen) setPanePinned(true);
-                setPaneOpen((v) => !v);
-              } else {
-                setDrawerVisible(true);
-              }
-            }}
-          />
-          <NavBtn
-            icon="layers-outline"
-            label={t("reader.version")}
-            c={c}
-            onPress={openVersion}
-          />
-          <NavBtn
-            icon="settings-outline"
-            label={t("reader.settings")}
-            c={c}
-            onPress={onOpenSettings}
-          />
-          <NavBtn
-            icon="ellipsis-horizontal"
-            label={t("reader.more")}
-            c={c}
-            onPress={() => void openMore()}
-          />
+          {/* 「就此段落提问」浮动按钮：只出现在焦点栏，非焦点栏隐藏。 */}
+          {focused && (
+            <Pressable
+              style={[styles.askFab, { backgroundColor: c.vermilion }]}
+              onPress={() => void askAboutParagraph()}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={17}
+                color="#fdfaf1"
+              />
+              <Text style={styles.askFabText}>
+                {t("reader.askAboutPassage")}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -1745,7 +1712,7 @@ export function ReaderLayerPane({
       />
     </View>
   );
-}
+});
 
 function VersionSheet({
   visible,
@@ -1982,12 +1949,6 @@ const styles = StyleSheet.create({
   pane: {
     flex: 1,
   },
-  navBar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  navRow: {
-    flexDirection: "row",
-  },
   navBtn: {
     flex: 1,
     flexDirection: "row",
@@ -2005,9 +1966,6 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-  },
-  listPane: {
-    borderRightWidth: StyleSheet.hairlineWidth,
   },
   web: {
     flex: 1,

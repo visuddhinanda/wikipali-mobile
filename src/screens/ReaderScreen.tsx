@@ -25,7 +25,11 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { bookEntryAt, bookLayerAt } from "../catalog";
 import type { CommentaryLayer } from "../catalog/commentary";
 import { getChapterLayers } from "../reading";
-import { ReaderLayerPane } from "./ReaderLayerPane";
+import {
+  NavBtn,
+  ReaderLayerPane,
+  type ReaderLayerPaneHandle,
+} from "./ReaderLayerPane";
 import { DownloadIconButton } from "../components/DownloadIconButton";
 import { KeepAwake } from "../components/KeepAwake";
 import { serifFont } from "../theme";
@@ -154,6 +158,24 @@ export function ReaderScreen({ route, navigation }: Props) {
   );
 
   const [settingsVisible, setSettingsVisible] = useState(false);
+
+  // 底部工具栏只渲染一份，作用于焦点栏（activeIndex）。每个 pane 通过 ref
+  // 暴露 goPrev/goNext/openToc/openVersion/openMore，工具栏据此调用焦点栏。
+  const paneRefs = useRef<Record<number, ReaderLayerPaneHandle | null>>({});
+  // 每栏上报的「上一章/下一章」可用性，工具栏显示焦点栏的这份值。
+  const [navStates, setNavStates] = useState<
+    Record<number, { hasPrev: boolean; hasNext: boolean }>
+  >({});
+  const handleNavState = useCallback(
+    (index: number, hasPrev: boolean, hasNext: boolean) => {
+      setNavStates((prev) => {
+        const cur = prev[index];
+        if (cur?.hasPrev === hasPrev && cur?.hasNext === hasNext) return prev;
+        return { ...prev, [index]: { hasPrev, hasNext } };
+      });
+    },
+    [],
+  );
 
   // 双列对照：阅读区净宽（onLayout 实测）达到 canDualColumn 的阈值就并排
   // 显示两层，否则退回单层 + 滑动（docs/README.md §4.7）。
@@ -434,6 +456,8 @@ export function ReaderScreen({ route, navigation }: Props) {
   const active = pages[activeIndex];
   const headerTitle = active?.toc ?? active?.title ?? title;
   const activeChannel = layerChannels[activeIndex];
+  // 底部工具栏显示焦点栏的翻章可用性（未加载的栏默认都禁用）。
+  const nav = navStates[activeIndex] ?? { hasPrev: false, hasNext: false };
 
   // 分享当前章节：生成一条 WikiPali 网页链接，直接打开系统分享抽屉
   // （其中自带「复制」）。定位取「用户自己这一层」当前章节锚点，
@@ -467,6 +491,10 @@ export function ReaderScreen({ route, navigation }: Props) {
     }
     return (
       <ReaderLayerPane
+        ref={(node) => {
+          if (node) paneRefs.current[i] = node;
+          else delete paneRefs.current[i];
+        }}
         book={p.book}
         paragraph={p.paragraph}
         title={p.title}
@@ -481,7 +509,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         preferredChannelUid={preferredChannelRef.current.uid}
         preferredChannelName={preferredChannelRef.current.name}
         onChannelChange={(uid, name) => handleChannelChange(i, uid, name)}
-        onOpenSettings={() => setSettingsVisible(true)}
+        onFocus={() => setActiveIndex(i)}
+        onNavState={(hasPrev, hasNext) => handleNavState(i, hasPrev, hasNext)}
         onShare={() => void shareCurrent()}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
@@ -492,9 +521,66 @@ export function ReaderScreen({ route, navigation }: Props) {
             ? highlightSid
             : null
         }
+        focused={i === activeIndex}
         navigation={navigation}
       />
     );
+  };
+
+  // 底部工具栏的六个按钮：手机窄屏分两行（上一行翻章、下一行工具），
+  // 双列宽屏合并为一行（见下方 return 里的 dual 分支）。
+  const tb = {
+    prev: (
+      <NavBtn
+        icon="chevron-back"
+        label={t("reader.prevChapter")}
+        disabled={!nav.hasPrev}
+        c={c}
+        onPress={() => paneRefs.current[activeIndex]?.goPrev()}
+      />
+    ),
+    next: (
+      <NavBtn
+        icon="chevron-forward"
+        label={t("reader.nextChapter")}
+        iconPosition="right"
+        disabled={!nav.hasNext}
+        c={c}
+        onPress={() => paneRefs.current[activeIndex]?.goNext()}
+      />
+    ),
+    toc: (
+      <NavBtn
+        icon="list-outline"
+        label={t("reader.toc")}
+        c={c}
+        onPress={() => paneRefs.current[activeIndex]?.openToc()}
+      />
+    ),
+    version: (
+      <NavBtn
+        icon="layers-outline"
+        label={t("reader.version")}
+        c={c}
+        onPress={() => paneRefs.current[activeIndex]?.openVersion()}
+      />
+    ),
+    settings: (
+      <NavBtn
+        icon="settings-outline"
+        label={t("reader.settings")}
+        c={c}
+        onPress={() => setSettingsVisible(true)}
+      />
+    ),
+    more: (
+      <NavBtn
+        icon="ellipsis-horizontal"
+        label={t("reader.more")}
+        c={c}
+        onPress={() => paneRefs.current[activeIndex]?.openMore()}
+      />
+    ),
   };
 
   return (
@@ -556,14 +642,8 @@ export function ReaderScreen({ route, navigation }: Props) {
             })}
           </View>
         </View>
-        <Pressable
-          onPress={() => void shareCurrent()}
-          hitSlop={8}
-          accessibilityLabel={t("reader.share")}
-        >
-          <Ionicons name="share-outline" size={22} color={c.ink} />
-        </Pressable>
-        {/* 离线下载：原「设置」图标已移到底部导航，这里换成针对当前层的下载。 */}
+        {/* 离线下载：原「设置」图标已移到底部导航，这里换成针对当前层的下载。
+            分享已从顶部栏去掉（「更多」菜单里有）。 */}
         {active && activeChannel?.uid ? (
           <DownloadIconButton
             book={active.book}
@@ -595,6 +675,13 @@ export function ReaderScreen({ route, navigation }: Props) {
                 ]}
               >
                 {renderPane(i)}
+                {/* 焦点内框线：覆盖在焦点栏上，不改变 WebView 布局。 */}
+                {i === activeIndex && (
+                  <View
+                    pointerEvents="none"
+                    style={[styles.focusRing, { borderColor: c.vermilion }]}
+                  />
+                )}
               </View>
             ))}
           </View>
@@ -620,6 +707,39 @@ export function ReaderScreen({ route, navigation }: Props) {
               ))}
             </PagerView>
           </GestureDetector>
+        )}
+      </View>
+
+      {/* 底部工具栏（全屏唯一一份）：作用于焦点栏（activeIndex）。
+          手机窄屏分两行；双列宽屏合并为一行。 */}
+      <View
+        style={[
+          styles.toolbar,
+          { backgroundColor: c.paperRaised, borderTopColor: c.hairline },
+        ]}
+      >
+        {dual ? (
+          <View style={styles.toolbarRow}>
+            {tb.prev}
+            {tb.next}
+            {tb.toc}
+            {tb.version}
+            {tb.settings}
+            {tb.more}
+          </View>
+        ) : (
+          <>
+            <View style={styles.toolbarRow}>
+              {tb.prev}
+              {tb.next}
+            </View>
+            <View style={styles.toolbarRow}>
+              {tb.toc}
+              {tb.version}
+              {tb.settings}
+              {tb.more}
+            </View>
+          </>
         )}
       </View>
 
@@ -1009,6 +1129,21 @@ const styles = StyleSheet.create({
   },
   dualPane: {
     flex: 1,
+  },
+  focusRing: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2,
+    opacity: 0.5,
+  },
+  toolbar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  toolbarRow: {
+    flexDirection: "row",
   },
   center: {
     flex: 1,
