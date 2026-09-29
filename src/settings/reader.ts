@@ -47,6 +47,8 @@ export interface ReaderSettings {
   annotationCollapsedLines: number;
   /** 手机注释呈现方式：行内 / 段后。 */
   annotationMode: AnnotationMode;
+  /** 阅读时保持屏幕常亮（`expo-keep-awake`），默认开。 */
+  keepAwake: boolean;
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
@@ -55,6 +57,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   paliScript: "auto",
   annotationCollapsedLines: 1,
   annotationMode: "inline",
+  keepAwake: true,
 };
 
 const KEY = "@wikipali/reader-settings";
@@ -83,6 +86,7 @@ export async function loadReaderSettings(): Promise<ReaderSettings> {
           : 1,
       annotationMode:
         parsed.annotationMode === "footnote" ? "footnote" : "inline",
+      keepAwake: parsed.keepAwake !== false,
     };
   } catch {
     return DEFAULT_READER_SETTINGS;

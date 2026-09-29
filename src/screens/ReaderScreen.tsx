@@ -21,6 +21,7 @@ import type { CommentaryLayer } from "../catalog/commentary";
 import { getChapterLayers } from "../reading";
 import { ReaderLayerPane } from "./ReaderLayerPane";
 import { DownloadIconButton } from "../components/DownloadIconButton";
+import { KeepAwake } from "../components/KeepAwake";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
 import { readerColors, type ReaderChrome } from "../theme/reader";
@@ -467,6 +468,7 @@ export function ReaderScreen({ route, navigation }: Props) {
       // App 导航栏在阅读器里隐藏，底部需要自己避让系统手势条 / Home 指示器。
       edges={["top", "left", "right", "bottom"]}
     >
+      {settings.keepAwake && <KeepAwake />}
       <View
         style={[
           styles.header,
@@ -662,6 +664,34 @@ function SettingsSheet({
                   { backgroundColor: activeOpt ? c.vermilion : c.paperSunken },
                 ]}
                 onPress={() => onChange({ ...settings, theme: opt.id })}
+              >
+                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>
+                  {t(opt.labelKey)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
+          {t("reader.keepAwake")}
+        </Text>
+        <View style={styles.fontRow}>
+          {(
+            [
+              { id: true, labelKey: "reader.keepAwake.on" },
+              { id: false, labelKey: "reader.keepAwake.off" },
+            ] as const
+          ).map((opt) => {
+            const activeOpt = settings.keepAwake === opt.id;
+            return (
+              <Pressable
+                key={String(opt.id)}
+                style={[
+                  styles.fontPill,
+                  { backgroundColor: activeOpt ? c.vermilion : c.paperSunken },
+                ]}
+                onPress={() => onChange({ ...settings, keepAwake: opt.id })}
               >
                 <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>
                   {t(opt.labelKey)}

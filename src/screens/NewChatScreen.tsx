@@ -26,6 +26,7 @@ import type { RootStackParamList } from "../navigation/types";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 import { CitationSheet, type CitationTarget } from "../components/CitationSheet";
+import { KeepAwake } from "../components/KeepAwake";
 
 /**
  * 从 wikipali 阅读器链接解析 book/paragraph/channel。
@@ -302,6 +303,7 @@ function ChatUI({
 
   return (
     <>
+      {isRunning && <KeepAwake />}
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
