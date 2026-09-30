@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "Hỏi tiếp…",
   "common.cancel": "Hủy",
   "common.ok": "Đã hiểu",
+  "common.retry": "Thử lại",
   "download.delete": "Xóa",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

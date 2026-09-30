@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "ဆက်လက် မေးမြန်းရန်…",
   "common.cancel": "ပယ်ဖျက်ရန်",
   "common.ok": "ရပါပြီ",
+  "common.retry": "ထပ်ကြိုးစားရန်",
   "download.delete": "ဖျက်ရန်",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "තවදුරටත් අසන්න…",
   "common.cancel": "අවලංගු කරන්න",
   "common.ok": "හරි",
+  "common.retry": "නැවත උත්සාහ කරන්න",
   "download.delete": "මකන්න",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

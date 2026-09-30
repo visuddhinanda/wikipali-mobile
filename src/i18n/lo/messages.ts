@@ -106,6 +106,7 @@ const messages = {
   "profile.signedOutHint": "ເຂົ້າສູ່ລະບົບເພື່ອຊິງຄ໌ຊັ້ນວາງປຶ້ມ ຄວາມຄືບໜ້າ ແລະ ປະຫວັດຄຳຖາມ",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
   "reader.copied": "ຄັດລອກແລ້ວ",
+  "reader.loadErrorHint": "ກວດການເຊື່ອມຕໍ່ເຄືອຂ່າຍແລ້ວລອງໃໝ່",
   "reader.noVersions": "ບໍ່ມີສະບັບໃຫ້ເລືອກ",
   "scan.hint": "ສະແກນ QR ຂອງໜ້າ WikiPali ເພື່ອເປີດຂໍ້ຄວາມ",
   "scan.permissionBody": "ການສະແກນຕ້ອງໃຊ້ກ້ອງ ກະລຸນາອະນຸຍາດໃນການຕັ້ງຄ່າ",

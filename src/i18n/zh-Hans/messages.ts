@@ -106,6 +106,7 @@ const messages = {
   "profile.signedOutHint": "登录后同步书架、进度与提问历史",
   "reader.annoCollapsedLines": "段落脚注默认收起行数",
   "reader.copied": "已复制",
+  "reader.loadErrorHint": "请检查网络连接后重试",
   "reader.noVersions": "暂无可用版本",
   "scan.hint": "扫描 WikiPali 网页二维码，直达对应经文",
   "scan.permissionBody": "扫码需要使用相机，请在系统设置里允许。",

@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "與AI助手討論",
   "common.cancel": "取消",
   "common.ok": "知道了",
+  "common.retry": "重試",
   "download.delete": "刪除",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

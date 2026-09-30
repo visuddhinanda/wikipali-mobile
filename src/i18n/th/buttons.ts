@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "ถามต่อ…",
   "common.cancel": "ยกเลิก",
   "common.ok": "รับทราบ",
+  "common.retry": "ลองใหม่",
   "download.delete": "ลบ",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

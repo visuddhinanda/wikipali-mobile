@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "ຖາມຕໍ່…",
   "common.cancel": "ຍົກເລີກ",
   "common.ok": "ຮັບຊາບ",
+  "common.retry": "ລອງໃໝ່",
   "download.delete": "ລຶບ",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

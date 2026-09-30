@@ -18,6 +18,7 @@ const buttons = {
   "chat.followUp": "Ask a follow-up…",
   "common.cancel": "Cancel",
   "common.ok": "OK",
+  "common.retry": "Retry",
   "download.delete": "Delete",
   "download.deleteDataAndRecord": "Delete data & record",
   "download.deleteDataOnly": "Delete data only",

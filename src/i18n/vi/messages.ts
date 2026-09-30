@@ -106,6 +106,7 @@ const messages = {
   "profile.signedOutHint": "Đăng nhập để đồng bộ kệ sách, tiến độ và lịch sử câu hỏi",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
   "reader.copied": "Đã sao chép",
+  "reader.loadErrorHint": "Kiểm tra kết nối mạng rồi thử lại",
   "reader.noVersions": "Không có bản nào",
   "scan.hint": "Quét mã QR trang WikiPali để mở đoạn kinh",
   "scan.permissionBody": "Quét mã cần dùng camera. Vui lòng cho phép trong cài đặt.",
