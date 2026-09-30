@@ -14,8 +14,9 @@
  * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`）。
  */
 import { getApiClient, throwHttpError } from "./openapi-client";
-import { mockReadParas } from "./mock";
 import { unwrapV3Collection } from "./v3";
+import { ApiError } from "./client";
+import { t } from "../i18n";
 
 /** 一段正文：游标接口与区间接口逐段返回的条目形状一致。 */
 export interface ReadParaItem {
@@ -26,11 +27,6 @@ export interface ReadParaItem {
 
 export interface ReadParaResult {
   items: ReadParaItem[];
-  /**
-   * 是否为离线占位数据。缓存层据此**不写盘** —— 否则占位文会冒充真经
-   * 永久留在缓存里，比一次加载失败糟得多。
-   */
-  mock: boolean;
   /**
    * 下一块的游标（原样传回 `after`）；为 null 表示该区间内已取完。
    * 区间足够小（一页装得下）时通常为 null。
@@ -83,12 +79,8 @@ export async function fetchReadParas(
       },
     });
   } catch {
-    // 网络不可达 → 回退 mock，保证离线时 UI 走得通。
-    return {
-      items: await mockReadParas(book, from, to),
-      mock: true,
-      nextCursor: null,
-    };
+    // 网络不可达 → 抛错交给上层展示，不再用 mock 占位。
+    throw new ApiError(t("error.network"));
   }
 
   const { data, error, response } = result;
@@ -98,5 +90,5 @@ export async function fetchReadParas(
     typeof meta.next_cursor === "string" && meta.next_cursor !== ""
       ? meta.next_cursor
       : null;
-  return { items, mock: false, nextCursor };
+  return { items, nextCursor };
 }

@@ -15,7 +15,6 @@ import {
   fetchReadChapter,
 } from "../api/read-chapter";
 import { fetchReadParas, type ReadParaItem } from "../api/read-para";
-import { mockReadParas } from "../api/mock";
 import { openReadingDb, withReadingTransaction } from "./db";
 
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
@@ -116,7 +115,7 @@ async function storeCovered(
 /**
  * 用区间接口补一个缺口 `[from, to]`：按游标一块块取，每块写回缓存。
  *
- * 返回该区间的 `para → html`（空段为 ""）；离线返回 `mock: true`（不写盘）。
+ * 返回该区间的 `para → html`（空段为 ""）；网络/后端失败会直接抛错。
  * 区间超过一页时用 `next_cursor` 续传，取完或 `next_cursor` 为 null 即停。
  */
 async function fillGap(
@@ -124,7 +123,7 @@ async function fillGap(
   book: number,
   from: number,
   to: number,
-): Promise<{ map: Map<number, string>; mock: boolean }> {
+): Promise<Map<number, string>> {
   const map = new Map<number, string>();
   let nextFrom = from;
   let after: string | null = null;
@@ -133,14 +132,13 @@ async function fillGap(
   // 写成「确认无内容」，下次进来看不到本该有的正文。
   let exhausted = false;
   for (let n = 0; n < MAX_BLOCKS_PER_FILL; n++) {
-    const { items, mock, nextCursor } = await fetchReadParas(
+    const { items, nextCursor } = await fetchReadParas(
       book,
       from,
       to,
       channelId,
       { after, pageSize: DOWNLOAD_PAGE_SIZE, unit: CHAPTER_PAGE_UNIT },
     );
-    if (mock) return { map, mock: true };
     if (items.length === 0) {
       exhausted = true;
       break;
@@ -166,7 +164,7 @@ async function fillGap(
     await storeCovered(channelId, book, nextFrom, to, []);
     for (let p = nextFrom; p <= to; p++) map.set(p, "");
   }
-  return { map, mock: false };
+  return map;
 }
 
 /**
@@ -202,14 +200,7 @@ export async function loadParasMap(
     let q = p;
     while (q <= to && !byPara.has(q)) q += 1;
     const gapEnd = q - 1;
-    const { map, mock } = await fillGap(channelId, book, p, gapEnd);
-    if (mock) {
-      // 离线：占位文只用于当次显示，不写盘 —— 否则会冒充真经永久留在缓存里。
-      for (const item of await mockReadParas(book, p, gapEnd)) {
-        byPara.set(item.para, item.display);
-      }
-      return byPara;
-    }
+    const map = await fillGap(channelId, book, p, gapEnd);
     for (const [para, html] of map) byPara.set(para, html);
     p = gapEnd + 1;
   }
@@ -219,7 +210,7 @@ export async function loadParasMap(
 
 /**
  * 取**精确一段**的正文（AI 回答里的引文角标用）：查缓存 → 缺了就联网取这一段。
- * 该版本没有这一段、或离线取不到，返回 null。
+ * 该版本没有这一段返回 null；网络/后端失败会抛错。
  *
  * 走区间接口（`fetchReadParas`）而不是游标接口：游标会**顺延到下一段有译文的**，
  * 问「9102-7」可能回 9102-350。引文要的是「这一段，有就是有、没有就是没有」，
@@ -237,14 +228,12 @@ export async function loadOnePara(
   const row = cached[0];
   if (row && isValid(row, Date.now())) return row.html;
 
-  const { items, mock } = await fetchReadParas(book, para, para, channelId);
-  // 离线占位文既不写盘、也不冒充真经显示出去
-  if (mock) return null;
+  const { items } = await fetchReadParas(book, para, para, channelId);
   return (await storeCovered(channelId, book, para, para, items)).get(para) ?? null;
 }
 
 /**
- * 从 `from` 起找第一个有正文的段落号；到 `hi` 为止都没有内容（或离线）返回 null。
+ * 从 `from` 起找第一个有正文的段落号；到 `hi` 为止都没有内容返回 null。
  *
  * 用于「点开书什么都看不到」：译文残缺的版本前面整段没有内容，窗口停在书首
  * 只会看到一串标题。阅读器据此把窗口挪到真有正文的地方。
@@ -263,11 +252,10 @@ export async function findFirstContent(
   if (scan.gap == null) return null; // 到 hi 为止都解析过且都没有正文
   const p = scan.gap;
 
-  const { items, mock } = await fetchReadParas(book, p, hi, channelId, {
+  const { items } = await fetchReadParas(book, p, hi, channelId, {
     pageSize: 1,
     unit: "para",
   });
-  if (mock) return null;
   if (items.length === 0) {
     // 该区间一段译文都没有，整段记空，下次不再重问。
     await storeCovered(channelId, book, p, hi, []);

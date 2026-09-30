@@ -34,6 +34,7 @@ import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getBookChannels } from "../api";
+import { ApiError } from "../api/client";
 import {
   WINDOW_STRLEN,
   bookBounds,
@@ -841,6 +842,8 @@ export const ReaderLayerPane = forwardRef<
   );
   const [doc, setDoc] = useState<ReaderDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 正文加载失败（网络/后端）时浮在正文顶端的提示条内容；全屏错误仍走 `error`。 */
+  const [loadError, setLoadError] = useState<string | null>(null);
   /** 当前滚动位置所在的最深层章节标题（随滚动更新，供顶部标题跟随）。 */
   const [headingToc, setHeadingToc] = useState<string | null>(null);
   const headingTocRef = useRef<string | null>(null);
@@ -900,6 +903,20 @@ export const ReaderLayerPane = forwardRef<
   const c = readerColors(settings.theme === "dark");
   const isDark = settings.theme === "dark";
 
+  /** 正文加载错误 → 用户可读文案：区分「后端返回错误(带状态码)」与「网络失败」。 */
+  const describeLoadError = useCallback(
+    (err: unknown): string => {
+      if (err instanceof ApiError && err.status) {
+        return `${t("error.backend")} (${err.status})`;
+      }
+      return err instanceof Error ? err.message : t("common.loadFailed");
+    },
+    [t],
+  );
+
+  /** 重试正文加载：再次触发正文窗口 effect（依赖 jumpNonce）。 */
+  const retryLoad = useCallback(() => setJumpNonce((n) => n + 1), []);
+
   /** 译文标题两份一起更新，避免 ref 与渲染用的 state 脱节。 */
   const applyHeadingTexts = useCallback((next: Map<number, string>) => {
     headingTextsRef.current = next;
@@ -923,6 +940,7 @@ export const ReaderLayerPane = forwardRef<
     let alive = true;
     setUnit(null);
     setError(null);
+    setLoadError(null);
     (async () => {
       const start = await resolveStartParagraph(book, paragraph);
       if (start === null) throw new Error(t("common.loadFailed"));
@@ -1082,7 +1100,7 @@ export const ReaderLayerPane = forwardRef<
     let alive = true;
     const token = ++loadTokenRef.current;
     setDoc(null);
-    setError(null);
+    setLoadError(null);
     // 重载/跳转时清掉旧标题，等新窗口的 wl-anchor 再更新（否则会残留上一本书的经名）。
     headingTocRef.current = null;
     setHeadingToc(null);
@@ -1150,7 +1168,7 @@ export const ReaderLayerPane = forwardRef<
       });
     })().catch((err) => {
       if (alive && token === loadTokenRef.current) {
-        setError(err instanceof Error ? err.message : t("common.loadFailed"));
+        setLoadError(describeLoadError(err));
       }
     });
     return () => {
@@ -1641,11 +1659,7 @@ export const ReaderLayerPane = forwardRef<
                 {error}
               </Text>
             </View>
-          ) : !doc ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={c.vermilion} />
-            </View>
-          ) : (
+          ) : doc ? (
             <WebView
               ref={webViewRef}
               source={{ html }}
@@ -1657,7 +1671,41 @@ export const ReaderLayerPane = forwardRef<
               onMessage={handleAnnoMessage}
               onLoadEnd={handleAnnoLoadEnd}
             />
+          ) : loadError ? null : (
+            <View style={styles.center}>
+              <ActivityIndicator color={c.vermilion} />
+            </View>
           )}
+          {/* 正文加载失败的浮动提示条：浮在阅读 view 顶端，不整屏打断。 */}
+          {loadError && !error ? (
+            <View
+              style={[
+                styles.errorBar,
+                { backgroundColor: c.paperRaised, borderColor: c.border },
+              ]}
+            >
+              <Ionicons name="cloud-offline" size={18} color={c.inkSoft} />
+              <View style={styles.errorBarBody}>
+                <Text style={[styles.errorBarText, { color: c.ink }]}>
+                  {loadError}
+                </Text>
+                <Text style={[styles.errorBarHint, { color: c.inkSoft }]}>
+                  {t("reader.loadErrorHint")}
+                </Text>
+              </View>
+              <Pressable
+                style={[styles.errorBarRetry, { borderColor: c.vermilion }]}
+                onPress={retryLoad}
+                hitSlop={8}
+              >
+                <Text
+                  style={[styles.errorBarRetryText, { color: c.vermilion }]}
+                >
+                  {t("common.retry")}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           {/* 「就此段落提问」浮动按钮：只出现在焦点栏，非焦点栏隐藏。 */}
           {focused && (
             <Pressable
@@ -1978,6 +2026,45 @@ const styles = StyleSheet.create({
   },
   centerText: {
     fontSize: 13,
+  },
+  errorBar: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    right: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  errorBarBody: {
+    flex: 1,
+  },
+  errorBarText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  errorBarHint: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  errorBarRetry: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  errorBarRetryText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   askFab: {
     position: "absolute",
