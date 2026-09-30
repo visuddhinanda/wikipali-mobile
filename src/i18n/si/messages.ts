@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · අයිතම {n}",
   "channel.bookCount": "පොත් {n}",
   "channel.books": "ඇතුළත් පොත්",
+  "channel.category.empty": "මෙම ප්රවර්ගයේ මෙම එකතුවෙන් තවමත් පොත් නොමැත",
   "channel.downloading": "බාගනිමින් {done}/{total}",
   "channel.emptyFiltered": "මෙම පෙරහනට ගැළපෙන පොත් නැත",
   "channel.paraCount": "පරිවර්තිත ඡේද {n}",

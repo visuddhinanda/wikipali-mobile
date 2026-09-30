@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} รายการ",
   "channel.bookCount": "{n} เล่ม",
   "channel.books": "หนังสือในชุด",
+  "channel.category.empty": "ยังไม่มีหนังสือในหมวดหมู่นี้จากชุดนี้",
   "channel.downloading": "กำลังดาวน์โหลด {done}/{total}",
   "channel.emptyFiltered": "ไม่มีหนังสือที่ตรงกับตัวกรองนี้",
   "channel.paraCount": "แปลแล้ว {n} ย่อหน้า",

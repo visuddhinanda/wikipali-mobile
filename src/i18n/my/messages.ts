@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} ခု",
   "channel.bookCount": "စာအုပ် {n} အုပ်",
   "channel.books": "ပါဝင်သောစာအုပ်များ",
+  "channel.category.empty": "ဤအမျိုးအစားတွင် ဤစုစည်းမှုမှ စာအုပ်မရှိသေးပါ",
   "channel.downloading": "ဒေါင်းလုဒ်လုပ်နေသည် {done}/{total}",
   "channel.emptyFiltered": "ဤစစ်ထုတ်မှုနှင့် ကိုက်ညီသောစာအုပ်မရှိပါ",
   "channel.paraCount": "ဘာသာပြန် {n} ပိုဒ်",

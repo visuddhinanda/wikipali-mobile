@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} 項",
   "channel.bookCount": "{n} 本書",
   "channel.books": "包含的書",
+  "channel.category.empty": "本頻道暫無該分類的譯本",
   "channel.downloading": "正在下載 {done}/{total}",
   "channel.emptyFiltered": "沒有符合篩選條件的書",
   "channel.paraCount": "{n} 段譯文",

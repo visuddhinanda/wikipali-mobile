@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} ລາຍການ",
   "channel.bookCount": "{n} ຫົວ",
   "channel.books": "ປຶ້ມໃນຊຸດ",
+  "channel.category.empty": "ຍັງບໍ່ມີປຶ້ມໃນໝວດນີ້ຈາກຊຸດນີ້",
   "channel.downloading": "ກຳລັງດາວໂຫລດ {done}/{total}",
   "channel.emptyFiltered": "ບໍ່ມີປຶ້ມທີ່ກົງກັບຕົວກັ່ນຕອງນີ້",
   "channel.paraCount": "ແປແລ້ວ {n} ຫຍໍ້ໜ້າ",

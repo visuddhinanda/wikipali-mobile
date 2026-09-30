@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} mục",
   "channel.bookCount": "{n} cuốn",
   "channel.books": "Sách trong bộ",
+  "channel.category.empty": "Chưa có sách trong danh mục này từ bộ này",
   "channel.downloading": "Đang tải {done}/{total}",
   "channel.emptyFiltered": "Không có sách nào khớp bộ lọc này",
   "channel.paraCount": "{n} đoạn đã dịch",

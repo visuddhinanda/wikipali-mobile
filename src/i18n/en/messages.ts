@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} items",
   "channel.bookCount": "{n} books",
   "channel.books": "Books included",
+  "channel.category.empty": "No books from this collection in this category yet",
   "channel.downloading": "Downloading {done}/{total}",
   "channel.emptyFiltered": "No books match this filter",
   "channel.paraCount": "{n} segments translated",

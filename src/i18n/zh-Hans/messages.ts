@@ -63,6 +63,7 @@ const messages = {
   "categoryBrowse.count": " · {n} 项",
   "channel.bookCount": "{n} 本书",
   "channel.books": "包含的书",
+  "channel.category.empty": "本频道暂无该分类的译本",
   "channel.downloading": "正在下载 {done}/{total}",
   "channel.emptyFiltered": "没有符合筛选条件的书",
   "channel.paraCount": "{n} 段译文",
