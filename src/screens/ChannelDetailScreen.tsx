@@ -5,7 +5,10 @@
  * 已经下过、如今服务端不再列出的书仍要能看到（和删除），否则那份缓存就
  * 成了删不掉的孤儿。已下载的排在最前面。
  *
- * 标题栏右上角的漏斗按钮按下载状态过滤（全部 / 已下载 / 下载中 / 未下载）。
+ * 信息块下方有一道「列表｜分类」工具条：
+ * - 列表：现在的书列表，标题栏右上角漏斗按下载状态过滤（全部/已下载/下载中/未下载）。
+ * - 分类：复用「分类」栏目的三藏目录树，下钻到叶子后直接显示该频道落在该
+ *   分类下的书（按 根本 → 义注 → 复注 排序）。分类视图下隐藏下载漏斗。
  */
 import React, {
   useCallback,
@@ -16,17 +19,22 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ListRenderItem,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { Avatar } from "../components/ChannelRow";
 import { BookDownloadCard } from "../components/BookDownloadCard";
+import { Breadcrumb } from "../components/Breadcrumb";
+import { CategoryRow } from "../components/CategoryRow";
+import { SegmentedControl } from "../components/SegmentedControl";
 import {
   fetchChannel,
   fetchChannelBooks,
@@ -34,7 +42,17 @@ import {
   type ChannelBook,
   type ChannelInfo,
 } from "../api/channels";
-import { bookEntryAt, bookLayerAt } from "../catalog";
+import {
+  bookEntryAt,
+  bookKind,
+  bookLayerAt,
+  booksUnderTags,
+  getTree,
+  isLeaf,
+  type BookKind,
+  type CategoryNode,
+} from "../catalog";
+import { label } from "../catalog/labels";
 import {
   downloadBook,
   isDownloading,
@@ -62,6 +80,21 @@ const FILTER_LABEL: Record<Filter, MessageKey> = {
   pending: "download.notDownloaded",
 };
 
+/** 书目分类排序：根本 → 义注 → 复注（与 ChapterListScreen 一致）。 */
+const KIND_RANK: Record<BookKind, number> = {
+  root: 0,
+  atthakatha: 1,
+  tika: 2,
+};
+
+/** 书列表的两种视图。 */
+type ViewMode = "list" | "category";
+
+/** FlatList 的一行：列表/分类叶子里的书，或分类视图里的目录节点。 */
+type Row =
+  | { key: string; kind: "book"; book: ChannelBook }
+  | { key: string; kind: "node"; node: CategoryNode };
+
 /** 下载状态归到哪一档（暂停 / 失败都还没下完，算「未下载」）。 */
 function bucket(p?: DownloadProgress): Exclude<Filter, "all"> {
   if (p?.status === "done") return "done";
@@ -87,6 +120,11 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(
     null,
   );
+  // 列表｜分类 视图切换。
+  const [view, setView] = useState<ViewMode>("list");
+  // 分类视图的下钻路径（根 → 当前节点；空数组 = 根层）。叶子也 push 进来，
+  // 这样面包屑能显示完整路径，「是否在叶子」由最后一项 `isLeaf` 判定。
+  const [catPath, setCatPath] = useState<CategoryNode[]>([]);
   const stopped = useRef(false);
 
   useEffect(() => {
@@ -146,25 +184,28 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     [navigation],
   );
 
-  // 标题栏右上角的过滤器。
+  // 标题栏右上角的过滤器：只在「列表」视图出现。
   useEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setMenu(true)}
-          style={styles.headerBtn}
-        >
-          <Ionicons
-            name={filter === "all" ? "funnel-outline" : "funnel"}
-            size={20}
-            color={filter === "all" ? colors.ink : colors.vermilion}
-          />
-        </Pressable>
-      ),
+      headerRight:
+        view === "list"
+          ? () => (
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setMenu(true)}
+                style={styles.headerBtn}
+              >
+                <Ionicons
+                  name={filter === "all" ? "funnel-outline" : "funnel"}
+                  size={20}
+                  color={filter === "all" ? colors.ink : colors.vermilion}
+                />
+              </Pressable>
+            )
+          : undefined,
     });
-  }, [navigation, filter]);
+  }, [navigation, filter, view]);
 
   /** 服务端列表 ∪ 本地下载记录，已下载的排前面。 */
   const merged = useMemo<ChannelBook[] | null>(() => {
@@ -252,8 +293,130 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
   const studio = studioLabel(info?.studio);
   const readonly = mode !== "download";
 
-  return (
-    <Screen contentStyle={styles.content}>
+  // —— 分类视图 ——
+  const catCurrent = catPath.length ? catPath[catPath.length - 1] : null;
+  const atLeaf = catCurrent != null && isLeaf(catCurrent);
+  const catChildren = catCurrent ? (catCurrent.children ?? []) : getTree();
+  const crumb = catPath.map((n) => label(n.name, locale));
+
+  /** 该频道落在某目录子树下的书数。 */
+  const channelCount = useCallback(
+    (node: CategoryNode): number =>
+      merged === null ? 0 : booksUnderTags(merged, node.tag).length,
+    [merged],
+  );
+
+  /** 叶子层的书：按 根本 → 义注 → 复注 排序（同层按 book）。 */
+  const leafBooks = useMemo<ChannelBook[]>(() => {
+    if (merged === null || !atLeaf || !catCurrent) return [];
+    return booksUnderTags(merged, catCurrent.tag).sort((a, b) => {
+      const ra = KIND_RANK[bookKind(bookEntryAt(a.book, a.para)?.tags)];
+      const rb = KIND_RANK[bookKind(bookEntryAt(b.book, b.para)?.tags)];
+      return ra - rb || a.book - b.book;
+    });
+  }, [merged, atLeaf, catCurrent]);
+
+  const openCategory = useCallback((child: CategoryNode) => {
+    setCatPath((prev) => [...prev, child]);
+  }, []);
+
+  /** 点面包屑返回上级：切到第 index 项所在层级。 */
+  const onCrumbPress = useCallback((index: number) => {
+    setCatPath((prev) =>
+      index >= prev.length - 1 ? prev : prev.slice(0, index + 1),
+    );
+  }, []);
+
+  const rows = useMemo<Row[]>(() => {
+    if (merged === null) return [];
+    if (view === "list") {
+      return (visible ?? []).map((b) => ({
+        key: `book-${b.book}`,
+        kind: "book" as const,
+        book: b,
+      }));
+    }
+    if (atLeaf) {
+      return leafBooks.map((b) => ({
+        key: `book-${b.book}`,
+        kind: "book" as const,
+        book: b,
+      }));
+    }
+    return catChildren.map((n) => ({
+      key: `node-${n.name}`,
+      kind: "node" as const,
+      node: n,
+    }));
+  }, [merged, view, visible, atLeaf, leafBooks, catChildren]);
+
+  const renderBook = useCallback(
+    (b: ChannelBook) => {
+      const layer = bookLayerAt(b.book, b.para);
+      const meta = [
+        layer
+          ? t(
+              layer === "mula"
+                ? "layer.root"
+                : (`layer.${layer}` as MessageKey),
+            )
+          : null,
+        b.progress > 0
+          ? t("channel.translated", { n: Math.round(b.progress * 100) })
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return (
+        <BookDownloadCard
+          book={b.book}
+          title={bookTitle(b)}
+          meta={meta}
+          channelId={uid}
+          paragraph={b.para}
+          readonly={readonly}
+          watch={bulk !== null}
+          onPress={() => openBook(b)}
+          onProgress={onProgress}
+        />
+      );
+    },
+    [bookTitle, openBook, onProgress, readonly, bulk, t, uid],
+  );
+
+  const renderItem: ListRenderItem<Row> = useCallback(
+    ({ item }) => {
+      if (item.kind === "book") return renderBook(item.book);
+      const count = channelCount(item.node);
+      return (
+        <CategoryRow
+          node={item.node}
+          count={count}
+          disabled={count === 0}
+          onPress={() => openCategory(item.node)}
+        />
+      );
+    },
+    [channelCount, openCategory, renderBook],
+  );
+
+  const loading = merged === null;
+  const emptyText = loading
+    ? null
+    : view === "category" && atLeaf && leafBooks.length === 0
+      ? t("channel.category.empty")
+      : view === "list" && visible && visible.length === 0
+        ? (error ?? t("channel.emptyFiltered"))
+        : null;
+
+  const catTotal = atLeaf
+    ? leafBooks.length
+    : catCurrent
+      ? channelCount(catCurrent)
+      : (merged?.length ?? 0);
+
+  const listHeader = (
+    <View>
       {/* 频道信息 */}
       <View style={styles.info}>
         <Avatar uri={info?.studio?.avatar} name={studio || name} size={52} />
@@ -268,72 +431,76 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>
-          {t("channel.books")}
-          {visible ? ` · ${t("channel.bookCount", { n: visible.length })}` : ""}
-        </Text>
-        {!readonly && merged && merged.length > 0 ? (
-          bulk ? (
-            <Pressable style={styles.action} onPress={stopAll} hitSlop={6}>
-              <Ionicons name="pause" size={16} color={colors.vermilion} />
-              <Text style={styles.actionText}>
-                {t("channel.downloading", {
-                  done: bulk.done,
-                  total: bulk.total,
-                })}
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable style={styles.action} onPress={downloadAll} hitSlop={6}>
-              <Ionicons
-                name="cloud-download-outline"
-                size={16}
-                color={colors.vermilion}
-              />
-              <Text style={styles.actionText}>{t("channel.downloadAll")}</Text>
-            </Pressable>
-          )
-        ) : null}
-      </View>
+      {/* 列表｜分类 工具条 */}
+      <SegmentedControl<ViewMode>
+        options={[
+          { value: "list", label: t("channel.view.list") },
+          { value: "category", label: t("channel.view.category") },
+        ]}
+        value={view}
+        onChange={setView}
+      />
 
-      {merged === null ? (
-        <ActivityIndicator color={colors.vermilion} style={styles.loading} />
-      ) : visible && visible.length === 0 ? (
-        <Text style={styles.empty}>{error ?? t("channel.emptyFiltered")}</Text>
+      {view === "list" ? (
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>
+            {t("channel.books")}
+            {visible ? ` · ${t("channel.bookCount", { n: visible.length })}` : ""}
+          </Text>
+          {!readonly && merged && merged.length > 0 ? (
+            bulk ? (
+              <Pressable style={styles.action} onPress={stopAll} hitSlop={6}>
+                <Ionicons name="pause" size={16} color={colors.vermilion} />
+                <Text style={styles.actionText}>
+                  {t("channel.downloading", {
+                    done: bulk.done,
+                    total: bulk.total,
+                  })}
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.action} onPress={downloadAll} hitSlop={6}>
+                <Ionicons
+                  name="cloud-download-outline"
+                  size={16}
+                  color={colors.vermilion}
+                />
+                <Text style={styles.actionText}>{t("channel.downloadAll")}</Text>
+              </Pressable>
+            )
+          ) : null}
+        </View>
       ) : (
-        visible?.map((b) => {
-          const layer = bookLayerAt(b.book, b.para);
-          const meta = [
-            layer
-              ? t(
-                  layer === "mula"
-                    ? "layer.root"
-                    : (`layer.${layer}` as MessageKey),
-                )
-              : null,
-            b.progress > 0
-              ? t("channel.translated", { n: Math.round(b.progress * 100) })
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          return (
-            <BookDownloadCard
-              key={b.book}
-              book={b.book}
-              title={bookTitle(b)}
-              meta={meta}
-              channelId={uid}
-              paragraph={b.para}
-              readonly={readonly}
-              watch={bulk !== null}
-              onPress={() => openBook(b)}
-              onProgress={onProgress}
-            />
-          );
-        })
+        <Breadcrumb
+          items={crumb}
+          trailing={t("categoryBrowse.count", { n: catTotal })}
+          onPressItem={onCrumbPress}
+          onPressHome={() => setCatPath([])}
+          homeLabel={t("categoryBrowse.home")}
+          flush
+        />
       )}
+    </View>
+  );
+
+  return (
+    <Screen scroll={false} contentStyle={styles.contentFill}>
+      <FlatList
+        // view / 下钻路径变化时重挂载，顺带把滚动位置复位到顶。
+        key={`${view}:${catPath.map((n) => n.name).join("/")}`}
+        data={rows}
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator color={colors.vermilion} style={styles.loading} />
+          ) : emptyText ? (
+            <Text style={styles.empty}>{emptyText}</Text>
+          ) : null
+        }
+        contentContainerStyle={styles.listContent}
+      />
 
       {/* 过滤器菜单（贴着标题栏右上角落下） */}
       <Modal
@@ -391,8 +558,15 @@ function dedupe(rows: ChannelBook[]): ChannelBook[] {
 }
 
 const styles = StyleSheet.create({
-  content: {
+  contentFill: {
+    flex: 1,
+    // Screen 的 scroll=false 容器自带 paddingVertical / paddingBottom，
+    // 这里归零后由 FlatList 的 contentContainerStyle 统一控制，避免双重留白。
+    paddingVertical: 0,
+  },
+  listContent: {
     paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
   },
   headerBtn: {
     paddingHorizontal: 4,
@@ -422,6 +596,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
   sectionTitle: {

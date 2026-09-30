@@ -41,6 +41,31 @@ export function getBooksByTags(tags: string[]): BookTitle[] {
   });
 }
 
+/** 一本书的引用（book + 它对应的 level=1 段）。 */
+export interface BookRef {
+  book: number;
+  para: number;
+}
+
+/**
+ * 从一批「书引用」里筛出落在某目录 `tagPath` 下的书。
+ *
+ * 规则与 `getBooksByTags` 一致：`tagPath` 的每个标签都必须出现在该书的 tags 里。
+ * 用结构类型 `BookRef` 而不是从 `api/channels` 引入 `ChannelBook`，保持
+ * catalog 不依赖上层模块。本地书目查不到的书（如藏外、book-titles.json 未收录）
+ * tags 视为空，不会匹配任何非空分类 —— 它们只出现在「列表」视图。
+ */
+export function booksUnderTags<T extends BookRef>(
+  books: T[],
+  tagPath: string[],
+): T[] {
+  if (tagPath.length === 0) return books;
+  return books.filter((b) => {
+    const tags = bookEntryAt(b.book, b.para)?.tags ?? [];
+    return tagPath.every((t) => tags.includes(t));
+  });
+}
+
 /** 书名左侧类型徽标的种类；显示名交给 i18n（`layer.*`）。 */
 export type BookKind = "root" | "atthakatha" | "tika";
 
