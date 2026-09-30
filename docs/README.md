@@ -214,7 +214,7 @@ medium 档不做双栏——600–839dp 拆两栏后正文只剩不到 500dp，�
 | 校验 | `zod` 4.4.3 |
 | **导航** | React Navigation v7（bottom-tabs + native-stack） |
 | **HTML 渲染** | react-native-webview 13.16（阅读器 HTML） |
-| **状态管理/数据请求** | 轻量 `src/api` fetch 封装（超时 + JSON + mock 回退），无 react-query/zustand |
+| **状态管理/数据请求** | 轻量 `src/api` fetch 封装（超时 + JSON），无 react-query/zustand |
 | **离线存储** | `expo-file-system` + `expo-sqlite`（阅读缓存 / 下载）+ AsyncStorage（设置类） |
 | **登录** | `expo-secure-store` 存 token + `src/auth`（`/auth/current` 校验） |
 | **多用户** | 见 [`multi-user-sync.md`](./multi-user-sync.md)（按 user_id 分目录 + 同步） |

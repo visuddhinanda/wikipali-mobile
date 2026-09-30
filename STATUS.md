@@ -181,7 +181,7 @@ cd /home/deploy/workspace/wikipali-mobile
 src/
   theme/index.ts          米黄纸感主题（colors/spacing/type/serif/cardShadow）
   catalog/                三藏目录树（仅 default.json 从 mint 复制）+ 类型 + 中文标签
-  api/                    client(config/env) + catalog(真实) + mock(回退) + index(门面)
+  api/                    client(config/env) + catalog(真实) + index(门面)
   navigation/             RootNavigator（根 Stack + 5 Tab）+ types
   components/Screen.tsx   统一纸面容器
   screens/                Discover / CategoryBrowse / ChapterList / Reader + Bookshelf/AiChat/Tools/Profile/NewChat
@@ -192,7 +192,7 @@ src/
 - **新增依赖（含原生代码 → 必须 EAS 重建 APK）**：`react-native-screens` 4.26、`react-native-safe-area-context` 5.7、`react-native-webview` 13.16、`@react-native-async-storage/async-storage` 2.2（纯 JS：`@react-navigation/*` 7、`@expo/vector-icons` 15）
 - **导航**：React Navigation v7（`@react-navigation/native` + `bottom-tabs` + `native-stack`），AI Chat 为中间凸起 Tab
 - **App.tsx**：`GestureHandlerRootView → SafeAreaProvider → CopilotKitProvider → RootNavigator`（CopilotKit 仍包住全树，`NewChat` 屏复用原 `CopilotChat`）
-- **数据源**：目录树 JSON 本地打包（离线可用）；书目/正文走 `src/api` 门面——后端地址 = `.env` 的 `EXPO_PUBLIC_API_URL`（测试覆盖）或「我 → 设置 → API 服务器」选择的域名（默认 `next.wikipali.org`）；请求失败回退 `mock.ts`（内置 8 篇知名经文 + Tufte sidenote 示例 HTML）
+- **数据源**：目录树 JSON 本地打包（离线可用）；书目/正文走 `src/api` 门面——后端地址 = `.env` 的 `EXPO_PUBLIC_API_URL`（测试覆盖）或「我 → 设置 → API 服务器」选择的域名（默认 `next.wikipali.org`）；请求失败时阅读器在正文顶端显示错误提示条并支持重试
 - **阅读器**：`react-native-webview` 渲染，注入「纸面 + Tufte sidenote」CSS（宽屏右侧边注 / 窄屏行内折叠）
 - **设置**：`src/settings/server.ts` 用 AsyncStorage 持久化 API 服务器选择；「我 → 设置」提供 4 个域名选项（next.wikipali.cc / www.wikipali.cc / next.wikipali.org / www.wikipali.org）
 
@@ -399,7 +399,8 @@ App 与脚本共用同一份实现）。
 - `html IS NULL` 表示「该版本没有这一段」，与「没请求过」区分 —— 残缺译本里
   空段是多数，不记下来的话永远命中不了缓存。空段带 `expires_at`（48 小时）：
   「没有」不是永久结论，译者随时可能补上。
-- 离线时 mock 占位数据带 `mock: true` **不写盘**，否则会冒充真经留在库里。
+- 离线时不再回退占位数据：正文加载抛错 → 阅读器顶端提示条提示并支持重试，
+  不写盘（抛错就不会走到 `storeCovered`），不会冒充真经留在库里。
 
 ### 11.4 取数：`tipitaka-reading`（一个端点两种用法）
 

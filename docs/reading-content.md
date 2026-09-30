@@ -580,9 +580,10 @@ node scripts/check-reading-unit.mjs 59       # 某本书连续翻页
 
 §3.4 的数字即由它产出。
 
-### 离线占位数据不入库
+### 离线 / 加载失败
 
-网络不可达时 `fetchReadParas` 回 `mock: true`（`fetchReadChapter` 回
-`status: "offline"`），缓存层据此改用 `mockReadParas` 的占位文**只供当次显示、
-不写盘** —— 否则占位文会冒充真经永久留在 `para_html` 里，比一次加载失败糟得多。
-引文角标走的 `loadOnePara`（§2.3）连显示都不显示，直接回 null 提示取不到。
+网络不可达时 `fetchReadParas` 抛错（`fetchReadChapter` 回 `status: "offline"`），
+缓存层不再用占位文兜底，异常沿调用链抛到阅读器 —— 阅读器在正文顶端显示错误
+提示条（区分「网络失败」与「后端返回错误」）并提供「重试」，同时**不写盘**
+（抛错就不会走到 `storeCovered`），占位文不会冒充真经永久留在 `para_html` 里。
+引文角标走的 `loadOnePara`（§2.3）抛错时由 `CitationSheet` 提示取不到。

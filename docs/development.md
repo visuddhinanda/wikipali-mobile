@@ -34,7 +34,7 @@ see [Troubleshooting](./troubleshooting.md#patched-dependencies).
 ## 3. Configuration
 
 All runtime configuration is optional — with an empty `.env` the app talks to the
-public API server and falls back to bundled mock data.
+public API server. Network/backend failures surface as an error bar in the reader.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -373,7 +373,7 @@ index.ts                 polyfill imports (order is mandatory) → App
 App.tsx                  GestureHandler → SafeArea → CopilotKit → RootNavigator
 metro.config.js          jose / node:* resolver fix
 src/
-  api/                   fetch wrapper, base-URL resolution, mock fallback
+  api/                   fetch wrapper, base-URL resolution
   catalog/               Tipiṭaka category tree, headings, labels
   components/            shared UI (chapter drawer, progress ring, screen)
   navigation/            5-tab bottom navigator + root stack
