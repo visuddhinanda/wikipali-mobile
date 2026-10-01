@@ -265,6 +265,42 @@ one-time install.
 | Native config in `app.json` (permissions, package id, icons, plugins) | **Yes** |
 | Upgrade `expo-dev-client` or the Expo SDK major | **Yes** |
 
+### Local release build (`assembleRelease`)
+
+The release APK is built locally with Gradle (not EAS — see `STATUS.md` §12):
+
+```bash
+cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk
+```
+
+**Before building release, comment out `EXPO_PUBLIC_API_URL` and
+`EXPO_PUBLIC_RUNTIME_URL` in `.env`.** Unlike the development build (where Metro
+inlines them live on every reload), `assembleRelease` inlines `EXPO_PUBLIC_*`
+values into the JS bundle **at build time**:
+
+| Variable | If left uncommented in `.env` |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | APK hard-codes a local/dev API server, ignoring the in-app server picker |
+| `EXPO_PUBLIC_RUNTIME_URL` | APK hard-codes a local AI runtime instead of the production fallback (`https://agent.wikipali.cc/api/copilotkit`) |
+
+> ⚠️ **Gradle does not track `.env`.** `createBundleReleaseJsAndAssets` caches
+> the bundle, and its up-to-date check only watches JS sources — not `.env`.
+> Editing `.env` alone does **not** invalidate that cache, so `assembleRelease`
+> silently reuses the stale bundle with the old inlined values. After changing
+> `.env`, force a re-bundle:
+>
+> ```bash
+> rm android/app/build/generated/assets/react/release/index.android.bundle
+> cd android && ./gradlew assembleRelease
+> ```
+>
+> (`./gradlew clean && ./gradlew assembleRelease` also works, but recompiles
+> native code and is much slower.)
+
+**Symptom of the stale bundle:** a release APK that keeps connecting to an old
+local/dev server even after you commented the variable out.
+
 ## 6. Waydroid (Android on a Linux desktop)
 
 [Waydroid](https://waydro.id) boots Android in a container on your own machine
