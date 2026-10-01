@@ -25,6 +25,7 @@
 | [`api-schema.md`](./api-schema.md) | **API 契约与 OpenAPI 注解完善清单**（schema 工作流 + 类型化客户端 + 服务端需补齐项） |
 | [`user-data-db.md`](./user-data-db.md) | **用户数据数据库设计**（SQLite 表结构 / 字段语义 / 同步字段 / 迁移） |
 | [`pali-script.md`](./pali-script.md) | 巴利文字体（script）转换 |
+| [`reader-settings.md`](./reader-settings.md) | **阅读页设置面板优化**（分组/即调即看/亮度/背景/排版，含可交互原型 `reader-settings-preview.html`） |
 | [`buddhist-calendar.md`](./buddhist-calendar.md) | 佛教日历（五套历法 + 天文计算 + 飞行计算） |
 | [`development.md`](./development.md) | 开发指南（环境 / 构建 / 联调） |
 | [`testing.md`](./testing.md) | 功能测试清单（真机） |
