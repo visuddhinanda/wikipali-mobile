@@ -516,6 +516,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
         onAnnoJump={handleAnnoJump}
         onCrossHighlight={handleCrossHighlight}
+        // 双栏时只有左栏是「点注释 → 跨栏高亮、不展开」的起点；右栏保持原互动。
+        dualOrigin={pairIndices.length === 2 && i === pairIndices[0]}
         highlightSid={
           highlightSid && p.book === Number(highlightSid.split("-")[0])
             ? highlightSid

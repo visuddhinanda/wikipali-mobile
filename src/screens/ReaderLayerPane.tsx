@@ -215,6 +215,11 @@ export interface ReaderLayerPaneProps {
   onAnnoJump: (book: number, para: number, start: number, end: number) => void;
   /** 用户点击角标（平板双栏）：定位到另一栏对应句并高亮，但不切换层。 */
   onCrossHighlight: (book: number, para: number, start: number, end: number) => void;
+  /**
+   * 平板双栏的**左栏**（`docs/reading-annotations.md` §11）：点角标 / 段后注释
+   * 只做跨栏高亮，不展开行内注释、不展开段后脚注，也不本栏滚动。
+   */
+  dualOrigin?: boolean;
   /** 需要滚动到并高亮的句子 data-sid（如 "101-507-2-23"）；仅命中的那一层有值。 */
   highlightSid?: string | null;
   /** 本栏是否获得焦点：只有焦点栏显示「就此段落提问」浮动按钮。 */
@@ -244,7 +249,7 @@ function buildReaderHtml(
     ? "--paper:#211d17;--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
     : "--paper:#f7f3ea;--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
   return `<!DOCTYPE html>
-<html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}">
+<html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -471,15 +476,40 @@ function buildReaderHtml(
     if (!para) return null;
     return para.querySelector(selector + '[data-idx="' + idx + '"]');
   }
+  function closest(elm, sel) {
+    return elm && elm.closest ? elm.closest(sel) : null;
+  }
+  // 跨栏高亮的坐标来源：角标 <label> 自身带 data-book/…；段后脚注的坐标在其内部
+  // .anno-jump <cite> 上（脚注本体只有 fn id 与正文）。
+  function crossHighlightFrom(origin) {
+    var fn = closest(origin, ".anno-footnote");
+    var src = origin;
+    if (fn) {
+      var jump = fn.querySelector(".anno-jump");
+      if (jump) src = jump;
+    }
+    var book = src && src.getAttribute ? src.getAttribute("data-book") : null;
+    if (!book || !window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) return;
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: "cross-highlight",
+      book: book,
+      para: src.getAttribute("data-para"),
+      start: src.getAttribute("data-start"),
+      end: src.getAttribute("data-end")
+    }));
+  }
   // <cite class="anno-jump"> 点击 → 通知 RN 跳到义注/复注对应句
-  // <label class="sidenote-number"> 点击 → 通知 RN 跨栏高亮对应句（同时仍会展开本行边注）
+  // <label class="sidenote-number"> 点击 → 通知 RN 跨栏高亮对应句
+  // 平板双栏左栏（data-dual-origin="true"）：角标 / 段后注释只做跨栏高亮，不展开、不本栏滚动。
   document.addEventListener("click", function (e) {
     // 任何点击都先告诉 RN「这栏获得焦点」：底部工具栏 / 顶部栏随之切换到本栏。
     // click 只在「点一下」时触发，滑动翻正文不会误报（滚动会取消 click）。
     if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: "pane-focus" }));
     }
-    var t = e.target && e.target.closest ? e.target.closest(".anno-jump") : null;
+    var dualOrigin = document.documentElement.getAttribute("data-dual-origin") === "true";
+
+    var t = closest(e.target, ".anno-jump");
     if (t) {
       e.preventDefault();
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
@@ -494,29 +524,45 @@ function buildReaderHtml(
       return;
     }
 
-    // 点脚注编号 [N] → 滚回正文角标并高亮（preventDefault 避免触发脚注展开/收起）
-    var fnNum = e.target && e.target.closest ? e.target.closest(".anno-fn-num") : null;
-    if (fnNum) {
-      e.preventDefault();
-      var fi = fnNum.getAttribute("data-idx");
-      var mark = annoTargetInPara(fnNum, ".sidenote-number", fi);
-      if (mark) {
-        mark.scrollIntoView({ block: "center", behavior: "smooth" });
-        flashAnno(mark);
+    // 段后脚注（含编号 [N] 与正文）：双栏左栏 → 跨栏高亮、不展开；其余保持原逻辑。
+    var fn = closest(e.target, ".anno-footnote");
+    if (fn) {
+      if (dualOrigin) {
+        e.preventDefault();
+        crossHighlightFrom(fn);
+        return;
       }
+      // 点脚注编号 [N] → 滚回正文角标并高亮（preventDefault 避免触发脚注展开/收起）
+      var fnNum = closest(e.target, ".anno-fn-num");
+      if (fnNum) {
+        e.preventDefault();
+        var fi = fnNum.getAttribute("data-idx");
+        var mark = annoTargetInPara(fnNum, ".sidenote-number", fi);
+        if (mark) {
+          mark.scrollIntoView({ block: "center", behavior: "smooth" });
+          flashAnno(mark);
+        }
+      }
+      // 点脚注正文 → 交给 label 默认展开/收起
       return;
     }
 
-    // 点正文角标 → 段后脚注模式下滚到对应脚注并高亮（行内模式仍展开边注）
-    var n = e.target && e.target.closest ? e.target.closest(".sidenote-number") : null;
+    // 点正文角标
+    var n = closest(e.target, ".sidenote-number");
     if (n) {
+      if (dualOrigin) {
+        // 左栏：不展开行内注释、不滚段后脚注，只跨栏高亮
+        e.preventDefault();
+        crossHighlightFrom(n);
+        return;
+      }
       var mi = n.getAttribute("data-idx");
       if (mi && document.documentElement.getAttribute("data-annotation-mode") === "footnote") {
-        var fn = annoTargetInPara(n, ".anno-footnote", mi);
-        if (fn) {
+        var fnInPara = annoTargetInPara(n, ".anno-footnote", mi);
+        if (fnInPara) {
           e.preventDefault();
-          fn.scrollIntoView({ block: "center", behavior: "smooth" });
-          flashAnno(fn);
+          fnInPara.scrollIntoView({ block: "center", behavior: "smooth" });
+          flashAnno(fnInPara);
         }
       }
       if (n.getAttribute("data-book") &&
@@ -822,6 +868,7 @@ export const ReaderLayerPane = forwardRef<
     onChannelChange,
     onAnnoJump,
     onCrossHighlight,
+    dualOrigin = false,
     highlightSid,
     focused,
     onFocus,
@@ -1443,6 +1490,17 @@ export const ReaderLayerPane = forwardRef<
     webViewRef.current?.injectJavaScript(js);
   };
 
+  // 平板双栏左栏（dualOrigin）的角色会随双栏窗口滑动变化，不能写进 WebView source
+  // （否则换角色会整页重载、丢失滚动位置），改用运行时注入 data-dual-origin 属性。
+  const dualOriginRef = useRef(false);
+  dualOriginRef.current = dualOrigin;
+  const injectDualOrigin = () => {
+    const v = dualOriginRef.current ? "true" : "false";
+    webViewRef.current?.injectJavaScript(
+      `(function(){var d=document.documentElement;if(d){d.setAttribute("data-dual-origin","${v}");}return true;})(); true;`,
+    );
+  };
+
   // 增量加载的段落同样要过一遍巴利字体转换（与首屏 `shown` 一致）。
   const convertFragment = useCallback(
     (fragment: string): string =>
@@ -1590,6 +1648,11 @@ export const ReaderLayerPane = forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightSid, doc]);
 
+  useEffect(() => {
+    injectDualOrigin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dualOrigin, doc]);
+
   const handleAnnoMessage = (e: { nativeEvent: { data: string } }) => {
     try {
       const msg = JSON.parse(e.nativeEvent.data);
@@ -1624,6 +1687,8 @@ export const ReaderLayerPane = forwardRef<
   };
 
   const handleAnnoLoadEnd = () => {
+    // 每次（重）载入后确保 data-dual-origin 与当前角色一致（首屏 / 换章 / 换版本）。
+    injectDualOrigin();
     const sid = pendingHighlightRef.current;
     if (!sid) return;
     pendingHighlightRef.current = null;
