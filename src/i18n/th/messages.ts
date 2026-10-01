@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "หลังออกจากระบบ ชั้นหนังสือและประวัติคำถามจะไม่ซิงค์อีกต่อไป",
   "profile.signedOutHint": "เข้าสู่ระบบเพื่อซิงค์ชั้นหนังสือ ความคืบหน้า และประวัติคำถาม",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "คัดลอกแล้ว",
   "reader.loadErrorHint": "ตรวจสอบการเชื่อมต่อเครือข่ายแล้วลองใหม่",
   "reader.noVersions": "ไม่มีฉบับให้เลือก",

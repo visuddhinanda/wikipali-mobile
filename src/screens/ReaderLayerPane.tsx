@@ -79,7 +79,11 @@ import {
   SIDENOTE_WIDTH,
   widthClassOf,
 } from "../theme/breakpoints";
-import { readerColors, type ReaderChrome } from "../theme/reader";
+import {
+  READER_BACKGROUND_PAPER,
+  readerColorsFor,
+  type ReaderChrome,
+} from "../theme/reader";
 import { useI18n, useT } from "../i18n/I18nContext";
 import {
   convertPaliHtml,
@@ -87,7 +91,12 @@ import {
   resolvePaliScript,
   scriptToRoman,
 } from "../pali/script";
-import { fontSizePx, type ReaderSettings } from "../settings/reader";
+import {
+  fontSizePx,
+  LINE_HEIGHT_VALUES,
+  PAGE_MARGIN_VALUES,
+  type ReaderSettings,
+} from "../settings/reader";
 import type { RootStackParamList } from "../navigation/types";
 import { ensureAiAvailable } from "../ai/availability";
 
@@ -237,17 +246,21 @@ function buildReaderHtml(
   doc: ReaderDoc,
   opts: {
     fontSizePx: number;
+    paper: string;
     dark: boolean;
     contentWidth: number;
     measure: number;
     sidenote: "inline" | "margin";
     annoClamp: number;
     annotationMode: "inline" | "footnote";
+    lineHeight: number;
+    pageMargin: number;
   },
 ): string {
-  const vars = opts.dark
-    ? "--paper:#211d17;--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
-    : "--paper:#f7f3ea;--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
+  const inkVars = opts.dark
+    ? "--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
+    : "--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
+  const vars = `--paper:${opts.paper};${inkVars}`;
   return `<!DOCTYPE html>
 <html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false">
 <head>
@@ -260,6 +273,8 @@ function buildReaderHtml(
     --measure:${opts.measure}px;
     --sidenote-w:${SIDENOTE_WIDTH}px;
     --anno-clamp:${opts.annoClamp};
+    --line-height:${opts.lineHeight};
+    --page-margin:${opts.pageMargin}px;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -278,13 +293,13 @@ function buildReaderHtml(
       "Noto Sans Thai", "Noto Serif Thai",
       "Noto Sans Tai Tham", "Noto Sans Telugu", serif;
     font-size: var(--base);
-    line-height: 1.95;
+    line-height: var(--line-height);
     -webkit-text-size-adjust: 100%;
   }
   .paper {
     max-width: var(--measure);
     margin: 0 auto;
-    padding: 20px 18px 60px;
+    padding: 20px var(--page-margin) 60px;
   }
   [data-sidenote="margin"] .paper {
     margin-right: calc(var(--sidenote-w) + 24px);
@@ -947,8 +962,8 @@ export const ReaderLayerPane = forwardRef<
     null,
   );
 
-  const c = readerColors(settings.theme === "dark");
-  const isDark = settings.theme === "dark";
+  const c = readerColorsFor(settings.background);
+  const isDark = settings.background === "dark";
 
   /** 正文加载错误 → 用户可读文案：区分「后端返回错误(带状态码)」与「网络失败」。 */
   const describeLoadError = useCallback(
@@ -1281,12 +1296,15 @@ export const ReaderLayerPane = forwardRef<
             { ...shown, subtitle: headerSubtitle },
             {
               fontSizePx: fontSizePx(settings.fontSize),
+              paper: READER_BACKGROUND_PAPER[settings.background],
               dark: isDark,
               contentWidth: readerWidth,
               measure,
               sidenote: sidenoteMode,
               annoClamp: settings.annotationCollapsedLines,
               annotationMode: settings.annotationMode,
+              lineHeight: LINE_HEIGHT_VALUES[settings.lineHeight],
+              pageMargin: PAGE_MARGIN_VALUES[settings.pageMargin],
             },
           )
         : "",
@@ -1294,6 +1312,9 @@ export const ReaderLayerPane = forwardRef<
       shown,
       headerSubtitle,
       settings.fontSize,
+      settings.background,
+      settings.lineHeight,
+      settings.pageMargin,
       settings.annotationCollapsedLines,
       settings.annotationMode,
       isDark,

@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "Next",
   "reader.prevChapter": "Previous",
   "reader.settings": "Reading settings",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "Share",
   "reader.switchVersion": "Switch version",
   "reader.toc": "Contents",

@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "පිටවීමෙන් පසු පොත් රාක්කය හා ප්‍රශ්න ඉතිහාසය සමමුහුර්ත නොවේ.",
   "profile.signedOutHint": "පොත් රාක්කය, ප්‍රගතිය හා ප්‍රශ්න ඉතිහාසය සමමුහුර්ත කිරීමට පිවිසෙන්න",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "පිටපත් කළා",
   "reader.loadErrorHint": "ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න",
   "reader.noVersions": "සංස්කරණ නොමැත",

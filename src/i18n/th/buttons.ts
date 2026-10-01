@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "บทถัดไป",
   "reader.prevChapter": "บทก่อนหน้า",
   "reader.settings": "ตั้งค่าการอ่าน",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "แชร์",
   "reader.switchVersion": "เปลี่ยนฉบับ",
   "reader.toc": "สารบัญ",

@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "Chương sau",
   "reader.prevChapter": "Chương trước",
   "reader.settings": "Cài đặt đọc",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "Chia sẻ",
   "reader.switchVersion": "Đổi bản",
   "reader.toc": "Mục lục",

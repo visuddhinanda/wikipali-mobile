@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "ထွက်ပြီးနောက် စာအုပ်စင်နှင့် မေးခွန်းမှတ်တမ်းများ ချိန်ကိုက်တော့မည် မဟုတ်ပါ။",
   "profile.signedOutHint": "စာအုပ်စင်၊ တိုးတက်မှုနှင့် မေးခွန်းမှတ်တမ်းများ ချိန်ကိုက်ရန် ဝင်ရောက်ပါ",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "ကူးယူပြီး",
   "reader.loadErrorHint": "အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ",
   "reader.noVersions": "ရနိုင်သော ဗားရှင်း မရှိပါ",

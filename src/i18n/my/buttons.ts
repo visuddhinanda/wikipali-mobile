@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "နောက်အခန်း",
   "reader.prevChapter": "ယခင်အခန်း",
   "reader.settings": "ဖတ်ရှုမှု ဆက်တင်",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "မျှဝေ",
   "reader.switchVersion": "ဗားရှင်း ပြောင်းရန်",
   "reader.toc": "မာတိကာ",

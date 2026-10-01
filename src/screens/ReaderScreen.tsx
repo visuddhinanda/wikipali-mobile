@@ -8,13 +8,16 @@ import React, {
 import {
   ActivityIndicator,
   Modal,
-  PanResponder,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
+import Slider from "@react-native-community/slider";
+import Checkbox from "expo-checkbox";
 import { SafeAreaView } from "react-native-safe-area-context";
 import PagerView, {
   type PagerViewOnPageSelectedEvent,
@@ -34,8 +37,14 @@ import { DownloadIconButton } from "../components/DownloadIconButton";
 import { KeepAwake } from "../components/KeepAwake";
 import { serifFont } from "../theme";
 import { useLayout } from "../hooks/useLayout";
-import { readerColors, type ReaderChrome } from "../theme/reader";
+import {
+  READER_BACKGROUND_PAPER,
+  readerColorsFor,
+  type ReaderBackground,
+  type ReaderChrome,
+} from "../theme/reader";
 import { useI18n, useT } from "../i18n/I18nContext";
+import type { MessageKey } from "../i18n";
 import {
   TARGET_LABELS,
   TARGET_SCRIPTS,
@@ -47,8 +56,11 @@ import {
   FONT_OPTIONS,
   loadReaderSettings,
   saveReaderSettings,
+  type ReaderLineHeight,
+  type ReaderPageMargin,
   type ReaderSettings,
 } from "../settings/reader";
+import * as Brightness from "expo-brightness";
 import type { RootStackParamList } from "../navigation/types";
 import { resolveBaseUrl } from "../api/config";
 import { buildWikipaliUrl, webOriginFromBaseUrl } from "../linking/wikipali-url";
@@ -98,6 +110,29 @@ export function ReaderScreen({ route, navigation }: Props) {
   const handleChangeSettings = useCallback((next: ReaderSettings) => {
     setSettings(next);
     saveReaderSettings(next);
+  }, []);
+
+  // 应用亮度设置：跟随系统 → 恢复系统亮度；手动 → 设置当前 Activity 亮度。
+  useEffect(() => {
+    const apply = async () => {
+      try {
+        if (settings.brightnessMode === "system") {
+          await Brightness.restoreSystemBrightnessAsync();
+        } else {
+          await Brightness.setBrightnessAsync(settings.brightness);
+        }
+      } catch {
+        // 亮度 API 不可用时静默忽略（模拟器 / 无传感器设备）。
+      }
+    };
+    void apply();
+  }, [settings.brightnessMode, settings.brightness]);
+
+  // 离开阅读器时恢复系统亮度，避免把亮度带出阅读页。
+  useEffect(() => {
+    return () => {
+      void Brightness.restoreSystemBrightnessAsync().catch(() => {});
+    };
   }, []);
 
   // 入口这一层不一定是根本：从「义注」书进来时，标签栏该停在义注，而不是
@@ -158,6 +193,7 @@ export function ReaderScreen({ route, navigation }: Props) {
   );
 
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [moreVisible, setMoreVisible] = useState(false);
 
   // 底部工具栏只渲染一份，作用于焦点栏（activeIndex）。每个 pane 通过 ref
   // 暴露 goPrev/goNext/openToc/openVersion/openMore，工具栏据此调用焦点栏。
@@ -207,7 +243,7 @@ export function ReaderScreen({ route, navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dual, pairIndices.join(",")]);
 
-  const c = readerColors(settings.theme === "dark");
+  const c = readerColorsFor(settings.background);
 
   // <cite> 跳转：切到义注/复注对应层、定位到该段，并高亮目标句（data-sid）。
   const [highlightSid, setHighlightSid] = useState<string | null>(null);
@@ -751,6 +787,18 @@ export function ReaderScreen({ route, navigation }: Props) {
         c={c}
         onClose={() => setSettingsVisible(false)}
         onChange={handleChangeSettings}
+        onMore={() => {
+          setSettingsVisible(false);
+          setMoreVisible(true);
+        }}
+      />
+
+      <MoreSettingsSheet
+        visible={moreVisible}
+        settings={settings}
+        c={c}
+        onClose={() => setMoreVisible(false)}
+        onChange={handleChangeSettings}
       />
     </SafeAreaView>
   );
@@ -762,14 +810,27 @@ function SettingsSheet({
   c,
   onClose,
   onChange,
+  onMore,
 }: {
   visible: boolean;
   settings: ReaderSettings;
   c: ReaderChrome;
   onClose: () => void;
   onChange: (s: ReaderSettings) => void;
+  onMore: () => void;
 }) {
   const t = useT();
+  const fontIndex = Math.max(
+    0,
+    FONT_OPTIONS.findIndex((f) => f.id === settings.fontSize),
+  );
+  const fontPx = FONT_OPTIONS[fontIndex]?.px ?? 15;
+  const setFontIndex = (i: number) => {
+    const next = FONT_OPTIONS[Math.max(0, Math.min(FONT_OPTIONS.length - 1, i))];
+    if (next) onChange({ ...settings, fontSize: next.id });
+  };
+  const followSystem = settings.brightnessMode === "system";
+
   return (
     <Modal
       transparent
@@ -787,138 +848,182 @@ function SettingsSheet({
           { backgroundColor: c.paperRaised, borderTopColor: c.border },
         ]}
       >
+        <View style={[styles.sheetHandle, { backgroundColor: c.border }]} />
         <Text
           style={[styles.sheetTitle, { color: c.ink, fontFamily: serifFont }]}
         >
           {t("reader.settings")}
         </Text>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.fontSize")}
-        </Text>
-        <FontScale
-          value={settings.fontSize}
-          c={c}
-          onChange={(fontSize) => onChange({ ...settings, fontSize })}
-        />
-
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.theme")}
-        </Text>
-        <View style={styles.fontRow}>
-          {(
-            [
-              { id: "light", labelKey: "reader.theme.light" },
-              { id: "dark", labelKey: "reader.theme.dark" },
-            ] as const
-          ).map((opt) => {
-            const activeOpt = settings.theme === opt.id;
-            return (
-              <Pressable
-                key={opt.id}
-                style={[
-                  styles.fontPill,
-                  { backgroundColor: activeOpt ? c.vermilion : c.paperSunken },
-                ]}
-                onPress={() => onChange({ ...settings, theme: opt.id })}
-              >
-                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>
-                  {t(opt.labelKey)}
-                </Text>
-              </Pressable>
-            );
-          })}
+        {/* 亮度：原生滑杆 + 跟随系统勾选（拖动滑杆自动取消勾选） */}
+        <View style={styles.qrow}>
+          <Text style={[styles.qlabel, { color: c.ink }]}>
+            {t("reader.brightness")}
+          </Text>
+          <Slider
+            style={styles.brightnessSlider}
+            minimumValue={0.3}
+            maximumValue={1}
+            value={settings.brightness}
+            onValueChange={(brightness) =>
+              onChange({ ...settings, brightness, brightnessMode: "app" })
+            }
+            minimumTrackTintColor={followSystem ? c.inkFaint : c.vermilion}
+            maximumTrackTintColor={c.border}
+            thumbTintColor={followSystem ? c.inkFaint : c.vermilion}
+          />
+          <View style={styles.followBtn}>
+            <Checkbox
+              value={followSystem}
+              onValueChange={(v) =>
+                onChange({
+                  ...settings,
+                  brightnessMode: v ? "system" : "app",
+                })
+              }
+              color={c.vermilion}
+            />
+            <Text
+              style={[
+                styles.followLabel,
+                { color: followSystem ? c.ink : c.inkSoft },
+              ]}
+            >
+              {t("reader.brightness.followSystem")}
+            </Text>
+          </View>
         </View>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.keepAwake")}
-        </Text>
-        <View style={styles.fontRow}>
-          {(
-            [
-              { id: true, labelKey: "reader.keepAwake.on" },
-              { id: false, labelKey: "reader.keepAwake.off" },
-            ] as const
-          ).map((opt) => {
-            const activeOpt = settings.keepAwake === opt.id;
-            return (
-              <Pressable
-                key={String(opt.id)}
+        {/* 字号：A− / 当前值 / A+ */}
+        <View style={styles.qrow}>
+          <Text style={[styles.qlabel, { color: c.ink }]}>
+            {t("reader.fontSize")}
+          </Text>
+          <View style={styles.qc}>
+            <Pressable
+              style={[
+                styles.stepBtn,
+                { borderColor: c.border, backgroundColor: c.paper },
+              ]}
+              disabled={fontIndex === 0}
+              hitSlop={6}
+              onPress={() => setFontIndex(fontIndex - 1)}
+            >
+              <Text
                 style={[
-                  styles.fontPill,
-                  { backgroundColor: activeOpt ? c.vermilion : c.paperSunken },
+                  styles.stepBtnText,
+                  { color: fontIndex === 0 ? c.inkFaint : c.ink },
                 ]}
-                onPress={() => onChange({ ...settings, keepAwake: opt.id })}
               >
-                <Text style={{ color: activeOpt ? "#fdfaf1" : c.ink }}>
-                  {t(opt.labelKey)}
-                </Text>
-              </Pressable>
-            );
-          })}
+                A−
+              </Text>
+            </Pressable>
+            <Text style={[styles.fontValue, { color: c.ink }]}>{fontPx}</Text>
+            <Pressable
+              style={[
+                styles.stepBtn,
+                { borderColor: c.border, backgroundColor: c.paper },
+              ]}
+              disabled={fontIndex === FONT_OPTIONS.length - 1}
+              hitSlop={6}
+              onPress={() => setFontIndex(fontIndex + 1)}
+            >
+              <Text
+                style={[
+                  styles.stepBtnText,
+                  {
+                    color:
+                      fontIndex === FONT_OPTIONS.length - 1
+                        ? c.inkFaint
+                        : c.ink,
+                  },
+                ]}
+              >
+                A+
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.paliScript")}
-        </Text>
-        <PaliScriptPicker
-          value={settings.paliScript}
-          c={c}
-          onChange={(paliScript) => onChange({ ...settings, paliScript })}
-        />
-
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.annoCollapsedLines")}
-        </Text>
-        <View style={styles.fontRow}>
-          {[1, 2, 3, 5].map((n) => {
-            const active = settings.annotationCollapsedLines === n;
-            return (
-              <Pressable
-                key={n}
-                style={[
-                  styles.fontPill,
-                  { backgroundColor: active ? c.vermilion : c.paperSunken },
-                ]}
-                onPress={() =>
-                  onChange({ ...settings, annotationCollapsedLines: n })
-                }
-              >
-                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>{n}</Text>
-              </Pressable>
-            );
-          })}
+        {/* 背景：只色块，无文字 */}
+        <View style={styles.qrow}>
+          <Text style={[styles.qlabel, { color: c.ink }]}>
+            {t("reader.background")}
+          </Text>
+          <View style={styles.qc}>
+            {(Object.keys(READER_BACKGROUND_PAPER) as ReaderBackground[]).map(
+              (key) => {
+                const active = settings.background === key;
+                return (
+                  <Pressable
+                    key={key}
+                    style={[
+                      styles.swatch,
+                      {
+                        backgroundColor: READER_BACKGROUND_PAPER[key],
+                        borderColor: active ? c.vermilion : c.border,
+                      },
+                    ]}
+                    onPress={() => onChange({ ...settings, background: key })}
+                  >
+                    {active && (
+                      <Ionicons
+                        name="checkmark"
+                        size={16}
+                        color={key === "dark" ? "#e8dfd0" : "#8c3b2e"}
+                      />
+                    )}
+                  </Pressable>
+                );
+              },
+            )}
+          </View>
         </View>
 
-        <Text style={[styles.sheetSection, { color: c.inkSoft }]}>
-          {t("reader.annoMode")}
-        </Text>
-        <View style={styles.fontRow}>
-          {(
-            [
-              { id: "inline", labelKey: "reader.annoMode.inline" },
-              { id: "footnote", labelKey: "reader.annoMode.footnote" },
-            ] as const
-          ).map((opt) => {
-            const active = settings.annotationMode === opt.id;
-            return (
-              <Pressable
-                key={opt.id}
-                style={[
-                  styles.fontPill,
-                  { backgroundColor: active ? c.vermilion : c.paperSunken },
-                ]}
-                onPress={() =>
-                  onChange({ ...settings, annotationMode: opt.id })
-                }
-              >
-                <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
-                  {t(opt.labelKey)}
-                </Text>
-              </Pressable>
-            );
-          })}
+        {/* 注释：行内 / 段后 */}
+        <View style={styles.qrow}>
+          <Text style={[styles.qlabel, { color: c.ink }]}>
+            {t("reader.annoMode")}
+          </Text>
+          <View style={styles.qc}>
+            {(
+              [
+                { id: "inline", labelKey: "reader.annoMode.inline" },
+                { id: "footnote", labelKey: "reader.annoMode.footnote" },
+              ] as const
+            ).map((opt) => {
+              const active = settings.annotationMode === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  style={[
+                    styles.fontPill,
+                    {
+                      backgroundColor: active ? c.vermilion : c.paperSunken,
+                    },
+                  ]}
+                  onPress={() =>
+                    onChange({ ...settings, annotationMode: opt.id })
+                  }
+                >
+                  <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
+                    {t(opt.labelKey)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
+
+        {/* 更多设置 */}
+        <Pressable style={styles.qrow} onPress={onMore}>
+          <Text style={[styles.qlabel, { color: c.ink }]}>
+            {t("reader.moreSettings")}
+          </Text>
+          <View style={styles.qcEnd}>
+            <Ionicons name="chevron-forward" size={18} color={c.inkFaint} />
+          </View>
+        </Pressable>
       </View>
     </Modal>
   );
@@ -979,106 +1084,171 @@ function PaliScriptPicker({
 }
 
 /**
- * 字号选择：四节点进度条。左右两端用「小 / 大」标注，档位本身不写字
- * —— 四个档的名字（标准/特大之类）在这么窄的条上只会互相挤。
- *
- * 整条都可点，也可以按住拖动，落点取最近的节点。
+ * 更多设置：完整页面（push 式滑入），收纳低频项。返回即回到阅读页。
  */
-function FontScale({
-  value,
+function MoreSettingsSheet({
+  visible,
+  settings,
   c,
+  onClose,
   onChange,
 }: {
-  value: ReaderSettings["fontSize"];
+  visible: boolean;
+  settings: ReaderSettings;
   c: ReaderChrome;
-  onChange: (v: ReaderSettings["fontSize"]) => void;
+  onClose: () => void;
+  onChange: (s: ReaderSettings) => void;
 }) {
-  const last = FONT_OPTIONS.length - 1;
-  const index = Math.max(
-    0,
-    FONT_OPTIONS.findIndex((f) => f.id === value),
+  const t = useT();
+  const inline = settings.annotationMode === "inline";
+
+  const pillGroup = (
+    options: { id: string; labelKey: MessageKey }[],
+    activeId: string,
+    apply: (id: string) => void,
+    disabled = false,
+  ) => (
+    <View style={[styles.fontRow, disabled && styles.disabledRow]}>
+      {options.map((opt) => {
+        const active = activeId === opt.id;
+        return (
+          <Pressable
+            key={opt.id}
+            disabled={disabled}
+            style={[
+              styles.fontPill,
+              { backgroundColor: active ? c.vermilion : c.paperSunken },
+            ]}
+            onPress={() => apply(opt.id)}
+          >
+            <Text style={{ color: active ? "#fdfaf1" : c.ink }}>
+              {t(opt.labelKey)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
-
-  // PanResponder 只创建一次，靠 ref 读最新的宽度与选中值，避免闭包读到旧状态。
-  const widthRef = useRef(0);
-  const valueRef = useRef(value);
-  valueRef.current = value;
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const pick = useCallback(
-    (x: number) => {
-      const w = widthRef.current;
-      if (w <= 0) return;
-      const i = Math.round(Math.min(1, Math.max(0, x / w)) * last);
-      const next = FONT_OPTIONS[i];
-      if (next && next.id !== valueRef.current) {
-        onChangeRef.current(next.id as ReaderSettings["fontSize"]);
-      }
-    },
-    [last],
-  );
-
-  // 拖动只能用绝对坐标：move 事件里的 locationX 在 Android 上不可靠
-  // （实测一路右拖反而跳到最左档）。按下时用 pageX - locationX 得到轨道
-  // 自身的屏幕左边界，之后统一拿 gestureState.moveX 减掉它。
-  const originRef = useRef(0);
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        originRef.current = e.nativeEvent.pageX - e.nativeEvent.locationX;
-        pick(e.nativeEvent.locationX);
-      },
-      onPanResponderMove: (_e, g) => pick(g.moveX - originRef.current),
-    }),
-  ).current;
 
   return (
-    <View style={styles.scaleRow}>
-      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 12 }]}>
-        小
-      </Text>
-
-      <View style={styles.scaleTrackHit} {...pan.panHandlers}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView
+        style={[styles.moreSafe, { backgroundColor: c.paper }]}
+        edges={["top", "left", "right", "bottom"]}
+      >
         <View
-          style={styles.scaleTrackInner}
-          onLayout={(e) => {
-            widthRef.current = e.nativeEvent.layout.width;
-          }}
+          style={[
+            styles.moreHead,
+            { backgroundColor: c.paperRaised, borderBottomColor: c.hairline },
+          ]}
         >
-          <View style={[styles.scaleLine, { backgroundColor: c.border }]} />
-          <View
-            style={[
-              styles.scaleLineFill,
-              {
-                backgroundColor: c.vermilion,
-                width: `${(index / last) * 100}%`,
-              },
-            ]}
-          />
-          {FONT_OPTIONS.map((f, i) => (
-            <View
-              key={f.id}
-              style={[
-                styles.scaleDot,
-                {
-                  left: `${(i / last) * 100}%`,
-                  backgroundColor: i <= index ? c.vermilion : c.paperSunken,
-                  borderColor: i <= index ? c.vermilion : c.border,
-                },
-                i === index && styles.scaleDotActive,
-              ]}
-            />
-          ))}
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Ionicons name="chevron-back" size={24} color={c.ink} />
+          </Pressable>
+          <Text
+            style={[styles.moreTitle, { color: c.ink, fontFamily: serifFont }]}
+          >
+            {t("reader.moreSettings")}
+          </Text>
+          <View style={styles.moreHeadSpacer} />
         </View>
-      </View>
 
-      <Text style={[styles.scaleCap, { color: c.inkSoft, fontSize: 19 }]}>
-        大
-      </Text>
-    </View>
+        <ScrollView contentContainerStyle={styles.moreBody}>
+          <Text style={[styles.moreLabel, { color: c.inkSoft }]}>
+            {t("reader.paliScript")}
+          </Text>
+          <PaliScriptPicker
+            value={settings.paliScript}
+            c={c}
+            onChange={(paliScript) => onChange({ ...settings, paliScript })}
+          />
+
+          <Text style={[styles.moreLabel, { color: c.inkSoft }]}>
+            {t("reader.lineHeight")}
+          </Text>
+          {pillGroup(
+            [
+              { id: "compact", labelKey: "reader.lineHeight.compact" },
+              { id: "standard", labelKey: "reader.lineHeight.standard" },
+              { id: "loose", labelKey: "reader.lineHeight.loose" },
+            ],
+            settings.lineHeight,
+            (lineHeight) =>
+              onChange({
+                ...settings,
+                lineHeight: lineHeight as ReaderLineHeight,
+              }),
+          )}
+
+          <Text style={[styles.moreLabel, { color: c.inkSoft }]}>
+            {t("reader.margin")}
+          </Text>
+          {pillGroup(
+            [
+              { id: "narrow", labelKey: "reader.margin.narrow" },
+              { id: "standard", labelKey: "reader.margin.standard" },
+              { id: "wide", labelKey: "reader.margin.wide" },
+            ],
+            settings.pageMargin,
+            (pageMargin) =>
+              onChange({
+                ...settings,
+                pageMargin: pageMargin as ReaderPageMargin,
+              }),
+          )}
+
+          <Text style={[styles.moreLabel, { color: c.inkSoft }]}>
+            {t("reader.annoCollapsedLines")}
+            <Text style={{ color: c.inkFaint }}>
+              {" "}· {t("reader.annoCollapsedHint")}
+            </Text>
+          </Text>
+          <View style={[styles.fontRow, inline && styles.disabledRow]}>
+            {[1, 2, 3, 5].map((n) => {
+              const active = settings.annotationCollapsedLines === n;
+              return (
+                <Pressable
+                  key={n}
+                  disabled={inline}
+                  style={[
+                    styles.fontPill,
+                    {
+                      backgroundColor: active ? c.vermilion : c.paperSunken,
+                    },
+                  ]}
+                  onPress={() =>
+                    onChange({ ...settings, annotationCollapsedLines: n })
+                  }
+                >
+                  <Text style={{ color: active ? "#fdfaf1" : c.ink }}>{n}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.moreSwitchRow}>
+            <Text style={[styles.moreSwitchLabel, { color: c.ink }]}>
+              {t("reader.keepAwake")}
+            </Text>
+            <Switch
+              value={settings.keepAwake}
+              onValueChange={(keepAwake) => onChange({ ...settings, keepAwake })}
+              trackColor={{ false: c.paperSunken, true: c.vermilion }}
+              thumbColor="#fdfaf1"
+            />
+          </View>
+
+          <Pressable
+            style={[styles.resetBtn, { borderColor: c.border }]}
+            onPress={() => onChange({ ...DEFAULT_READER_SETTINGS })}
+          >
+            <Text style={[styles.resetText, { color: c.vermilion }]}>
+              {t("reader.reset")}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -1152,88 +1322,161 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  // 快速面板（底部抽屉）
   sheetBackdrop: {
     flex: 1,
   },
   sheet: {
     borderTopWidth: StyleSheet.hairlineWidth,
     padding: 16,
-    paddingBottom: 32,
+    paddingTop: 10,
+    paddingBottom: 24,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 10,
   },
   sheetTitle: {
     fontSize: 17,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  sheetSection: {
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  scaleRow: {
+  qrow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 4,
+    minHeight: 52,
   },
-  scaleCap: {
-    width: 24,
-    textAlign: "center",
+  qlabel: {
+    width: 72,
+    fontSize: 14,
   },
-  // 触摸区比线粗得多，免得要"戳准"那根 3px 的线
-  scaleTrackHit: {
+  qc: {
     flex: 1,
-    height: 44,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  scaleTrackInner: {
-    height: 18,
-    marginHorizontal: 9,
-    justifyContent: "center",
+  qcEnd: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
-  scaleLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 3,
-    borderRadius: 2,
+  followBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  // 单独写一份：RN 的样式合并会忽略 undefined，靠覆盖 scaleLine 的 right 清不掉
-  scaleLineFill: {
-    position: "absolute",
-    left: 0,
-    height: 3,
-    borderRadius: 2,
+  followLabel: {
+    fontSize: 13,
   },
-  scaleDot: {
-    position: "absolute",
-    top: 3,
-    width: 12,
-    height: 12,
-    marginLeft: -6,
-    borderRadius: 6,
+  stepBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  scaleDotActive: {
-    top: 0,
-    width: 18,
-    height: 18,
-    marginLeft: -9,
-    borderRadius: 9,
+  stepBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
+  fontValue: {
+    minWidth: 24,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  swatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // 亮度滑杆（原生 Slider）
+  brightnessSlider: {
+    flex: 1,
+    height: 40,
+  },
+
+  // 胶囊（PaliScriptPicker 与新面板共用）
   fontRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
   fontPill: {
-    minWidth: 60,
+    minWidth: 52,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
+  },
+  disabledRow: {
+    opacity: 0.4,
+  },
+
+  // 更多设置完整页
+  moreSafe: {
+    flex: 1,
+  },
+  moreHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  moreHeadSpacer: {
+    width: 24,
+  },
+  moreTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  moreBody: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  moreLabel: {
+    fontSize: 13,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  moreSwitchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  moreSwitchLabel: {
+    fontSize: 15,
+  },
+  resetBtn: {
+    marginTop: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  resetText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

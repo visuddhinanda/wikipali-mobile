@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "Sau khi đăng xuất, kệ sách và lịch sử câu hỏi sẽ không còn được đồng bộ.",
   "profile.signedOutHint": "Đăng nhập để đồng bộ kệ sách, tiến độ và lịch sử câu hỏi",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "Đã sao chép",
   "reader.loadErrorHint": "Kiểm tra kết nối mạng rồi thử lại",
   "reader.noVersions": "Không có bản nào",

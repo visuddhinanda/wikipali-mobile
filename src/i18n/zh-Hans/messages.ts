@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "退出后将无法同步书架与提问历史。",
   "profile.signedOutHint": "登录后同步书架、进度与提问历史",
   "reader.annoCollapsedLines": "段落脚注默认收起行数",
+  "reader.annoCollapsedHint": "仅段后模式生效",
   "reader.copied": "已复制",
   "reader.loadErrorHint": "请检查网络连接后重试",
   "reader.noVersions": "暂无可用版本",

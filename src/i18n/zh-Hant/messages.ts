@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "登出後將無法同步書架與提問紀錄。",
   "profile.signedOutHint": "登入後同步書架、進度與提問紀錄",
   "reader.annoCollapsedLines": "段落註腳預設收合行數",
+  "reader.annoCollapsedHint": "僅段後模式生效",
   "reader.copied": "已複製",
   "reader.loadErrorHint": "請檢查網路連線後重試",
   "reader.noVersions": "暫無可用版本",

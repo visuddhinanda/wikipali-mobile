@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "ඊළඟ පරිච්ඡේදය",
   "reader.prevChapter": "පෙර පරිච්ඡේදය",
   "reader.settings": "කියවීම් සැකසුම්",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "බෙදාගන්න",
   "reader.switchVersion": "සංස්කරණය මාරු කරන්න",
   "reader.toc": "පටුන",

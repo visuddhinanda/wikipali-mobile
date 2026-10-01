@@ -51,3 +51,24 @@ const DARK: ReaderChrome = {
 export function readerColors(dark: boolean): ReaderChrome {
   return dark ? DARK : LIGHT;
 }
+
+/**
+ * 阅读器背景预设（纸白 / 米黄护眼 / 浅灰 / 夜间）。
+ *
+ * 前三个共用亮色 chrome（墨色、朱砂、线色不变），只换纸面色；
+ * 夜间单独一套深色 chrome（见 `docs/reader-settings.md` §4.4.2）。
+ */
+export type ReaderBackground = "paper" | "sepia" | "gray" | "dark";
+
+export const READER_BACKGROUND_PAPER: Record<ReaderBackground, string> = {
+  paper: "#f7f3ea", // 现有亮色纸面
+  sepia: "#f0e6cf", // 米黄护眼
+  gray: "#e8e6e1", // 中性浅灰
+  dark: "#211d17", // 夜间（同 DARK.paper）
+};
+
+export function readerColorsFor(background: ReaderBackground): ReaderChrome {
+  const dark = background === "dark";
+  const chrome = dark ? DARK : LIGHT;
+  return { ...chrome, paper: READER_BACKGROUND_PAPER[background] };
+}

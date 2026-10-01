@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "After signing out your library and question history will no longer sync.",
   "profile.signedOutHint": "Sign in to sync your library, progress and question history",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "Copied",
   "reader.loadErrorHint": "Check your network connection and try again",
   "reader.noVersions": "No versions available",

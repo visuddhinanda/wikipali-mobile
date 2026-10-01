@@ -106,6 +106,7 @@ const messages = {
   "profile.signOutConfirm": "ຫຼັງອອກຈາກລະບົບ ຊັ້ນວາງປຶ້ມ ແລະ ປະຫວັດຄຳຖາມຈະບໍ່ຖືກຊິງຄ໌ອີກຕໍ່ໄປ.",
   "profile.signedOutHint": "ເຂົ້າສູ່ລະບົບເພື່ອຊິງຄ໌ຊັ້ນວາງປຶ້ມ ຄວາມຄືບໜ້າ ແລະ ປະຫວັດຄຳຖາມ",
   "reader.annoCollapsedLines": "Annotation collapsed lines",
+  "reader.annoCollapsedHint": "Footnote mode only",
   "reader.copied": "ຄັດລອກແລ້ວ",
   "reader.loadErrorHint": "ກວດການເຊື່ອມຕໍ່ເຄືອຂ່າຍແລ້ວລອງໃໝ່",
   "reader.noVersions": "ບໍ່ມີສະບັບໃຫ້ເລືອກ",

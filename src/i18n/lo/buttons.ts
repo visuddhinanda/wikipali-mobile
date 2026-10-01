@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "ບົດຕໍ່ໄປ",
   "reader.prevChapter": "ບົດກ່ອນໜ້າ",
   "reader.settings": "ຕັ້ງຄ່າການອ່ານ",
+  "reader.moreSettings": "More settings",
+  "reader.reset": "Reset",
   "reader.share": "ແບ່ງປັນ",
   "reader.switchVersion": "ປ່ຽນສະບັບ",
   "reader.toc": "ສາລະບານ",

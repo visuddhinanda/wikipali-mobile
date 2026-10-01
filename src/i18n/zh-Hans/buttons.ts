@@ -38,6 +38,8 @@ const buttons = {
   "reader.nextChapter": "下一章",
   "reader.prevChapter": "上一章",
   "reader.settings": "阅读设置",
+  "reader.moreSettings": "更多设置",
+  "reader.reset": "恢复默认",
   "reader.share": "分享",
   "reader.switchVersion": "切换版本",
   "reader.toc": "目录",
