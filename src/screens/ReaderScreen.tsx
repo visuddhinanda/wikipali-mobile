@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -212,6 +213,17 @@ export function ReaderScreen({ route, navigation }: Props) {
     },
     [],
   );
+
+  // App 转后台 / 被系统清退前，把焦点栏的视口顶部段落盘到阅读记录，
+  // 保证「恢复上次阅读位置」拿到的是刚离开那一刻的位置（见 useRestoreLastReading）。
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        paneRefs.current[selfIndexRef.current]?.savePosition();
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // 双列对照：阅读区净宽（onLayout 实测）达到 canDualColumn 的阈值就并排
   // 显示两层，否则退回单层 + 滑动（docs/README.md §4.7）。
@@ -1233,6 +1245,20 @@ function MoreSettingsSheet({
             <Switch
               value={settings.keepAwake}
               onValueChange={(keepAwake) => onChange({ ...settings, keepAwake })}
+              trackColor={{ false: c.paperSunken, true: c.vermilion }}
+              thumbColor="#fdfaf1"
+            />
+          </View>
+
+          <View style={styles.moreSwitchRow}>
+            <Text style={[styles.moreSwitchLabel, { color: c.ink }]}>
+              {t("reader.restoreLastReading")}
+            </Text>
+            <Switch
+              value={settings.restoreLastReading}
+              onValueChange={(restoreLastReading) =>
+                onChange({ ...settings, restoreLastReading })
+              }
               trackColor={{ false: c.paperSunken, true: c.vermilion }}
               thumbColor="#fdfaf1"
             />

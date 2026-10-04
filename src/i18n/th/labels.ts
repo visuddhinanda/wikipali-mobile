@@ -104,6 +104,7 @@ const labels = {
   "reader.keepAwake": "เปิดหน้าจอค้างไว้",
   "reader.keepAwake.off": "ปิด",
   "reader.keepAwake.on": "เปิด",
+  "reader.restoreLastReading": "เปิดตำแหน่งที่อ่านล่าสุด",
   "reader.paliScript": "อักษรบาลี",
   "reader.size.lg": "ใหญ่",
   "reader.size.md": "มาตรฐาน",

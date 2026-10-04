@@ -42,6 +42,7 @@ import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
 import { navigationRef } from "../linking/handler";
 import { useDeepLinks } from "../linking/useDeepLinks";
+import { useRestoreLastReading } from "./useRestoreLastReading";
 import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 
@@ -402,6 +403,7 @@ export function RootNavigator() {
   // 导航容器就绪后才能处理冷启动带进来的链接。
   const [navReady, setNavReady] = React.useState(false);
   useDeepLinks(navReady);
+  useRestoreLastReading(navReady);
   const vertical = navKind !== "tabs";
 
   return (

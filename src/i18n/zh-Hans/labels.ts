@@ -104,6 +104,7 @@ const labels = {
   "reader.keepAwake": "屏幕常亮",
   "reader.keepAwake.off": "关",
   "reader.keepAwake.on": "开",
+  "reader.restoreLastReading": "恢复上次阅读位置",
   "reader.paliScript": "巴利字体",
   "reader.size.lg": "大",
   "reader.size.md": "标准",

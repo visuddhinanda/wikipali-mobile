@@ -104,6 +104,7 @@ const labels = {
   "reader.keepAwake": "තිරය අවදියෙන් තබන්න",
   "reader.keepAwake.off": "අක්‍රිය",
   "reader.keepAwake.on": "සක්‍රිය",
+  "reader.restoreLastReading": "අවසන් කියවූ ස්ථානය යළි විවෘත කරන්න",
   "reader.paliScript": "පාලි අකුරු",
   "reader.size.lg": "විශාල",
   "reader.size.md": "සම්මත",

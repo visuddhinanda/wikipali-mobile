@@ -78,6 +78,8 @@ export interface ReaderSettings {
   lineHeight: ReaderLineHeight;
   /** 正文左右页边距。 */
   pageMargin: ReaderPageMargin;
+  /** 冷启动时是否自动回到上次的阅读页与阅读位置（见 useRestoreLastReading）。 */
+  restoreLastReading: boolean;
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
@@ -91,6 +93,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   brightness: 1,
   lineHeight: "standard",
   pageMargin: "standard",
+  restoreLastReading: true,
 };
 
 const KEY = "@wikipali/reader-settings";
@@ -163,6 +166,7 @@ export async function loadReaderSettings(): Promise<ReaderSettings> {
       pageMargin: isPageMargin(parsed.pageMargin)
         ? parsed.pageMargin
         : "standard",
+      restoreLastReading: parsed.restoreLastReading !== false,
     };
   } catch {
     return DEFAULT_READER_SETTINGS;

@@ -104,6 +104,7 @@ const labels = {
   "reader.keepAwake": "Keep screen awake",
   "reader.keepAwake.off": "Off",
   "reader.keepAwake.on": "On",
+  "reader.restoreLastReading": "Resume last reading position",
   "reader.paliScript": "Pāli script",
   "reader.size.lg": "Large",
   "reader.size.md": "Default",

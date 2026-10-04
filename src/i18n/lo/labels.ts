@@ -104,6 +104,7 @@ const labels = {
   "reader.keepAwake": "ຮັກສາໜ້າຈໍໃຫ້ສະຫວ່າງ",
   "reader.keepAwake.off": "ປິດ",
   "reader.keepAwake.on": "ເປີດ",
+  "reader.restoreLastReading": "ເປີດຕຳແໜ່ງທີ່ອ່ານຫຼ້າສຸດ",
   "reader.paliScript": "ອັກສອນບາລີ",
   "reader.size.lg": "ໃຫຍ່",
   "reader.size.md": "ມາດຕະຖານ",

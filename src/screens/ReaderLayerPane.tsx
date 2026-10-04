@@ -183,6 +183,8 @@ export interface ReaderLayerPaneHandle {
   openToc: () => void;
   openVersion: () => void;
   openMore: () => void;
+  /** 立即把当前视口顶部段落盘到阅读记录（App 转后台 flush 用）。 */
+  savePosition: () => void;
 }
 
 export interface ReaderLayerPaneProps {
@@ -911,6 +913,8 @@ export const ReaderLayerPane = forwardRef<
   const headingTocRef = useRef<string | null>(null);
   /** 锚点防抖定时器：滚动补偿的 ±1px 抖动会让顶部段在章节边界来回跳，稍等再提交。 */
   const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 阅读位置落盘防抖定时器：滚动中稍等再写，避免高频写 SQLite + 入同步队列。 */
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [versionVisible, setVersionVisible] = useState(false);
@@ -1036,10 +1040,11 @@ export const ReaderLayerPane = forwardRef<
     unitRef.current = unit;
   }, [unit]);
 
-  // 卸载时清掉锚点防抖定时器，避免泄漏。
+  // 卸载时清掉锚点/落盘防抖定时器，避免泄漏。
   useEffect(
     () => () => {
       if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     },
     [],
   );
@@ -1135,19 +1140,43 @@ export const ReaderLayerPane = forwardRef<
   }, [channelId, channelName, onChannelChange]);
 
   // 记录阅读位置（本地存储，见 src/data/history.ts）——每一层各自的书各算一条。
-  useEffect(() => {
-    if (!unit) return;
+  // 连续滚动时存「视口顶部段」而非章节起点，恢复阅读位置更精确。
+  const persistPosition = useCallback(() => {
+    const u = unitRef.current;
+    if (!u) return;
     // 只存版本 uid，不存名字：名字查 channels 表（见 history.ts 注释）。
-    saveReadingRecord({
+    void saveReadingRecord({
       book,
-      // 连续滚动时存「视口顶部段」而非章节起点，恢复阅读位置更精确。
-      paragraph: topParaRef.current || unit.from,
+      paragraph: topParaRef.current || u.from,
       title,
-      heading: toc,
+      heading: headingTocRef.current ?? u.chapter?.toc ?? undefined,
       channelId,
       updatedAt: Date.now(),
     });
+  }, [book, title, channelId]);
+
+  // 滚动中的位置落盘按「停止滚动后稍等」防抖，避免每个顶部段都写一次库。
+  const schedulePersist = useCallback(() => {
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      persistTimerRef.current = null;
+      persistPosition();
+    }, 800);
+  }, [persistPosition]);
+
+  // 换章 / 换版本 / 标题刷新时立即落盘（保持原「章节单元变化即存」的行为）。
+  useEffect(() => {
+    if (unit) persistPosition();
+    // persistPosition 已覆盖 book/title/channelId，这里只关心位置维度的变化。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, unit, title, toc, channelId]);
+
+  // 切回本层（focused 变真）时立即落盘一次，让「最近阅读」准确指向用户正在读的那一层。
+  const wasFocusedRef = useRef(focused);
+  useEffect(() => {
+    if (focused && !wasFocusedRef.current) persistPosition();
+    wasFocusedRef.current = focused;
+  }, [focused, persistPosition]);
 
   // 副标题只放版本名，不放「段落 from–to」——连续滚动下锚点单元(unit)随时在变，
   // 若把 unit 依赖带进 WebView source，跨章时会让整个 WebView 重载、窗口被重置回
@@ -1638,6 +1667,8 @@ export const ReaderLayerPane = forwardRef<
   const handleWlAnchor = useCallback(
     (para: number) => {
       topParaRef.current = para;
+      // 滚动中位置变化 → 防抖落盘，保证「恢复位置」始终接近真实视口顶部段。
+      schedulePersist();
       // 防抖提交：滚动补偿的 ±1px 抖动会让顶部段在章节边界（尤其空标题段，如
       // 435↔437 中间隔着空段 436）来回跳，直接跟会连锁触发标题/伴读层反复刷新。
       if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
@@ -1659,7 +1690,7 @@ export const ReaderLayerPane = forwardRef<
         });
       }, 250);
     },
-    [book],
+    [book, schedulePersist],
   );
 
   useEffect(() => {
@@ -1725,8 +1756,9 @@ export const ReaderLayerPane = forwardRef<
       openToc: () => setDrawerVisible(true),
       openVersion,
       openMore,
+      savePosition: persistPosition,
     }),
-    [goPrev, goNext, openVersion, openMore],
+    [goPrev, goNext, openVersion, openMore, persistPosition],
   );
 
   return (
