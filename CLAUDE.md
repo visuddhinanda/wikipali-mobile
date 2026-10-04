@@ -4,26 +4,26 @@
 
 代码统一在 `src/` 下按职责分层，新增文件放对目录、不要往根目录堆：
 
-| 目录 | 用途 |
-|---|---|
-| `src/screens/` | 页面组件，一个 Screen 一个文件（`XxxScreen.tsx`） |
-| `src/components/` | 跨页面复用的 UI 组件 |
-| `src/navigation/` | React Navigation 导航器与路由类型 |
-| `src/api/` | 后端接口客户端（一个后端域一个文件，如 `like.ts` / `recent.ts`） |
-| `src/data/` | 本地持久化与同步（SQLite / AsyncStorage、同步队列、迁移） |
-| `src/auth/` | 登录会话（token / 当前用户） |
-| `src/user/` | 多用户作用域与设备身份（`userScope` / `deviceUuid`） |
-| `src/reading/` | 阅读链路（正文缓存、阅读单元、下载、章节查询） |
-| `src/catalog/` | 三藏目录树 / 书目 |
-| `src/i18n/` | 界面语言（按语言分目录、按语义分文件，见下方「i18n 目录结构」规则） |
-| `src/theme/` | 主题与响应式断点数值（断点唯一数值来源 `breakpoints.ts`） |
-| `src/settings/` | 用户设置项持久化 |
-| `src/hooks/` | 跨组件复用 hook（如 `useLayout`） |
-| `src/calendar/` `src/pali/` `src/linking/` `src/ai/` | 各自子项目的实现，自成目录、互不串 |
-| `scripts/` | 自检脚本（`check-*.mjs`，纯 node 可跑、不依赖 App 运行） |
-| `docs/` | 设计文档（见下方规则） |
-| `assets/db/` | 打包进 App 的只读数据库（`tipitaka.db3`） |
-| `patches/` | patch-package 补丁，随 `postinstall` 应用 |
+| 目录                                                         | 用途                                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `src/screens/`                                             | 页面组件，一个 Screen 一个文件（`XxxScreen.tsx`）                 |
+| `src/components/`                                          | 跨页面复用的 UI 组件                                                |
+| `src/navigation/`                                          | React Navigation 导航器与路由类型                                   |
+| `src/api/`                                                 | 后端接口客户端（一个后端域一个文件，如`like.ts` / `recent.ts`） |
+| `src/data/`                                                | 本地持久化与同步（SQLite / AsyncStorage、同步队列、迁移）           |
+| `src/auth/`                                                | 登录会话（token / 当前用户）                                        |
+| `src/user/`                                                | 多用户作用域与设备身份（`userScope` / `deviceUuid`）            |
+| `src/reading/`                                             | 阅读链路（正文缓存、阅读单元、下载、章节查询）                      |
+| `src/catalog/`                                             | 三藏目录树 / 书目                                                   |
+| `src/i18n/`                                                | 界面语言（按语言分目录、按语义分文件，见下方「i18n 目录结构」规则） |
+| `src/theme/`                                               | 主题与响应式断点数值（断点唯一数值来源`breakpoints.ts`）          |
+| `src/settings/`                                            | 用户设置项持久化                                                    |
+| `src/hooks/`                                               | 跨组件复用 hook（如`useLayout`）                                  |
+| `src/calendar/` `src/pali/` `src/linking/` `src/ai/` | 各自子项目的实现，自成目录、互不串                                  |
+| `scripts/`                                                 | 自检脚本（`check-*.mjs`，纯 node 可跑、不依赖 App 运行）          |
+| `docs/`                                                    | 设计文档（见下方规则）                                              |
+| `assets/db/`                                               | 打包进 App 的只读数据库（`tipitaka.db3`）                         |
+| `patches/`                                                 | patch-package 补丁，随`postinstall` 应用                          |
 
 - 跨层依赖方向：`screens/components` → `api/data/auth/user/reading/...`，底层模块不得反向依赖页面。
 - 不改动 `index.ts` 的 polyfill 导入顺序、`metro.config.js`、`patches/`（见 `docs/README.md` §0.3 工程约束）。
@@ -61,7 +61,7 @@ src/i18n/
 # 提交规则（必须遵守）
 
 - **不自动提交**：完成工作后只交付改动、报告结果，`git add` / `git commit` / `git push` 一律不做。
-- **人类 review**：提交前由人类审查代码与文档，确认无误后由人类执行提交。
+- **人类 review**：提交前由人类审查代码与文档，确认无误后可以在人类的命令下执行提交。
 - **按修改内容分批提交**：一次会话的改动若横跨多个主题，拆成多个 commit，每个 commit 只做一件事，例如：
   1. 文档重组（docs 移动 / 拆分子项目文档 / CLAUDE.md 规则）；
   2. 多用户同步功能实现（一个 commit 或按「数据层 / 同步引擎 / auth 集成」再细分）；
