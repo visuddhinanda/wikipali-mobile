@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "ຄັດລອກແລ້ວ",
   "reader.loadErrorHint": "ກວດການເຊື່ອມຕໍ່ເຄືອຂ່າຍແລ້ວລອງໃໝ່",
   "reader.noVersions": "ບໍ່ມີສະບັບໃຫ້ເລືອກ",
+  "scan.albumNoQr": "ບໍ່ພົບ QR ໃນຮູບ",
   "scan.hint": "ສະແກນ QR ຂອງໜ້າ WikiPali ເພື່ອເປີດຂໍ້ຄວາມ",
   "scan.permissionBody": "ການສະແກນຕ້ອງໃຊ້ກ້ອງ ກະລຸນາອະນຸຍາດໃນການຕັ້ງຄ່າ",
   "scan.permissionTitle": "ຕ້ອງການສິດກ້ອງຖ່າຍຮູບ",

@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "已复制",
   "reader.loadErrorHint": "请检查网络连接后重试",
   "reader.noVersions": "暂无可用版本",
+  "scan.albumNoQr": "图片中没有识别到二维码",
   "scan.hint": "扫描 WikiPali 网页二维码，直达对应经文",
   "scan.permissionBody": "扫码需要使用相机，请在系统设置里允许。",
   "scan.permissionTitle": "需要相机权限",

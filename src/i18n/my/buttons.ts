@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "ဗားရှင်း ပြောင်းရန်",
   "reader.toc": "မာတိကာ",
   "reader.version": "ဗားရှင်း",
+  "scan.album": "အယ်လ်ဘမ်မှ ရွေးချယ်ပါ",
   "scan.grant": "ခွင့်ပြုသည်",
   "settings.uposathaNotifyPowerAction": "စနစ်ဆက်တင် ဖွင့်ရန်",
   "signIn.submit": "ဝင်ရောက်ရန်",

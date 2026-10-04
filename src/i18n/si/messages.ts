@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "පිටපත් කළා",
   "reader.loadErrorHint": "ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න",
   "reader.noVersions": "සංස්කරණ නොමැත",
+  "scan.albumNoQr": "රූපයේ QR කේතයක් හමු නොවීය",
   "scan.hint": "ඡේදය විවෘත කිරීමට WikiPali පිටුවේ QR කේතය පරිලෝකනය කරන්න",
   "scan.permissionBody": "පරිලෝකනයට කැමරාව අවශ්‍යයි. සැකසුම් තුළ අවසර දෙන්න.",
   "scan.permissionTitle": "කැමරා අවසරය අවශ්‍යයි",

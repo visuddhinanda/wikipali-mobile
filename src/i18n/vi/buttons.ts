@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "Đổi bản",
   "reader.toc": "Mục lục",
   "reader.version": "Bản",
+  "scan.album": "Chọn từ thư viện ảnh",
   "scan.grant": "Cho phép",
   "settings.uposathaNotifyPowerAction": "Mở cài đặt hệ thống",
   "signIn.submit": "Đăng nhập",

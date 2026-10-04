@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "已複製",
   "reader.loadErrorHint": "請檢查網路連線後重試",
   "reader.noVersions": "暫無可用版本",
+  "scan.albumNoQr": "圖片中沒有辨識到 QR Code",
   "scan.hint": "掃描 WikiPali 網頁 QR Code，直達對應經文",
   "scan.permissionBody": "掃碼需要使用相機，請在系統設定裡允許。",
   "scan.permissionTitle": "需要相機權限",

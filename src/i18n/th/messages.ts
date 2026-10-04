@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "คัดลอกแล้ว",
   "reader.loadErrorHint": "ตรวจสอบการเชื่อมต่อเครือข่ายแล้วลองใหม่",
   "reader.noVersions": "ไม่มีฉบับให้เลือก",
+  "scan.albumNoQr": "ไม่พบ QR โค้ดในรูปภาพ",
   "scan.hint": "สแกน QR โค้ดของหน้า WikiPali เพื่อเปิดข้อความ",
   "scan.permissionBody": "การสแกนต้องใช้กล้อง โปรดอนุญาตในการตั้งค่า",
   "scan.permissionTitle": "ต้องการสิทธิ์กล้อง",

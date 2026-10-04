@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "ປ່ຽນສະບັບ",
   "reader.toc": "ສາລະບານ",
   "reader.version": "ສະບັບ",
+  "scan.album": "ເລືອກຈາກອັນບັ້ມ",
   "scan.grant": "ອະນຸຍາດ",
   "settings.uposathaNotifyPowerAction": "ເປີດການຕັ້ງຄ່າລະບົບ",
   "signIn.submit": "ເຂົ້າສູ່ລະບົບ",

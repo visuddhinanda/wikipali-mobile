@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "Đã sao chép",
   "reader.loadErrorHint": "Kiểm tra kết nối mạng rồi thử lại",
   "reader.noVersions": "Không có bản nào",
+  "scan.albumNoQr": "Không tìm thấy mã QR trong ảnh",
   "scan.hint": "Quét mã QR trang WikiPali để mở đoạn kinh",
   "scan.permissionBody": "Quét mã cần dùng camera. Vui lòng cho phép trong cài đặt.",
   "scan.permissionTitle": "Cần quyền camera",

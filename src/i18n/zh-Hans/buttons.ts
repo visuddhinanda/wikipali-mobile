@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "切换版本",
   "reader.toc": "目录",
   "reader.version": "版本",
+  "scan.album": "从相册选择",
   "scan.grant": "允许",
   "settings.uposathaNotifyPowerAction": "打开系统设置",
   "signIn.submit": "登录",

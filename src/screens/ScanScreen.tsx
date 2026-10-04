@@ -1,6 +1,9 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { CameraView, scanFromURLAsync, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { useT } from "../i18n/I18nContext";
@@ -15,17 +18,21 @@ type Props = NativeStackScreenProps<RootStackParamList, "Scan">;
  *
  * 只在本页做「扫到 → 解析 → 跳转」，链接语义都在 `src/linking/wikipali-url.ts`，
  * 与外部分享进来的链接共用同一份解析。
+ *
+ * 除了摄像头实时扫，也支持从相册选一张二维码图片（`expo-image-picker` 选图 +
+ * `expo-camera` 的 `scanFromURLAsync` 解静态图），与微信的「扫一扫 + 相册」一致。
  */
 export function ScanScreen({ navigation }: Props) {
   const t = useT();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   // 相机会连续回调同一个码，扫到第一个之后就别再处理了。
   const handled = useRef(false);
   const [scanning, setScanning] = useState(true);
 
-  const onScanned = useCallback(
-    ({ data }: { data: string }) => {
-      if (handled.current) return;
+  /** 拿到一段扫码结果（摄像头或相册图片）：解析并跳转，或提示无法识别。 */
+  const handleResult = useCallback(
+    (data: string) => {
       const target = parseWikipaliUrl(data);
       if (!target) {
         handled.current = true;
@@ -47,6 +54,33 @@ export function ScanScreen({ navigation }: Props) {
     },
     [navigation, t],
   );
+
+  const onScanned = useCallback(
+    ({ data }: { data: string }) => {
+      if (handled.current) return;
+      handleResult(data);
+    },
+    [handleResult],
+  );
+
+  /** 从相册选图 → `scanFromURLAsync` 解二维码 → 复用同一套解析跳转。 */
+  const pickFromAlbum = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      const scanned = await scanFromURLAsync(result.assets[0].uri, ["qr"]);
+      if (scanned.length === 0) {
+        Alert.alert(t("scan.albumNoQr"));
+        return;
+      }
+      handleResult(scanned[0].data);
+    } catch {
+      Alert.alert(t("scan.albumNoQr"));
+    }
+  }, [handleResult, t]);
 
   if (!permission) return <Screen scroll={false}>{null}</Screen>;
 
@@ -73,6 +107,16 @@ export function ScanScreen({ navigation }: Props) {
       <View pointerEvents="none" style={styles.overlay}>
         <View style={styles.frame} />
         <Text style={styles.hint}>{t("scan.hint")}</Text>
+      </View>
+      <View style={[styles.albumWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void pickFromAlbum()}
+          style={({ pressed }) => [styles.albumButton, pressed && { opacity: 0.6 }]}
+        >
+          <Ionicons name="images-outline" size={18} color={colors.paperRaised} />
+          <Text style={styles.albumText}>{t("scan.album")}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -103,6 +147,29 @@ const styles = StyleSheet.create({
     color: colors.paperRaised,
     textAlign: "center",
     paddingHorizontal: spacing.xl,
+  },
+  albumWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+  },
+  albumButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    borderWidth: 1,
+    borderColor: "rgba(253, 250, 241, 0.55)",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+  },
+  albumText: {
+    ...type.body,
+    color: colors.paperRaised,
+    fontWeight: "600",
   },
   center: { alignItems: "center", justifyContent: "center", paddingTop: spacing.xl },
   permTitle: { ...type.title, marginBottom: spacing.sm },

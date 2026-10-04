@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "เปลี่ยนฉบับ",
   "reader.toc": "สารบัญ",
   "reader.version": "ฉบับ",
+  "scan.album": "เลือกจากอัลบั้ม",
   "scan.grant": "อนุญาต",
   "settings.uposathaNotifyPowerAction": "เปิดการตั้งค่าระบบ",
   "signIn.submit": "เข้าสู่ระบบ",

@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "Switch version",
   "reader.toc": "Contents",
   "reader.version": "Version",
+  "scan.album": "Choose from album",
   "scan.grant": "Allow",
   "settings.uposathaNotifyPowerAction": "Open system settings",
   "signIn.submit": "Sign in",

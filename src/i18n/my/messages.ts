@@ -110,6 +110,7 @@ const messages = {
   "reader.copied": "ကူးယူပြီး",
   "reader.loadErrorHint": "အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ",
   "reader.noVersions": "ရနိုင်သော ဗားရှင်း မရှိပါ",
+  "scan.albumNoQr": "ပုံထဲတွင် QR ကုဒ် မတွေ့ပါ",
   "scan.hint": "WikiPali စာမျက်နှာ QR ကုဒ်ကို ဖတ်ပြီး ကျမ်းပိုဒ်သို့ တိုက်ရိုက်သွားပါ",
   "scan.permissionBody": "ကုဒ်ဖတ်ရန် ကင်မရာ လိုအပ်သည်။ ဆက်တင်တွင် ခွင့်ပြုပါ။",
   "scan.permissionTitle": "ကင်မရာ ခွင့်ပြုချက် လိုအပ်သည်",

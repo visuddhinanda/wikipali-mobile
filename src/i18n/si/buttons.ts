@@ -44,6 +44,7 @@ const buttons = {
   "reader.switchVersion": "සංස්කරණය මාරු කරන්න",
   "reader.toc": "පටුන",
   "reader.version": "සංස්කරණය",
+  "scan.album": "ඇල්බමයෙන් තෝරන්න",
   "scan.grant": "අවසර දෙන්න",
   "settings.uposathaNotifyPowerAction": "පද්ධති සැකසුම් විවෘත කරන්න",
   "signIn.submit": "පිවිසෙන්න",

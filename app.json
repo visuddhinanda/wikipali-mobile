@@ -92,6 +92,12 @@
           "cameraPermission": "允许 WikiPali 使用相机扫描二维码，打开对应经文。"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许 WikiPali 从相册选择二维码图片进行识别。"
+        }
+      ],
       "expo-share-intent"
     ],
     "scheme": "wikipali"
