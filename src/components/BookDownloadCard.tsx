@@ -88,7 +88,14 @@ export function BookDownloadCard({
   }, [apply, book, channelId]);
 
   useEffect(() => {
-    if (!watch && !isDownloading(channelId, book)) return;
+    // 卡片自身还停在「下载中」时也继续轮询：外部批量下载结束后，最后一次轮询
+    // 可能晚于完成，靠这里再拉一次把「已下载/失败/暂停」刷新出来。
+    if (
+      !watch &&
+      !isDownloading(channelId, book) &&
+      progress?.status !== "downloading"
+    )
+      return;
     const timer = setInterval(refresh, 1000);
     return () => clearInterval(timer);
   }, [book, channelId, refresh, watch, progress?.status]);

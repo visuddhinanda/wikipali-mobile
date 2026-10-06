@@ -14,6 +14,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Alert, AppState } from "react-native";
@@ -31,6 +32,7 @@ import {
   syncNow,
 } from "../data/sync";
 import { t } from "../i18n";
+import { pauseAllDownloads, reconcileDownloads } from "../reading";
 import {
   clearSession,
   loadToken,
@@ -139,6 +141,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, restoring]);
 
+  // 冷启动：作用域解析完后对账一次（残留 downloading→paused）。
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (restoring || resumed.current) return;
+    resumed.current = true;
+    void reconcileDownloads().catch(() => {
+      /* 对账失败不影响启动，下次下载时自愈 */
+    });
+  }, [restoring]);
+
   // 回到前台且已登录时，补推一次待同步项。
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
@@ -152,14 +164,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await saveToken(fresh);
     setToken(fresh);
     const me = await fetchCurrentUser(fresh);
-    setUser(me);
     await saveUser(me);
+    // 先暂停游客仍在跑/排队的下载（此刻作用域仍为 guest），再切到登录用户。
+    await pauseAllDownloads();
+    setUser(me);
     setUserScope({ kind: "user", id: me.id });
     void afterSignIn(me.id);
   }, []);
 
   const signOut = useCallback(async () => {
     await clearSession();
+    // 先暂停该账号仍在跑/排队的下载（此刻作用域仍为该用户），再切回游客。
+    await pauseAllDownloads();
     setToken(null);
     setUser(null);
     void getDeviceUuid().then((id) => setUserScope({ kind: "guest", id }));

@@ -6,10 +6,18 @@
  *
  * 断点续传 = 把 `meta.next_cursor` 存进 `download_state.cursor`：中断 / 重启后从
  * 游标继续，不重下已下过的段。游标为 null 表示整本取完。
+ *
+ * 串行下载：同一时刻只跑一个下载循环（并发 1，逐个下载），没有排队队列。切用户前
+ * 用 `pauseAllDownloads` 暂停当前下载（downloading → paused、保留 cursor），避免
+ * 旧账号的循环写进新账号的库。
  */
 import { DOWNLOAD_PAGE_SIZE } from "../api/read-chapter";
 import { cachedParaCount, fetchChapterBlock } from "./cache";
-import { openReadingDb, tipitakaRunner } from "./db";
+import {
+  tipitakaRunner,
+  withReadingTransaction,
+  withReadingWrite,
+} from "./db";
 import { firstReadingParagraph, level1ParagraphOf } from "./unit";
 import { localKey, outboxDelete, outboxUpsert } from "../data/queue";
 import { t } from "../i18n";
@@ -62,33 +70,35 @@ async function writeState(
   anchorParagraph?: number,
   cursor?: string | null,
 ): Promise<void> {
-  const db = await openReadingDb();
-  // 用 upsert 保留 server_id（同步回填的服务器 like.id），下载进度更新不覆盖它。
-  await db.runAsync(
-    `INSERT INTO download_state (channel, book, status, total, done, error, updated_at, cursor)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(channel, book) DO UPDATE SET
-       status = excluded.status,
-       total = excluded.total,
-       done = excluded.done,
-       error = excluded.error,
-       updated_at = excluded.updated_at,
-       cursor = excluded.cursor`,
-    [
-      p.channel,
-      p.book,
-      p.status,
-      p.total,
-      p.done,
-      p.error ?? null,
-      p.updatedAt,
-      cursor ?? null,
-    ],
-  );
-  // 下载完成 = 一条「下载记录」，入队同步到服务器 likes（type=download）。
-  if (p.status === "done") {
-    await enqueueDownloadSync(db, p.channel, p.book, anchorParagraph);
-  }
+  // 进度写 + 完成时入队放同一个事务（与正文缓存的写事务串行，避免互相打断）。
+  await withReadingTransaction(async (db) => {
+    // 用 upsert 保留 server_id（同步回填的服务器 like.id），下载进度更新不覆盖它。
+    await db.runAsync(
+      `INSERT INTO download_state (channel, book, status, total, done, error, updated_at, cursor)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(channel, book) DO UPDATE SET
+         status = excluded.status,
+         total = excluded.total,
+         done = excluded.done,
+         error = excluded.error,
+         updated_at = excluded.updated_at,
+         cursor = excluded.cursor`,
+      [
+        p.channel,
+        p.book,
+        p.status,
+        p.total,
+        p.done,
+        p.error ?? null,
+        p.updatedAt,
+        cursor ?? null,
+      ],
+    );
+    // 下载完成 = 一条「下载记录」，入队同步到服务器 likes（type=download）。
+    if (p.status === "done") {
+      await enqueueDownloadSync(db, p.channel, p.book, anchorParagraph);
+    }
+  });
 }
 
 /** 下载完成时入队一条下载记录同步（幂等，local_key 唯一）。 */
@@ -118,44 +128,46 @@ async function enqueueDownloadSync(
 }
 
 /** 读一本书的下载状态；没有记录时按已缓存段数现算。 */
-export async function getDownloadProgress(
+export function getDownloadProgress(
   channelId: string,
   book: number,
 ): Promise<DownloadProgress> {
-  const db = await openReadingDb();
-  const row = await db.getFirstAsync<{
-    status: DownloadStatus;
-    total: number;
-    done: number;
-    error: string | null;
-    updated_at: number;
-  }>(
-    "SELECT status, total, done, error, updated_at FROM download_state WHERE channel = ? AND book = ?",
-    [channelId, book],
-  );
-  if (row) {
+  // 读也走串行队列，避免与下载写并发（expo-sqlite 并发调用会触发 NPE）。
+  return withReadingWrite(async (db) => {
+    const row = await db.getFirstAsync<{
+      status: DownloadStatus;
+      total: number;
+      done: number;
+      error: string | null;
+      updated_at: number;
+    }>(
+      "SELECT status, total, done, error, updated_at FROM download_state WHERE channel = ? AND book = ?",
+      [channelId, book],
+    );
+    if (row) {
+      return {
+        channel: channelId,
+        book,
+        status: row.status,
+        total: row.total,
+        done: row.done,
+        error: row.error,
+        updatedAt: row.updated_at,
+      };
+    }
+    const doneRow = await db.getFirstAsync<{ n: number }>(
+      "SELECT count(html) n FROM para_html WHERE channel = ? AND book = ?",
+      [channelId, book],
+    );
     return {
       channel: channelId,
       book,
-      status: row.status,
-      total: row.total,
-      done: row.done,
-      error: row.error,
-      updatedAt: row.updated_at,
+      status: "pending",
+      total: await totalParas(book),
+      done: doneRow?.n ?? 0,
+      updatedAt: 0,
     };
-  }
-  const [total, done] = await Promise.all([
-    totalParas(book),
-    cachedParaCount(channelId, book),
-  ]);
-  return {
-    channel: channelId,
-    book,
-    status: "pending",
-    total,
-    done,
-    updatedAt: 0,
-  };
+  });
 }
 
 /**
@@ -166,16 +178,18 @@ export async function clearDownloadData(
   channelId: string,
   book: number,
 ): Promise<void> {
-  const db = await openReadingDb();
-  await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
-    channelId,
-    book,
-  ]);
-  await db.runAsync(
-    `UPDATE download_state SET status = 'pending', total = 0, done = 0, error = NULL, cursor = NULL
-      WHERE channel = ? AND book = ?`,
-    [channelId, book],
-  );
+  cancelIfCurrent(channelId, book);
+  await withReadingTransaction(async (db) => {
+    await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
+      channelId,
+      book,
+    ]);
+    await db.runAsync(
+      `UPDATE download_state SET status = 'pending', total = 0, done = 0, error = NULL, cursor = NULL
+        WHERE channel = ? AND book = ?`,
+      [channelId, book],
+    );
+  });
 }
 
 /**
@@ -186,65 +200,80 @@ export async function removeDownload(
   channelId: string,
   book: number,
 ): Promise<void> {
-  const db = await openReadingDb();
-  await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
-    channelId,
-    book,
-  ]);
-  const prev = await db.getFirstAsync<{ server_id: string | null }>(
-    "SELECT server_id FROM download_state WHERE channel = ? AND book = ?",
-    [channelId, book],
-  );
-  await db.runAsync("DELETE FROM download_state WHERE channel = ? AND book = ?", [
-    channelId,
-    book,
-  ]);
-  await outboxDelete(
-    db,
-    localKey("download", book, undefined, channelId),
-    "download",
-    { channel: channelId, book },
-    prev?.server_id ?? null,
-  );
+  cancelIfCurrent(channelId, book);
+  await withReadingTransaction(async (db) => {
+    await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
+      channelId,
+      book,
+    ]);
+    const prev = await db.getFirstAsync<{ server_id: string | null }>(
+      "SELECT server_id FROM download_state WHERE channel = ? AND book = ?",
+      [channelId, book],
+    );
+    await db.runAsync(
+      "DELETE FROM download_state WHERE channel = ? AND book = ?",
+      [channelId, book],
+    );
+    await outboxDelete(
+      db,
+      localKey("download", book, undefined, channelId),
+      "download",
+      { channel: channelId, book },
+      prev?.server_id ?? null,
+    );
+  });
 }
 
 /** 全部下载记录（书架「已下载」列表）。 */
-export async function listDownloads(): Promise<DownloadProgress[]> {
-  const db = await openReadingDb();
-  const rows = await db.getAllAsync<{
-    channel: string;
-    book: number;
-    status: DownloadStatus;
-    total: number;
-    done: number;
-    error: string | null;
-    updated_at: number;
-  }>("SELECT * FROM download_state ORDER BY updated_at DESC");
-  return rows.map((r) => ({
-    channel: r.channel,
-    book: r.book,
-    status: r.status,
-    total: r.total,
-    done: r.done,
-    error: r.error,
-    updatedAt: r.updated_at,
-  }));
+export function listDownloads(): Promise<DownloadProgress[]> {
+  return withReadingWrite(async (db) => {
+    const rows = await db.getAllAsync<{
+      channel: string;
+      book: number;
+      status: DownloadStatus;
+      total: number;
+      done: number;
+      error: string | null;
+      updated_at: number;
+    }>("SELECT * FROM download_state ORDER BY updated_at DESC");
+    return rows.map((r) => ({
+      channel: r.channel,
+      book: r.book,
+      status: r.status,
+      total: r.total,
+      done: r.done,
+      error: r.error,
+      updatedAt: r.updated_at,
+    }));
+  });
 }
 
-/** 正在下载的书 → 取消开关。用于暂停：停止循环即可，已写入的数据全部有效。 */
-const running = new Map<string, { cancelled: boolean }>();
+// ── 串行下载：同一时刻只跑一个循环，逐个下载 ──
 
 const runKey = (channelId: string, book: number) => `${channelId}/${book}`;
 
-/** 是否正在下载。 */
+/** 正在跑的那本书的 key（同一时刻最多一个）。 */
+let currentKey: string | null = null;
+/** 当前循环的取消开关。 */
+let cancelled = false;
+/** 切用户 / 暂停全部期间：不再开跑等待中的下载。 */
+let suspended = false;
+/** 串行队列：下一个下载等上一个结束再跑。 */
+let chain: Promise<unknown> = Promise.resolve();
+
+/** 是否正在下载（有活体循环在跑）。 */
 export function isDownloading(channelId: string, book: number): boolean {
-  return running.has(runKey(channelId, book));
+  return currentKey === runKey(channelId, book);
 }
 
-/** 暂停下载：已写入的批次全部有效，下次调用 `downloadBook` 从游标继续。 */
+/** 暂停下载：若正是当前这本书，停止循环；已写入的批次全部有效。 */
 export function pauseDownload(channelId: string, book: number): void {
-  const flag = running.get(runKey(channelId, book));
-  if (flag) flag.cancelled = true;
+  if (currentKey === runKey(channelId, book)) cancelled = true;
+}
+
+/** 若这本书正在下载则取消它（删除/清数据用）。 */
+function cancelIfCurrent(channelId: string, book: number): void {
+  if (currentKey === runKey(channelId, book)) cancelled = true;
 }
 
 /**
@@ -253,57 +282,61 @@ export function pauseDownload(channelId: string, book: number): void {
  */
 const MAX_DOWNLOAD_BLOCKS = 50000;
 
-/**
- * 下载整本书。已在下载中则直接返回当前进度。
- *
- * @param onProgress 每块结束后回调，用于刷新 UI 百分比。
- */
-export async function downloadBook(
+/** 跑一本书的下载循环，返回最终进度（错误落到 status，不向外抛）。 */
+async function runDownloadLoop(
   channelId: string,
   book: number,
   onProgress?: (p: DownloadProgress) => void,
   anchorParagraph?: number,
 ): Promise<DownloadProgress> {
-  const key = runKey(channelId, book);
-  if (running.has(key)) {
-    // 已有循环在跑，重复调用直接回当前进度 —— 但要回调一次，
-    // 否则调用方（书架的「继续」按钮）点了完全没反馈。
-    const current = await getDownloadProgress(channelId, book);
-    onProgress?.(current);
-    return current;
+  // 切用户暂停期间不再开跑。
+  if (suspended) {
+    const p = await getDownloadProgress(channelId, book);
+    onProgress?.(p);
+    return p;
   }
 
-  const flag = { cancelled: false };
-  running.set(key, flag);
-
-  const db = await openReadingDb();
-  // 断点续传：上次没取完的游标与分母。
-  const stored = await db.getFirstAsync<{ total: number; cursor: string | null }>(
-    "SELECT total, cursor FROM download_state WHERE channel = ? AND book = ?",
-    [channelId, book],
-  );
+  currentKey = runKey(channelId, book);
+  cancelled = false;
 
   let progress: DownloadProgress = {
     channel: channelId,
     book,
     status: "downloading",
-    total: stored?.total ?? (await totalParas(book)),
-    done: await cachedParaCount(channelId, book),
+    total: 0,
+    done: 0,
     error: null,
     updatedAt: Date.now(),
   };
-  let cursor: string | null = stored?.cursor ?? null;
+  let cursor: string | null = null;
 
   const publish = async (patch: Partial<DownloadProgress>) => {
     progress = { ...progress, ...patch, updatedAt: Date.now() };
     await writeState(progress, anchorParagraph, cursor);
     onProgress?.(progress);
   };
-  await publish({});
 
   try {
+    // 断点续传：上次没取完的游标与分母（读也走串行队列）。
+    const stored = await withReadingWrite((wdb) =>
+      wdb.getFirstAsync<{
+        total: number;
+        cursor: string | null;
+      }>(
+        "SELECT total, cursor FROM download_state WHERE channel = ? AND book = ?",
+        [channelId, book],
+      ),
+    );
+    progress = {
+      ...progress,
+      total: stored?.total ?? (await totalParas(book)),
+      done: await cachedParaCount(channelId, book),
+    };
+    cursor = stored?.cursor ?? null;
+    await publish({});
+
     for (let n = 0; n < MAX_DOWNLOAD_BLOCKS; n++) {
-      if (flag.cancelled) {
+      if (cancelled) {
         await publish({ status: "paused" });
         return progress;
       }
@@ -314,6 +347,11 @@ export async function downloadBook(
         cursor,
         DOWNLOAD_PAGE_SIZE,
       );
+      // 取数期间被取消（暂停/删除/切用户）：别再写 done 或继续推进，落 paused。
+      if (cancelled) {
+        await publish({ status: "paused" });
+        return progress;
+      }
       if (!block) throw new Error(t("error.network"));
       // 分母取 meta.total（本书有译文的段数），首块拿到即固定。
       if (block.total != null) progress.total = block.total;
@@ -334,12 +372,78 @@ export async function downloadBook(
     }
     throw new Error(`download: book ${book} 取数块数超上限`);
   } catch (err) {
-    await publish({
-      status: "error",
-      error: err instanceof Error ? err.message : String(err),
-    });
+    try {
+      await publish({
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } catch {
+      /* 写 error 状态本身失败（如 DB 不可用）时放弃，循环照常结束 */
+    }
     return progress;
   } finally {
-    running.delete(key);
+    currentKey = null;
   }
+}
+
+/**
+ * 下载整本书。同一时刻只跑一个：若别的书在下载，则排队等到它结束；若这本书
+ * 已在下载，直接回当前进度。返回的 Promise 在本书真正结束（done/error/paused）
+ * 时 resolve。
+ *
+ * @param onProgress 每块结束后回调，用于刷新 UI 百分比。
+ */
+export function downloadBook(
+  channelId: string,
+  book: number,
+  onProgress?: (p: DownloadProgress) => void,
+  anchorParagraph?: number,
+): Promise<DownloadProgress> {
+  const key = runKey(channelId, book);
+  // 已在跑同一本书：复用当前进度，回一次。
+  if (currentKey === key) {
+    return getDownloadProgress(channelId, book).then((p) => {
+      onProgress?.(p);
+      return p;
+    });
+  }
+  // 串行：等上一个下载结束再开跑。
+  const run = chain.then(() =>
+    runDownloadLoop(channelId, book, onProgress, anchorParagraph),
+  );
+  chain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+/**
+ * 切换用户 / 退出前的「全部暂停」：当前正在下载 → paused（保留 cursor 可续传），
+ * 等待中的不再开跑。清空执行体，防止旧账号的循环写进新账号的库。
+ */
+export async function pauseAllDownloads(): Promise<void> {
+  suspended = true;
+  cancelled = true;
+  await withReadingWrite((db) =>
+    db.runAsync(
+      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status = 'downloading'",
+      [Date.now()],
+    ),
+  );
+  // 当前循环停到下一个块边界、等待中的循环因 suspended 直接返回。
+  await chain;
+  suspended = false;
+}
+
+/**
+ * 冷启动对账：上次进程被杀残留的 `downloading` → `paused`（保留 cursor 可续传）。
+ */
+export async function reconcileDownloads(): Promise<void> {
+  await withReadingWrite((db) =>
+    db.runAsync(
+      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status = 'downloading'",
+      [Date.now()],
+    ),
+  );
 }

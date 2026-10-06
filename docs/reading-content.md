@@ -348,11 +348,14 @@ CREATE TABLE IF NOT EXISTS para_html (
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,
-  status     TEXT    NOT NULL,   -- pending | downloading | paused | done | error
-  total      INTEGER NOT NULL,   -- 该书正文段总数（本地算，见下）
-  done       INTEGER NOT NULL,   -- 已缓存段数
+  status     TEXT    NOT NULL,   -- pending | queued | downloading | paused | done | error
+  total      INTEGER NOT NULL,   -- 该版本本书有译文的段数（首块 meta.total）
+  done       INTEGER NOT NULL,   -- 已缓存到的非空段数
   error      TEXT,
   updated_at INTEGER NOT NULL,
+  server_id  TEXT,               -- 同步后回填的服务器 like.id（type=download）
+  cursor     TEXT,               -- 断点续传游标（meta.next_cursor）；NULL = 从头/取完
+  queued_at  INTEGER,            -- 入队时间戳（status='queued' 时有效），FIFO 排序
   PRIMARY KEY (channel, book)
 );
 ```
@@ -416,6 +419,25 @@ CREATE TABLE IF NOT EXISTS download_state (
 4. 每块结束更新 `download_state.done` 与 `cursor`，UI 据此显示百分比；
 5. `next_cursor == null` 即取完；暂停 / 取消 = 停止循环，已写入的数据全部
    有效，`status` 置 `paused`、游标保留。
+
+**串行下载**（`src/reading/download.ts`）：
+
+- 同一时刻**只跑一个下载循环**（并发 1，逐个下载）：`downloadBook` 内部用一个
+  promise 链（`chain`）串行化，后点的那本等前面那本结束才开跑；同一本书重复点
+  直接回当前进度。
+- 没有排队队列，也没有 `queued` 状态；「全部下载」就是一个串行 `for` 逐本
+  `await downloadBook`。
+- 暂停（`pauseDownload`）：当前那本置取消、下一块边界写 `paused`（保留 cursor）。
+- 写库都走 `withReadingTransaction` / `withReadingWrite` 串行队列，避免
+  expo-sqlite 的 `withTransactionAsync`（非独占事务）被同连接的其它查询打断。
+
+**切换用户时的「全部暂停」**（`pauseAllDownloads`，登录/登出前由 auth 层调用）：
+
+- 当前正在下载 → `paused`（保留 cursor，登录回来可续传）；
+- 等待中的不再开跑（`suspended` 标志，`runDownloadLoop` 开头检查后直接返回）；
+- 清空执行体，**防止旧账号的下载循环把数据写进新账号的 `reading.db3`**。
+
+冷启动对账（`reconcileDownloads`）：上次进程被杀残留的 `downloading` → `paused`。
 
 整本取完时把 `done` 按 `total` 写满：服务端数的是「有句子的段」，客户端数的是
 「渲染出正文的段」，个别段两边会差一点，不补的话进度条永远停在 99%。

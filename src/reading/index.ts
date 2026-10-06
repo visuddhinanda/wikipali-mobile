@@ -57,8 +57,10 @@ export {
   getDownloadProgress,
   isDownloading,
   listDownloads,
+  pauseAllDownloads,
   pauseDownload,
   percent,
+  reconcileDownloads,
   removeDownload,
 } from "./download";
 export {

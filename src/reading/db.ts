@@ -30,22 +30,21 @@ export function toRunner(db: SQLite.SQLiteDatabase): SqlRunner {
 }
 
 let tipitakaPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+/** 强引用，防止 tipitaka 连接被 GC（同 readingDb 的考虑）。 */
+let tipitakaDb: SQLite.SQLiteDatabase | null = null;
 let readingPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+/** 强引用当前 `SQLiteDatabase`，防止 JS 对象被 GC 后原生连接被释放（NPE）。 */
+let readingDb: SQLite.SQLiteDatabase | null = null;
 /** 当前 `readingPromise` 对应的用户目录 id，用于切换时判断要不要重开。 */
 let readingScopeId: string | null = null;
 
-// 切用户：关掉旧连接、清空缓存 promise，下次 open 时指向新库。
+// 切用户：清空缓存 promise，下次 open 时指向新库。
+// 不主动 closeAsync：`old.then(db => close)` 会在「刚打开还没用完」时把连接关掉，
+// 导致使用旧连接的代码 `prepareAsync` 抛 NullPointerException。旧连接交给
+// expo-sqlite 的 SharedRef 随 JS 对象 GC 自动关闭。
 onScopeChange(() => {
-  const old = readingPromise;
   readingPromise = null;
   readingScopeId = null;
-  if (old) {
-    old
-      .then((db) => db.closeAsync())
-      .catch(() => {
-        /* 关闭失败忽略，连接句柄由下次 GC 释放 */
-      });
-  }
 });
 
 /**
@@ -107,6 +106,7 @@ export function openTipitakaDb(): Promise<SQLite.SQLiteDatabase> {
           throw new Error("离线目录数据库损坏：重拷后仍缺 pali_text 表");
         }
       }
+      tipitakaDb = db; // 强引用，避免 GC 关闭原生连接
       return db;
     })().catch((err) => {
       tipitakaPromise = null;
@@ -144,24 +144,24 @@ async function migrateParaHtmlNullable(db: SQLite.SQLiteDatabase): Promise<void>
   const htmlCol = cols.find((c) => c.name === "html");
   if (!htmlCol || htmlCol.notnull === 0) return;
 
-  await db.withTransactionAsync(async () => {
-    await db.execAsync(`
-      ALTER TABLE para_html RENAME TO para_html_old;
-      CREATE TABLE para_html (
-        channel    TEXT    NOT NULL,
-        book       INTEGER NOT NULL,
-        para       INTEGER NOT NULL,
-        html       TEXT,
-        fetched_at INTEGER NOT NULL,
-        expires_at INTEGER,
-        PRIMARY KEY (channel, book, para)
-      );
-      INSERT INTO para_html (channel, book, para, html, fetched_at, expires_at)
-        SELECT channel, book, para, NULLIF(html, ''), fetched_at, expires_at
-        FROM para_html_old;
-      DROP TABLE para_html_old;
-    `);
-  });
+  // 不包事务：与下载链路一致，避免 `withTransactionAsync` 在部分环境触发 NPE。
+  // 迁移只跑一次，多语句 execAsync 即使中断，下次启动会因表已重命名而自愈。
+  await db.execAsync(`
+    ALTER TABLE para_html RENAME TO para_html_old;
+    CREATE TABLE para_html (
+      channel    TEXT    NOT NULL,
+      book       INTEGER NOT NULL,
+      para       INTEGER NOT NULL,
+      html       TEXT,
+      fetched_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      PRIMARY KEY (channel, book, para)
+    );
+    INSERT INTO para_html (channel, book, para, html, fetched_at, expires_at)
+      SELECT channel, book, para, NULLIF(html, ''), fetched_at, expires_at
+      FROM para_html_old;
+    DROP TABLE para_html_old;
+  `);
 }
 
 /** 当前用户 `reading.db3` 所在目录的 URI（不存在则创建）。 */
@@ -211,6 +211,7 @@ export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
     readingPromise = (async () => {
       const scope = await resolveScope();
       const db = await openReadingDbFor(scope.id);
+      readingDb = db; // 强引用，避免 GC 关闭原生连接
       readingScopeId = scope.id;
       return db;
     })().catch((err) => {
@@ -222,28 +223,58 @@ export function openReadingDb(): Promise<SQLite.SQLiteDatabase> {
 }
 
 /**
- * 串行化 `reading.db3` 上的写事务。
+ * 全局串行队列：**所有** expo-sqlite 调用（读 + 写，reading + tipitaka）都经过它。
+ *
+ * 原因：expo-modules-core 的 `SharedObjectRegistry` 读取 pairs 时未加锁，并发调用
+ * 会把「还在用的 shared object」提前释放 → `prepareAsync` / `runAsync` 抛
+ * NullPointerException（见 expo/expo #50855）。串行化后每次只有一个原生调用在跑。
+ *
+ * 可重入：嵌套调用（如 `getDownloadProgress` 内部再读 `para_html`）会在当前队列
+ * 上下文里直接执行，不再排队，避免自死锁。
  */
-let writeQueue: Promise<unknown> = Promise.resolve();
+let dbQueue: Promise<unknown> = Promise.resolve();
+let inDbTask = false;
+
+function withDbTask<T>(task: () => Promise<T>): Promise<T> {
+  if (inDbTask) {
+    return task(); // 嵌套：直接执行，复用当前串行上下文
+  }
+  const run = dbQueue.then(async () => {
+    inDbTask = true;
+    try {
+      return await task();
+    } finally {
+      inDbTask = false;
+    }
+  });
+  dbQueue = run.catch(() => undefined);
+  return run;
+}
 
 export function withReadingTransaction<T>(
   task: (db: SQLite.SQLiteDatabase) => Promise<T>,
 ): Promise<T> {
-  const run = writeQueue.then(async () => {
-    const db = await openReadingDb();
-    let result!: T;
-    await db.withTransactionAsync(async () => {
-      result = await task(db);
-    });
-    return result;
-  });
-  writeQueue = run.catch(() => undefined);
-  return run;
+  return withDbTask(() => openReadingDb().then(task));
+}
+
+/** 串行化的单条读写（与 `withReadingTransaction` 同队列；历史遗留两个名字）。 */
+export function withReadingWrite<T>(
+  task: (db: SQLite.SQLiteDatabase) => Promise<T>,
+): Promise<T> {
+  return withDbTask(() => openReadingDb().then(task));
 }
 
 /** `pali_text` 的 SqlRunner，供 `unit.ts` / `commentary.ts` 使用。 */
-export async function tipitakaRunner(): Promise<SqlRunner> {
-  return toRunner(await openTipitakaDb());
+export function tipitakaRunner(): Promise<SqlRunner> {
+  return withDbTask(async () => {
+    const db = await openTipitakaDb();
+    return {
+      all: <T = unknown>(sql: string, params: unknown[]) =>
+        withDbTask(() =>
+          db.getAllAsync<T>(sql, params as SQLite.SQLiteBindValue[]),
+        ),
+    };
+  });
 }
 
 /**

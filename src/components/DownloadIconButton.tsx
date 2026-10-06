@@ -57,9 +57,11 @@ export function DownloadIconButton({
     };
   }, [book, channelId]);
 
-  // 下载可能是在别处发起的（比如从版本列表点的，再进阅读器），轮询同步状态
+  // 下载可能是在别处发起的（比如从版本列表点的，再进阅读器），轮询同步状态；
+  // 自身还停在「下载中」时也继续轮询，直到拉到最终状态。
   useEffect(() => {
-    if (!isDownloading(channelId, book)) return;
+    if (!isDownloading(channelId, book) && progress?.status !== "downloading")
+      return;
     const timer = setInterval(refresh, 1000);
     return () => clearInterval(timer);
   }, [book, channelId, refresh, progress?.status]);

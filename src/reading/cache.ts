@@ -15,7 +15,11 @@ import {
   fetchReadChapter,
 } from "../api/read-chapter";
 import { fetchReadParas, type ReadParaItem } from "../api/read-para";
-import { openReadingDb, withReadingTransaction } from "./db";
+import {
+  openReadingDb,
+  withReadingTransaction,
+  withReadingWrite,
+} from "./db";
 
 /** 被动缓存配额：超过后按 LRU 清理未被主动下载的书（§4.5）。 */
 export const CACHE_QUOTA_BYTES = 200 * 1024 * 1024;
@@ -329,12 +333,15 @@ export async function cachedParaCount(
   channelId: string,
   book: number,
 ): Promise<number> {
-  const db = await openReadingDb();
-  const row = await db.getFirstAsync<{ n: number }>(
-    "SELECT count(html) n FROM para_html WHERE channel = ? AND book = ?",
-    [channelId, book],
-  );
-  return row?.n ?? 0;
+  // 读也走串行队列：expo-sqlite 并发调用（读+写）会触发 SharedObjectRegistry
+  // 竞争 → prepareAsync NPE（见 expo/expo #50855）。
+  return withReadingWrite(async (db) => {
+    const row = await db.getFirstAsync<{ n: number }>(
+      "SELECT count(html) n FROM para_html WHERE channel = ? AND book = ?",
+      [channelId, book],
+    );
+    return row?.n ?? 0;
+  });
 }
 
 /**

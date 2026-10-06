@@ -271,13 +271,14 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     if (!merged) return;
     stopped.current = false;
     setBulk({ done: 0, total: merged.length });
+    // 逐个下载：一本下完再下一本（下载层串行，这里只是按序发起）。
     for (let i = 0; i < merged.length; i += 1) {
       if (stopped.current) break;
       setBulk({ done: i, total: merged.length });
       try {
         await downloadBook(uid, merged[i].book, undefined, merged[i].para);
       } catch {
-        // 单本失败不该中断整批：书列表里那一行会显示失败状态。
+        // 单本失败不中断整批：书列表里那一行会显示失败状态。
       }
     }
     setBulk(null);
