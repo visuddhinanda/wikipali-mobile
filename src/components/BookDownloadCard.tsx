@@ -25,6 +25,7 @@ import type { MessageKey } from "../i18n";
 
 const STATUS_LABEL: Record<DownloadProgress["status"], MessageKey> = {
   pending: "download.notDownloaded",
+  queued: "download.queued",
   downloading: "download.downloading",
   paused: "download.paused",
   done: "download.done",
@@ -88,12 +89,13 @@ export function BookDownloadCard({
   }, [apply, book, channelId]);
 
   useEffect(() => {
-    // 卡片自身还停在「下载中」时也继续轮询：外部批量下载结束后，最后一次轮询
-    // 可能晚于完成，靠这里再拉一次把「已下载/失败/暂停」刷新出来。
+    // 卡片自身还停在「下载中/排队中」时也继续轮询：外部批量下载结束后，最后一次
+    // 轮询可能晚于完成，靠这里再拉一次把「已下载/失败/暂停」刷新出来。
     if (
       !watch &&
       !isDownloading(channelId, book) &&
-      progress?.status !== "downloading"
+      progress?.status !== "downloading" &&
+      progress?.status !== "queued"
     )
       return;
     const timer = setInterval(refresh, 1000);
@@ -102,6 +104,7 @@ export function BookDownloadCard({
 
   const p = progress;
   const running = p?.status === "downloading" && isDownloading(channelId, book);
+  const queued = p?.status === "queued";
   const ratio = p && p.total > 0 ? Math.min(1, p.done / p.total) : 0;
 
   const start = async () => {
@@ -173,7 +176,7 @@ export function BookDownloadCard({
         <Ionicons name="chevron-forward" size={18} color={colors.vermilion} />
       ) : (
         <View style={styles.actions}>
-          {running ? (
+          {running || queued ? (
             <Action
               icon="pause"
               label={t("download.pause")}

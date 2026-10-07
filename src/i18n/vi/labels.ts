@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "Tải thất bại",
   "download.notDownloaded": "Chưa tải",
   "download.paused": "Đã tạm dừng",
+  "download.queued": "Đang chờ",
   "download.section": "Tải về ngoại tuyến",
   "layer.anutika": "Tùy phụ chú giải",
   "layer.atthakatha": "Chú giải",

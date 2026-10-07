@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "ດາວໂຫຼດບໍ່ສຳເລັດ",
   "download.notDownloaded": "ຍັງບໍ່ໄດ້ດາວໂຫຼດ",
   "download.paused": "ຢຸດຊົ່ວຄາວ",
+  "download.queued": "ລໍຖ້າ",
   "download.section": "ດາວໂຫຼດແບບອອບໄລນ໌",
   "layer.anutika": "ອະນຸຎີກາ",
   "layer.atthakatha": "ອັດຖະກະຖາ",

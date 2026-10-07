@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "ဒေါင်းလုဒ် မအောင်မြင်ပါ",
   "download.notDownloaded": "မဒေါင်းလုဒ်ရသေး",
   "download.paused": "ခေတ္တရပ်ထားသည်",
+  "download.queued": "စောင့်ဆိုင်းနေသည်",
   "download.section": "အော့ဖ်လိုင်း ဒေါင်းလုဒ်",
   "layer.anutika": "အနုဋီကာ",
   "layer.atthakatha": "အဋ္ဌကထာ",

@@ -26,6 +26,7 @@ import type { MessageKey } from "../i18n";
 
 const STATUS_LABEL: Record<DownloadProgress["status"], MessageKey> = {
   pending: "download.notDownloaded",
+  queued: "download.queued",
   downloading: "download.downloading",
   paused: "download.paused",
   done: "download.done",
@@ -85,13 +86,14 @@ export function DownloadControl({
   }, [book, channelId]);
 
   // 下载在别处发起时（例如从阅读器点的、返回书架后仍在跑），轮询刷新进度。
-  // 自身还停在「下载中」时也继续轮询，直到拉到最终状态（批量下载收尾的兜底刷新）。
+  // 自身还停在「下载中/排队中」时也继续轮询，直到拉到最终状态。
   useEffect(() => {
     if (
       !channelId ||
       (!watch &&
         !isDownloading(channelId, book) &&
-        progress?.status !== "downloading")
+        progress?.status !== "downloading" &&
+        progress?.status !== "queued")
     )
       return;
     const timer = setInterval(refresh, 1000);
@@ -108,6 +110,7 @@ export function DownloadControl({
 
   const p = progress;
   const running = p?.status === "downloading" && isDownloading(channelId, book);
+  const queued = p?.status === "queued";
   const ratio = p && p.total > 0 ? p.done / p.total : 0;
 
   const start = async () => {
@@ -176,7 +179,7 @@ export function DownloadControl({
         </Text>
       </View>
 
-      {running ? (
+      {running || queued ? (
         <ActionBtn
           icon="pause"
           label={t("download.pause")}

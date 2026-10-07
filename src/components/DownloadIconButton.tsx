@@ -58,21 +58,26 @@ export function DownloadIconButton({
   }, [book, channelId]);
 
   // 下载可能是在别处发起的（比如从版本列表点的，再进阅读器），轮询同步状态；
-  // 自身还停在「下载中」时也继续轮询，直到拉到最终状态。
+  // 自身还停在「下载中/排队中」时也继续轮询，直到拉到最终状态。
   useEffect(() => {
-    if (!isDownloading(channelId, book) && progress?.status !== "downloading")
+    if (
+      !isDownloading(channelId, book) &&
+      progress?.status !== "downloading" &&
+      progress?.status !== "queued"
+    )
       return;
     const timer = setInterval(refresh, 1000);
     return () => clearInterval(timer);
   }, [book, channelId, refresh, progress?.status]);
 
   const running = progress?.status === "downloading" && isDownloading(channelId, book);
+  const queued = progress?.status === "queued";
   const done = progress?.status === "done";
   const pct = progress ? percent(progress) : 0;
 
   const onPress = () => {
     if (done) return;
-    if (running) {
+    if (running || queued) {
       pauseDownload(channelId, book);
       refresh();
       return;
@@ -89,7 +94,9 @@ export function DownloadIconButton({
       ? "alert-circle-outline"
       : running
         ? "pause-circle-outline"
-        : "cloud-download-outline";
+        : queued
+          ? "time-outline"
+          : "cloud-download-outline";
 
   return (
     <Pressable style={styles.wrap} onPress={onPress} hitSlop={8}>

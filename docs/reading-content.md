@@ -425,9 +425,10 @@ CREATE TABLE IF NOT EXISTS download_state (
 - 同一时刻**只跑一个下载循环**（并发 1，逐个下载）：`downloadBook` 内部用一个
   promise 链（`chain`）串行化，后点的那本等前面那本结束才开跑；同一本书重复点
   直接回当前进度。
-- 没有排队队列，也没有 `queued` 状态；「全部下载」就是一个串行 `for` 逐本
-  `await downloadBook`。
-- 暂停（`pauseDownload`）：当前那本置取消、下一块边界写 `paused`（保留 cursor）。
+- 排队中：当有别的书在跑/在排队时，新点的书 `status='queued'`（「排队中」），
+  等链轮到它才转 `downloading`；排队中可「暂停」撤出队列（有数据 → `paused`，
+  无数据 → `pending`）。
+- 暂停（`pauseDownload`）：跑着的置取消、下一块边界写 `paused`；排队中的撤出队列。
 - 写库都走 `withReadingTransaction` / `withReadingWrite` 串行队列，避免
   expo-sqlite 的 `withTransactionAsync`（非独占事务）被同连接的其它查询打断。
 
@@ -437,7 +438,7 @@ CREATE TABLE IF NOT EXISTS download_state (
 - 等待中的不再开跑（`suspended` 标志，`runDownloadLoop` 开头检查后直接返回）；
 - 清空执行体，**防止旧账号的下载循环把数据写进新账号的 `reading.db3`**。
 
-冷启动对账（`reconcileDownloads`）：上次进程被杀残留的 `downloading` → `paused`。
+冷启动对账（`reconcileDownloads`）：上次进程被杀残留的 `downloading` / `queued` → `paused`。
 
 整本取完时把 `done` 按 `total` 写满：服务端数的是「有句子的段」，客户端数的是
 「渲染出正文的段」，个别段两边会差一点，不补的话进度条永远停在 99%。

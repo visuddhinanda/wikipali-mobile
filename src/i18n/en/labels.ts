@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "Download failed",
   "download.notDownloaded": "Not downloaded",
   "download.paused": "Paused",
+  "download.queued": "Queued",
   "download.section": "Offline download",
   "layer.anutika": "Anuṭīkā",
   "layer.atthakatha": "Aṭṭhakathā",

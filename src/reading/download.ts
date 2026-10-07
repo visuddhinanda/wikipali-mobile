@@ -24,6 +24,7 @@ import { t } from "../i18n";
 
 export type DownloadStatus =
   | "pending"
+  | "queued"
   | "downloading"
   | "paused"
   | "done"
@@ -260,15 +261,60 @@ let cancelled = false;
 let suspended = false;
 /** 串行队列：下一个下载等上一个结束再跑。 */
 let chain: Promise<unknown> = Promise.resolve();
+/** 排队中 + 正在跑的下载总数（用来判断新来的书是否需要排队）。 */
+let pendingCount = 0;
+/** 排队等待中的 key（在串行链里等着的书）。 */
+const queuedKeys = new Set<string>();
+/** 被用户取消排队的 key（等链轮到它时直接跳过）。 */
+const cancelledQueued = new Set<string>();
 
 /** 是否正在下载（有活体循环在跑）。 */
 export function isDownloading(channelId: string, book: number): boolean {
   return currentKey === runKey(channelId, book);
 }
 
-/** 暂停下载：若正是当前这本书，停止循环；已写入的批次全部有效。 */
+/** 是否排队等待下载（还没轮到，串行链里等前面的书下完）。 */
+export function isQueued(channelId: string, book: number): boolean {
+  return queuedKeys.has(runKey(channelId, book));
+}
+
+/** 把一本书标记为排队中（保留 total/done/cursor/server_id）。 */
+async function markQueued(channelId: string, book: number): Promise<void> {
+  await withReadingWrite((db) =>
+    db.runAsync(
+      `INSERT INTO download_state (channel, book, status, total, done, error, updated_at, cursor)
+       VALUES (?, ?, 'queued', 0, 0, NULL, ?, NULL)
+       ON CONFLICT(channel, book) DO UPDATE SET
+         status = 'queued',
+         updated_at = excluded.updated_at`,
+      [channelId, book, Date.now()],
+    ),
+  );
+}
+
+/** 暂停下载：跑着的停止循环；排队中的撤出队列。已写入的数据全部有效。 */
 export function pauseDownload(channelId: string, book: number): void {
-  if (currentKey === runKey(channelId, book)) cancelled = true;
+  const key = runKey(channelId, book);
+  if (currentKey === key) {
+    cancelled = true;
+    return;
+  }
+  if (queuedKeys.has(key)) {
+    queuedKeys.delete(key);
+    cancelledQueued.add(key);
+    // 撤出队列：有数据 → paused（可续传），否则 → pending（未下载）。
+    void withReadingWrite(async (db) => {
+      const row = await db.getFirstAsync<{ done: number }>(
+        "SELECT done FROM download_state WHERE channel = ? AND book = ?",
+        [channelId, book],
+      );
+      const status = (row?.done ?? 0) > 0 ? "paused" : "pending";
+      await db.runAsync(
+        "UPDATE download_state SET status = ?, updated_at = ? WHERE channel = ? AND book = ?",
+        [status, Date.now(), channelId, book],
+      );
+    });
+  }
 }
 
 /** 若这本书正在下载则取消它（删除/清数据用）。 */
@@ -289,6 +335,15 @@ async function runDownloadLoop(
   onProgress?: (p: DownloadProgress) => void,
   anchorParagraph?: number,
 ): Promise<DownloadProgress> {
+  const key = runKey(channelId, book);
+  // 轮到它了：不再是排队状态；若排队期间被取消，直接跳过。
+  queuedKeys.delete(key);
+  if (cancelledQueued.has(key)) {
+    cancelledQueued.delete(key);
+    const p = await getDownloadProgress(channelId, book);
+    onProgress?.(p);
+    return p;
+  }
   // 切用户暂停期间不再开跑。
   if (suspended) {
     const p = await getDownloadProgress(channelId, book);
@@ -296,7 +351,7 @@ async function runDownloadLoop(
     return p;
   }
 
-  currentKey = runKey(channelId, book);
+  currentKey = key;
   cancelled = false;
 
   let progress: DownloadProgress = {
@@ -407,13 +462,42 @@ export function downloadBook(
       return p;
     });
   }
+  // 已在排队：回一次排队进度。
+  if (queuedKeys.has(key)) {
+    return getDownloadProgress(channelId, book).then((p) => {
+      onProgress?.(p);
+      return p;
+    });
+  }
+
+  // 排队：当前有别的书在跑/在排队，这本书标记为排队中，等链轮到它再开跑。
+  if (pendingCount > 0) {
+    queuedKeys.add(key);
+    cancelledQueued.delete(key);
+    const queued: DownloadProgress = {
+      channel: channelId,
+      book,
+      status: "queued",
+      total: 0,
+      done: 0,
+      updatedAt: Date.now(),
+    };
+    onProgress?.(queued);
+    void markQueued(channelId, book);
+  }
+  pendingCount++;
+
   // 串行：等上一个下载结束再开跑。
   const run = chain.then(() =>
     runDownloadLoop(channelId, book, onProgress, anchorParagraph),
   );
   chain = run.then(
-    () => undefined,
-    () => undefined,
+    () => {
+      pendingCount = Math.max(0, pendingCount - 1);
+    },
+    () => {
+      pendingCount = Math.max(0, pendingCount - 1);
+    },
   );
   return run;
 }
@@ -425,9 +509,10 @@ export function downloadBook(
 export async function pauseAllDownloads(): Promise<void> {
   suspended = true;
   cancelled = true;
+  queuedKeys.clear();
   await withReadingWrite((db) =>
     db.runAsync(
-      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status = 'downloading'",
+      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status IN ('downloading', 'queued')",
       [Date.now()],
     ),
   );
@@ -437,12 +522,13 @@ export async function pauseAllDownloads(): Promise<void> {
 }
 
 /**
- * 冷启动对账：上次进程被杀残留的 `downloading` → `paused`（保留 cursor 可续传）。
+ * 冷启动对账：上次进程被杀残留的 `downloading` / `queued` → `paused`
+ * （保留 cursor 可续传）。
  */
 export async function reconcileDownloads(): Promise<void> {
   await withReadingWrite((db) =>
     db.runAsync(
-      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status = 'downloading'",
+      "UPDATE download_state SET status = 'paused', updated_at = ? WHERE status IN ('downloading', 'queued')",
       [Date.now()],
     ),
   );

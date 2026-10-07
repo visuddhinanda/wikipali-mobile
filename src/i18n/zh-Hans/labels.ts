@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "下载失败",
   "download.notDownloaded": "未下载",
   "download.paused": "已暂停",
+  "download.queued": "排队中",
   "download.section": "离线下载",
   "layer.anutika": "再复注",
   "layer.atthakatha": "义注",

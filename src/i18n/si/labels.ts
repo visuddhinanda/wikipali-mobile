@@ -77,6 +77,7 @@ const labels = {
   "download.failed": "බාගැනීම අසාර්ථකයි",
   "download.notDownloaded": "බාගෙන නැත",
   "download.paused": "විරාම කර ඇත",
+  "download.queued": "පෝලිමේ",
   "download.section": "නොබැඳි බාගැනීම",
   "layer.anutika": "අනුටීකා",
   "layer.atthakatha": "අට්ඨකථා",
