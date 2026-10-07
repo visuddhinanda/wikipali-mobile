@@ -251,6 +251,15 @@ function withDbTask<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/**
+ * 把任意异步任务塞进全局串行队列。
+ * 供「登录合并 / 旧数据迁移 / 游客数据检查」这类需要**独立连接**（非当前用户库）的场景用：
+ * 它们直接 `openReadingDbFor(...)` 开连接，但原生调用仍需与其它 expo-sqlite 调用串行。
+ */
+export function withDbQueue<T>(task: () => Promise<T>): Promise<T> {
+  return withDbTask(task);
+}
+
 export function withReadingTransaction<T>(
   task: (db: SQLite.SQLiteDatabase) => Promise<T>,
 ): Promise<T> {
@@ -280,20 +289,22 @@ export function tipitakaRunner(): Promise<SqlRunner> {
 /**
  * App 更新后若打包的数据库比设备上的新，则覆盖。
  */
-export async function refreshTipitakaDbIfStale(
+export function refreshTipitakaDbIfStale(
   bundledGeneratedAt: string,
 ): Promise<boolean> {
-  const db = await openTipitakaDb();
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM meta WHERE key = 'generated_at'",
-  );
-  if (row?.value && row.value >= bundledGeneratedAt) return false;
+  return withDbQueue(async () => {
+    const db = await openTipitakaDb();
+    const row = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM meta WHERE key = 'generated_at'",
+    );
+    if (row?.value && row.value >= bundledGeneratedAt) return false;
 
-  await db.closeAsync();
-  tipitakaPromise = null;
-  new File(Paths.document, DB_DIR, TIPITAKA_DB).delete();
-  await openTipitakaDb();
-  return true;
+    await db.closeAsync();
+    tipitakaPromise = null;
+    new File(Paths.document, DB_DIR, TIPITAKA_DB).delete();
+    await openTipitakaDb();
+    return true;
+  });
 }
 
 /**

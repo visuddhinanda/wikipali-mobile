@@ -6,7 +6,7 @@
  * `likes`（type=bookmark，target_id=progress_chapters.uid）。
  * 契约见 `docs/multi-user-sync.md` §6.2。
  */
-import { openReadingDb, withReadingTransaction } from "../reading/db";
+import { openReadingDb, withReadingTransaction, withReadingWrite } from "../reading/db";
 import { localKey, outboxDelete, outboxUpsert } from "./queue";
 
 export interface Bookmark {
@@ -50,15 +50,16 @@ function toRecord(r: Row): Bookmark {
 /** 读取全部书签（按时间倒序）。 */
 export async function loadBookmarks(): Promise<Bookmark[]> {
   try {
-    const db = await openReadingDb();
-    const rows = await db.getAllAsync<Row>(
-      `SELECT book, paragraph, title, heading, channel_id, updated_at
-         FROM bookmarks
-        ORDER BY updated_at DESC
-        LIMIT ?`,
-      [MAX_RECORDS],
-    );
-    return rows.map(toRecord);
+    return withReadingWrite(async (db) => {
+      const rows = await db.getAllAsync<Row>(
+        `SELECT book, paragraph, title, heading, channel_id, updated_at
+           FROM bookmarks
+          ORDER BY updated_at DESC
+          LIMIT ?`,
+        [MAX_RECORDS],
+      );
+      return rows.map(toRecord);
+    });
   } catch {
     return [];
   }
@@ -140,12 +141,13 @@ export async function isBookmarked(
   paragraph: number,
 ): Promise<boolean> {
   try {
-    const db = await openReadingDb();
-    const row = await db.getFirstAsync<{ n: number }>(
-      "SELECT count(*) n FROM bookmarks WHERE book = ? AND paragraph = ?",
-      [book, paragraph],
-    );
-    return (row?.n ?? 0) > 0;
+    return withReadingWrite(async (db) => {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT count(*) n FROM bookmarks WHERE book = ? AND paragraph = ?",
+        [book, paragraph],
+      );
+      return (row?.n ?? 0) > 0;
+    });
   } catch {
     return false;
   }

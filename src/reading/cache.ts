@@ -55,18 +55,19 @@ function isValid(row: Pick<CachedPara, "html" | "expires_at">, now: number): boo
 }
 
 /** 查缓存：返回该区间已缓存的段（含 `html IS NULL` 的空段记录）。 */
-export async function readCachedParas(
+export function readCachedParas(
   channelId: string,
   book: number,
   from: number,
   to: number,
 ): Promise<CachedPara[]> {
-  const db = await openReadingDb();
-  return db.getAllAsync<CachedPara>(
-    `SELECT para, html, expires_at FROM para_html
-      WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
-      ORDER BY para`,
-    [channelId, book, from, to],
+  return withReadingWrite((db) =>
+    db.getAllAsync<CachedPara>(
+      `SELECT para, html, expires_at FROM para_html
+        WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
+        ORDER BY para`,
+      [channelId, book, from, to],
+    ),
   );
 }
 
@@ -281,25 +282,26 @@ async function scanCached(
   from: number,
   hi: number,
 ): Promise<{ content: number | null; gap: number | null }> {
-  const db = await openReadingDb();
-  const now = Date.now();
-  // 只取仍然有效的行，段号升序；`has` 是「这一段有正文」。一次最多扫这么多行，
-  // 扫满了还没遇到缺口就当缺口在末尾，下一轮接着扫。
-  const rows = await db.getAllAsync<{ para: number; has: number }>(
-    `SELECT para, (html IS NOT NULL) AS has FROM para_html
-      WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
-        AND (html IS NOT NULL OR expires_at > ?)
-      ORDER BY para LIMIT 5000`,
-    [channelId, book, from, hi, now],
-  );
+  return withReadingWrite(async (db) => {
+    const now = Date.now();
+    // 只取仍然有效的行，段号升序；`has` 是「这一段有正文」。一次最多扫这么多行，
+    // 扫满了还没遇到缺口就当缺口在末尾，下一轮接着扫。
+    const rows = await db.getAllAsync<{ para: number; has: number }>(
+      `SELECT para, (html IS NOT NULL) AS has FROM para_html
+        WHERE channel = ? AND book = ? AND para BETWEEN ? AND ?
+          AND (html IS NOT NULL OR expires_at > ?)
+        ORDER BY para LIMIT 5000`,
+      [channelId, book, from, hi, now],
+    );
 
-  let expected = from;
-  for (const row of rows) {
-    if (row.para !== expected) return { content: null, gap: expected };
-    if (row.has) return { content: row.para, gap: null };
-    expected = row.para + 1;
-  }
-  return { content: null, gap: expected > hi ? null : expected };
+    let expected = from;
+    for (const row of rows) {
+      if (row.para !== expected) return { content: null, gap: expected };
+      if (row.has) return { content: row.para, gap: null };
+      expected = row.para + 1;
+    }
+    return { content: null, gap: expected > hi ? null : expected };
+  });
 }
 
 /**
@@ -388,25 +390,30 @@ export interface CacheUsage {
 }
 
 /** 按「频道 + 书」统计缓存占用，用于设置页展示与 LRU 清理。 */
-export async function cacheUsage(): Promise<CacheUsage[]> {
-  const db = await openReadingDb();
-  const rows = await db.getAllAsync<{
-    channel: string;
-    book: number;
-    paras: number;
-    bytes: number;
-    lastUsed: number;
-    downloaded: number;
-  }>(
-    `SELECT p.channel, p.book,
-            count(p.html) paras, sum(length(p.html)) bytes, max(p.fetched_at) lastUsed,
-            (d.book IS NOT NULL) downloaded
-       FROM para_html p
-       LEFT JOIN download_state d
-              ON d.channel = p.channel AND d.book = p.book AND d.status = 'done'
-      GROUP BY p.channel, p.book`,
-  );
-  return rows.map((r) => ({ ...r, bytes: r.bytes ?? 0, downloaded: !!r.downloaded }));
+export function cacheUsage(): Promise<CacheUsage[]> {
+  return withReadingWrite(async (db) => {
+    const rows = await db.getAllAsync<{
+      channel: string;
+      book: number;
+      paras: number;
+      bytes: number;
+      lastUsed: number;
+      downloaded: number;
+    }>(
+      `SELECT p.channel, p.book,
+              count(p.html) paras, sum(length(p.html)) bytes, max(p.fetched_at) lastUsed,
+              (d.book IS NOT NULL) downloaded
+         FROM para_html p
+         LEFT JOIN download_state d
+                ON d.channel = p.channel AND d.book = p.book AND d.status = 'done'
+        GROUP BY p.channel, p.book`,
+    );
+    return rows.map((r) => ({
+      ...r,
+      bytes: r.bytes ?? 0,
+      downloaded: !!r.downloaded,
+    }));
+  });
 }
 
 /**
@@ -424,32 +431,36 @@ export async function enforceCacheQuota(
     .filter((u) => !u.downloaded)
     .sort((a, b) => a.lastUsed - b.lastUsed);
 
-  const db = await openReadingDb();
-  let freed = 0;
-  for (const u of evictable) {
-    if (total <= quotaBytes) break;
-    await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
-      u.channel,
-      u.book,
-    ]);
-    total -= u.bytes;
-    freed += u.bytes;
-  }
-  // SQLite 删数据后文件不会自动缩小
-  if (freed > 0) await db.execAsync("VACUUM");
-  return freed;
+  return withReadingWrite(async (db) => {
+    let freed = 0;
+    for (const u of evictable) {
+      if (total <= quotaBytes) break;
+      await db.runAsync("DELETE FROM para_html WHERE channel = ? AND book = ?", [
+        u.channel,
+        u.book,
+      ]);
+      total -= u.bytes;
+      freed += u.bytes;
+    }
+    // SQLite 删数据后文件不会自动缩小
+    if (freed > 0) await db.execAsync("VACUUM");
+    return freed;
+  });
 }
 
 /** 记住版本 uid 对应的显示名（离线选版本、离线显示名字都要用）。 */
-export async function rememberChannelName(
+export function rememberChannelName(
   channelUid: string,
   name: string,
 ): Promise<void> {
-  if (!channelUid || !name) return;
-  const db = await openReadingDb();
-  await db.runAsync(
-    "INSERT OR REPLACE INTO channels (uid, name) VALUES (?, ?)",
-    [channelUid, name],
+  if (!channelUid || !name) return Promise.resolve();
+  return withReadingWrite((db) =>
+    db
+      .runAsync("INSERT OR REPLACE INTO channels (uid, name) VALUES (?, ?)", [
+        channelUid,
+        name,
+      ])
+      .then(() => undefined),
   );
 }
 
@@ -472,45 +483,45 @@ export interface LocalChannel {
  * 按行数排会把「扫过一遍但一段没译」的版本排到前面。同理，一段正文都没有的
  * 版本直接不算「本地有内容」。
  */
-export async function localChannelsFor(book: number): Promise<LocalChannel[]> {
-  const db = await openReadingDb();
-  const rows = await db.getAllAsync<{
-    channel: string;
-    name: string | null;
-    cached: number;
-    downloaded: number;
-  }>(
-    `SELECT c.channel,
-            n.name                          AS name,
-            c.cached                        AS cached,
-            CASE WHEN d.channel IS NULL THEN 0 ELSE 1 END AS downloaded
-       FROM (SELECT channel, COUNT(html) AS cached
-               FROM para_html WHERE book = ? GROUP BY channel
-             HAVING COUNT(html) > 0) c
-       LEFT JOIN channels n ON n.uid = c.channel
-       LEFT JOIN download_state d
-               ON d.channel = c.channel AND d.book = ? AND d.done > 0
-      ORDER BY downloaded DESC, cached DESC`,
-    [book, book],
-  );
-  return rows.map((r) => ({
-    channelId: r.channel,
-    name: r.name,
-    cached: r.cached,
-    downloaded: r.downloaded === 1,
-  }));
+export function localChannelsFor(book: number): Promise<LocalChannel[]> {
+  return withReadingWrite(async (db) => {
+    const rows = await db.getAllAsync<{
+      channel: string;
+      name: string | null;
+      cached: number;
+      downloaded: number;
+    }>(
+      `SELECT c.channel,
+              n.name                          AS name,
+              c.cached                        AS cached,
+              CASE WHEN d.channel IS NULL THEN 0 ELSE 1 END AS downloaded
+         FROM (SELECT channel, COUNT(html) AS cached
+                 FROM para_html WHERE book = ? GROUP BY channel
+               HAVING COUNT(html) > 0) c
+         LEFT JOIN channels n ON n.uid = c.channel
+         LEFT JOIN download_state d
+                ON d.channel = c.channel AND d.book = ? AND d.done > 0
+        ORDER BY downloaded DESC, cached DESC`,
+      [book, book],
+    );
+    return rows.map((r) => ({
+      channelId: r.channel,
+      name: r.name,
+      cached: r.cached,
+      downloaded: r.downloaded === 1,
+    }));
+  });
 }
 
 /** 批量查版本显示名（uid → name）；没见过的 uid 不会出现在结果里。 */
-export async function channelNames(
-  uids: string[],
-): Promise<Map<string, string>> {
+export function channelNames(uids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(uids.filter(Boolean))];
-  if (unique.length === 0) return new Map();
-  const db = await openReadingDb();
-  const rows = await db.getAllAsync<{ uid: string; name: string }>(
-    `SELECT uid, name FROM channels WHERE uid IN (${unique.map(() => "?").join(",")})`,
-    unique,
-  );
-  return new Map(rows.map((r) => [r.uid, r.name]));
+  if (unique.length === 0) return Promise.resolve(new Map());
+  return withReadingWrite(async (db) => {
+    const rows = await db.getAllAsync<{ uid: string; name: string }>(
+      `SELECT uid, name FROM channels WHERE uid IN (${unique.map(() => "?").join(",")})`,
+      unique,
+    );
+    return new Map(rows.map((r) => [r.uid, r.name]));
+  });
 }

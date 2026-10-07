@@ -5,7 +5,7 @@
  * 一条。写入/删除入队 `sync_outbox`，联网后同步到服务器 `likes`（type=favorite）。
  * 契约见 `docs/multi-user-sync.md` §6.2。
  */
-import { openReadingDb, withReadingTransaction } from "../reading/db";
+import { openReadingDb, withReadingTransaction, withReadingWrite } from "../reading/db";
 import { localKey, outboxDelete, outboxUpsert } from "./queue";
 
 export interface StarredBook {
@@ -45,15 +45,16 @@ function toRecord(r: Row): StarredBook {
 /** 读取全部收藏（按收藏时间倒序）。 */
 export async function loadStarred(): Promise<StarredBook[]> {
   try {
-    const db = await openReadingDb();
-    const rows = await db.getAllAsync<Row>(
-      `SELECT book, paragraph, title, channel_id, updated_at
-         FROM starred
-        ORDER BY updated_at DESC
-        LIMIT ?`,
-      [MAX_RECORDS],
-    );
-    return rows.map(toRecord);
+    return withReadingWrite(async (db) => {
+      const rows = await db.getAllAsync<Row>(
+        `SELECT book, paragraph, title, channel_id, updated_at
+           FROM starred
+          ORDER BY updated_at DESC
+          LIMIT ?`,
+        [MAX_RECORDS],
+      );
+      return rows.map(toRecord);
+    });
   } catch {
     return [];
   }
@@ -124,12 +125,13 @@ export async function removeStarred(book: number): Promise<void> {
 /** 某本书是否已收藏。 */
 export async function isStarred(book: number): Promise<boolean> {
   try {
-    const db = await openReadingDb();
-    const row = await db.getFirstAsync<{ n: number }>(
-      "SELECT count(*) n FROM starred WHERE book = ?",
-      [book],
-    );
-    return (row?.n ?? 0) > 0;
+    return withReadingWrite(async (db) => {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT count(*) n FROM starred WHERE book = ?",
+        [book],
+      );
+      return (row?.n ?? 0) > 0;
+    });
   } catch {
     return false;
   }

@@ -6,7 +6,7 @@
  * 之后登录时再按 `mergeGuestIntoUser` 并入账户。只跑一次（AsyncStorage flag 标记）。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { openReadingDbFor } from "../reading/db";
+import { openReadingDbFor, withDbQueue } from "../reading/db";
 import { getDeviceUuid } from "../user/deviceUuid";
 
 const DONE_KEY = "@wikipali/legacy-migrated";
@@ -28,7 +28,7 @@ function parseArray(raw: string | null): unknown[] {
 
 export function migrateLegacyAsyncStorage(): Promise<void> {
   if (!running) {
-    running = (async () => {
+    running = withDbQueue(async () => {
       try {
         if (await AsyncStorage.getItem(DONE_KEY)) return;
         const guestId = await getDeviceUuid();
@@ -48,7 +48,7 @@ export function migrateLegacyAsyncStorage(): Promise<void> {
         running = null; // 失败下次再试
         throw new Error("legacy migration failed");
       }
-    })();
+    });
   }
   return running;
 }
