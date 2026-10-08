@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "පිවිසීම අසාර්ථකයි",
   "signIn.passwordPlaceholder": "මුරපදය ඇතුළු කරන්න",
   "signIn.serverHint": "පිවිසුම් සේවාදායකය මම → සැකසුම් → API සේවාදායකය තුළ මාරු කළ හැක.",
+  "signIn.tooManyAttempts": "උත්සාහයන් වැඩිය. කරුණාකර පසුව නැවත උත්සාහ කරන්න",
   "signIn.usernamePlaceholder": "පරිශීලක නාමය හෝ විද්‍යුත් තැපෑල ඇතුළු කරන්න",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",

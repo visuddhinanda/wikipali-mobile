@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ",
   "signIn.passwordPlaceholder": "ໃສ່ລະຫັດຜ່ານ",
   "signIn.serverHint": "ປ່ຽນເຊີບເວີໄດ້ທີ່ ຂ້ອຍ → ຕັ້ງຄ່າ → ເຊີບເວີ API",
+  "signIn.tooManyAttempts": "ພະຍາຍາມຫຼາຍເກີນໄປ, ກະລຸນາລອງໃໝ່ພາຍຫຼັງ",
   "signIn.usernamePlaceholder": "ໃສ່ຊື່ຜູ້ໃຊ້ ຫຼື ອີເມວ",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",

@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "ဝင်ရောက်မှု မအောင်မြင်ပါ",
   "signIn.passwordPlaceholder": "စကားဝှက် ထည့်ပါ",
   "signIn.serverHint": "ဝင်ရောက်ရာ ဆာဗာကို ကျွန်ုပ် → ဆက်တင် → API ဆာဗာ တွင် ပြောင်းနိုင်ပါသည်။",
+  "signIn.tooManyAttempts": "ကြိုးစားမှု များလွန်းသည်။ ခဏနေမှ ထပ်ကြိုးစားပါ",
   "signIn.usernamePlaceholder": "အသုံးပြုသူအမည် သို့မဟုတ် အီးမေးလ် ထည့်ပါ",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",

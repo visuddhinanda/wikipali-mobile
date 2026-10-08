@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "เข้าสู่ระบบไม่สำเร็จ",
   "signIn.passwordPlaceholder": "กรอกรหัสผ่าน",
   "signIn.serverHint": "เปลี่ยนเซิร์ฟเวอร์ได้ที่ ฉัน → ตั้งค่า → เซิร์ฟเวอร์ API",
+  "signIn.tooManyAttempts": "ลองหลายครั้งเกินไป โปรดลองใหม่ภายหลัง",
   "signIn.usernamePlaceholder": "กรอกชื่อผู้ใช้หรืออีเมล",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",

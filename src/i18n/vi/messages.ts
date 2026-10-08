@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "Đăng nhập thất bại",
   "signIn.passwordPlaceholder": "Nhập mật khẩu",
   "signIn.serverHint": "Bạn có thể đổi máy chủ đăng nhập tại Tôi → Cài đặt → Máy chủ API.",
+  "signIn.tooManyAttempts": "Thử quá nhiều lần, vui lòng thử lại sau",
   "signIn.usernamePlaceholder": "Nhập tên đăng nhập hoặc email",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",

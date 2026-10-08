@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "登录失败",
   "signIn.passwordPlaceholder": "请输入密码",
   "signIn.serverHint": "登录服务器可在「我 → 设置 → API 服务器」中切换。",
+  "signIn.tooManyAttempts": "尝试次数过多，请稍后再试",
   "signIn.usernamePlaceholder": "请输入用户名或邮箱",
   "sync.mergeMessage": "是否将未登录期间的阅读记录、收藏、书签和下载记录同步到当前账户？",
   "sync.mergeTitle": "同步游客数据？",

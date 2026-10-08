@@ -130,6 +130,7 @@ const messages = {
   "signIn.failed": "Sign-in failed",
   "signIn.passwordPlaceholder": "Enter your password",
   "signIn.serverHint": "You can switch the sign-in server under Me → Settings → API server.",
+  "signIn.tooManyAttempts": "Too many attempts. Please try again later",
   "signIn.usernamePlaceholder": "Enter your username or email",
   "sync.mergeMessage": "Sync the reading history, favorites, bookmarks and downloads from before you signed in to this account?",
   "sync.mergeTitle": "Sync guest data?",
