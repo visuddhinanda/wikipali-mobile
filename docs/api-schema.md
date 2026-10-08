@@ -39,8 +39,6 @@
 | 3 | `GET /v2/progress`（多 view） | `data.rows = Record<string,never>[]` | 按 view 分 schema（至少这三个）：`view=chapter_channels` → `{book, para, uid, channel_id, name, type, progress, updated_at, channel{uid,name,type}}`；`view=ids` → `{id}`；`view=channel`（+`channel_type=translation`）→ `{channel_id, count, studio{...}, channel{name,summary,lang}}` |
 | 4 | `GET /v2/channel/{channel}` | `data = Record<string,never>` | `ChannelInfo`：`uid`、`name`、`summary`、`lang`、`type`、`updated_at`、`studio{id,nickName,realName,studioName,avatar}` |
 | 5 | `GET /v2/progress/{progress}` | `data = Record<string,never>` | `ProgressChapterInfo`：`book:int`、`para:int`、`channel_id`、`title` |
-| 6 | `GET /v2/auth/current` | `data = Record<string,never>` | `AuthUser`：`id`、`nickName`、`realName`、`avatar`、`roles[]`（可复用 `/v3/me/reactions` 里已类型化的 `user` 结构） |
-| 7 | `POST /v2/sign-in` | response `data = Record<string,never>` | `data` 为 token（`string`） |
 
 ### B. 字段类型错误（会污染类型，照抄会改错移动端已有正确类型）
 
@@ -59,11 +57,14 @@
 ### D. 已达标（无需改，供核对）
 
 - `GET /v3/progress`：`data[]` 已逐字段类型化（`book/para/lang/progress/channel_id/title/last_chapter_completed_at/completed_at/updated_at`），对齐移动端 `ChannelBook`（`view` 参数已删，channel 是唯一口径）。✅
+- `POST /v3/sessions` / `GET /v3/me`：登录与当前用户，取代 `/v2/sign-in` + `/v2/auth/current`
+  （原清单 #6/#7 随之关闭）。登录一次返回 `{token, user}`，`user` 与 `AuthUser` 同名驼峰字段，
+  另有 `email`；失败看状态码（422 账号或密码错、429 过频、401 token 失效）。✅
 - `GET/POST/DELETE /v3/me/reactions`：`data` / `requestBody` 已类型化（含 `type`/`target_type` 枚举、`user` 嵌套）；POST 返回完整 reaction 资源、DELETE 返回 204。✅
 
 ---
 
 ## 4. 根因提示
 
-v2 接口普遍返回 `data?: Record<string, never>`，根因是 **v2 控制器响应未写 item 的 OpenAPI schema**（不止上面列出的 9 个）。
+v2 接口普遍返回 `data?: Record<string, never>`，根因是 **v2 控制器响应未写 item 的 OpenAPI schema**（不止上面列出的这些）。
 移动端目前只消费上述接口；若后续新增 v2 调用，应同样要求补齐对应响应注解。

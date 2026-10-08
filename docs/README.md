@@ -217,7 +217,7 @@ medium 档不做双栏——600–839dp 拆两栏后正文只剩不到 500dp，�
 | **HTML 渲染** | react-native-webview 13.16（阅读器 HTML） |
 | **状态管理/数据请求** | 轻量 `src/api` fetch 封装（超时 + JSON），无 react-query/zustand |
 | **离线存储** | `expo-file-system` + `expo-sqlite`（阅读缓存 / 下载）+ AsyncStorage（设置类） |
-| **登录** | `expo-secure-store` 存 token + `src/auth`（`/auth/current` 校验） |
+| **登录** | `expo-secure-store` 存 token + `src/auth`（`/v3/me` 校验） |
 | **多用户** | 见 [`multi-user-sync.md`](./multi-user-sync.md)（按 user_id 分目录 + 同步） |
 
 ### 0.2 后端（工作区相关服务）
@@ -293,6 +293,6 @@ medium 档不做双栏——600–839dp 拆两栏后正文只剩不到 500dp，�
 | 罗马转写 | `RomanizeService`（`TransferController`） |
 | AI 翻译 / 问答 | `AiTranslateService` / `OpenAIService` / `EmbeddingService` |
 | 聊天 | `ChatController` / `ChatMessageController` |
-| 登录 | `AuthController`（`/sign-in`、`/auth/current`）/ `SignUpController` |
+| 登录 | `V3\SessionController`（`/v3/sessions`）/ `V3\MeController`（`/v3/me`） |
 
 > 多用户同步的接口契约、数据映射与**服务端需补齐的 API 缺口**，见 [`multi-user-sync.md`](./multi-user-sync.md)。

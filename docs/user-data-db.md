@@ -33,7 +33,7 @@ SQLite/
 └── users/
     ├── <guest-uuid>/            # 游客（设备 uuid，见 multi-user-sync.md §3）
     │   └── reading.db3
-    └── <user-uuid>/             # 登录用户（user_uid = /auth/current 的 id）
+    └── <user-uuid>/             # 登录用户（user_uid = /v3/me 的 id）
         └── reading.db3
 ```
 

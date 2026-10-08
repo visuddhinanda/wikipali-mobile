@@ -29,7 +29,7 @@ SQLite/
 └── users/
     ├── <guest-uuid>/            # 游客（设备 uuid）
     │   └── reading.db3          # 该用户的读写库：正文缓存 + 下载 + 历史/收藏/书签 + 同步队列
-    └── <user-uuid>/             # 登录用户（user_uid = /auth/current 的 id）
+    └── <user-uuid>/             # 登录用户（user_uid = /v3/me 的 id）
         └── reading.db3
 ```
 
@@ -37,7 +37,7 @@ SQLite/
 
 - **`tipitaka.db3` 永远共享、只读**：它只是章节树 / `pali_text` 索引，不含用户数据；更新时覆盖文件即可（**尚未实现**：目前只在文件不存在时从 assets 拷贝，App 升级不会替换旧库）。
 - **每个用户一个 `reading.db3`**：正文缓存 `para_html`、版本名 `channels`、下载状态 `download_state`、以及新增的历史 / 收藏 / 书签 / 同步队列都放这里。切用户 = 切整个库文件。
-- **目录名就是 uuid**：`guest` 目录名是设备 uuid（§3），登录用户目录名是 `/auth/current` 返回的 `id`（已确认 `AuthController::getUserInfoByToken` 的 `id = curr['user_uid']`，即 uuid）。
+- **目录名就是 uuid**：`guest` 目录名是设备 uuid（§3），登录用户目录名是 `/v3/me`（登录时 `/v3/sessions` 的 `user`）返回的 `id`，即 `user_infos.userid`（uuid）。
 - **不迁移旧数据到新目录？迁移**：首次升级时，把旧的共享 `SQLite/reading.db3` 视为「上一个游客」的库，整体搬到 `<guest-uuid>/reading.db3`（§9）。
 
 > 取舍说明：`para_html` 正文缓存按用户各存一份会占用更多磁盘（同一本书两个用户都下载 = 两份）。
@@ -71,9 +71,9 @@ SQLite/
 
 ```
 冷启动
-  ├─ 有 token → 先按缓存用户进 <user.id>/，后台校验 /auth/current（10 秒超时）
+  ├─ 有 token → 先按缓存用户进 <user.id>/，后台校验 /v3/me（10 秒超时）
   │     ├─ 成功 → 刷新用户信息，留在 <user.id>/          （该用户自己的库）
-  │     ├─ 明确被拒（401/403，或 200 + ok:false）→ 清会话 → 当前目录 = <guest-uuid>/
+  │     ├─ 明确被拒（401/403）→ 清会话 → 当前目录 = <guest-uuid>/
   │     └─ 断网 / 超时 / 5xx / 其它 → 保留会话（离线优先），App 回到前台时再校验
   └─ 无 token → 当前目录 = <guest-uuid>/
 
