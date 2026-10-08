@@ -38,12 +38,22 @@ public API server. Network/backend failures surface as an error bar in the reade
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `EXPO_PUBLIC_RUNTIME_URL` | `http://localhost:3001/api/copilotkit` | CopilotKit runtime for the AI tab |
-| `EXPO_PUBLIC_API_URL` | unset | Overrides the content API base (e.g. `http://192.168.1.10:4000/api/v2`) |
+| `EXPO_PUBLIC_RUNTIME_URL` | unset | Initial value of the debug **AI runtime** address |
+| `EXPO_PUBLIC_API_URL` | unset | Initial value of the debug **API** address (e.g. `http://192.168.1.10:4000/api/v2`) |
 
-When `EXPO_PUBLIC_API_URL` is unset the base URL comes from the in-app picker
-(**Me → Settings → API server**), which defaults to `next.wikipali.org`
-(`src/settings/server.ts`).
+These two variables are **not used directly**. They only pre-fill
+**Me → Settings → Debug** (`src/settings/debug.ts`):
+
+- **Debug on** — the app uses the two addresses typed there (an empty field falls
+  back to the default below). Changes apply immediately, no restart.
+- **Debug off** — the app uses the built-in values: the API comes from the
+  in-app picker (**Me → Settings → API server**, default `next.wikipali.org`,
+  `src/settings/server.ts`), the AI runtime is `https://agent.wikipali.cc/api/copilotkit`.
+
+The switch defaults to **on** in a development build when `.env` sets either
+variable, and to **off** in a release build. The switch and both addresses are
+persisted on the device (AsyncStorage), so a value typed on the phone survives
+restarts.
 
 > On a physical device `localhost` means *the phone*. Always use the LAN IP of
 > your computer (`ip addr` / `ifconfig` / `ipconfig`), and restart
@@ -274,49 +284,14 @@ cd android && ./gradlew assembleRelease
 # → android/app/build/outputs/apk/release/app-release.apk
 ```
 
-**Before building release, comment out `EXPO_PUBLIC_API_URL` and
-`EXPO_PUBLIC_RUNTIME_URL` in `.env`.** Unlike the development build (where Metro
-inlines them live on every reload), `assembleRelease` inlines `EXPO_PUBLIC_*`
-values into the JS bundle **at build time**:
+**No need to comment out `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_RUNTIME_URL`
+before building release.** They only pre-fill the debug fields (§3); a release
+build starts with **Debug off** and uses the built-in addresses. The local IPs
+still end up inlined in the bundle as the fields' initial values — harmless, and
+the reason the old "grep the bundle for `192.168.`" check no longer applies.
 
-| Variable | If left uncommented in `.env` |
-|---|---|
-| `EXPO_PUBLIC_API_URL` | APK hard-codes a local/dev API server, ignoring the in-app server picker |
-| `EXPO_PUBLIC_RUNTIME_URL` | APK hard-codes a local AI runtime instead of the production fallback (`https://agent.wikipali.cc/api/copilotkit`) |
-
-> ⚠️ **只注释 `.env` 不一定够 —— 有三处会让 release 用上旧的 local 值：**
->
-> 1. **Shell 环境变量优先于 `.env`**（最常踩）：babel 内联的是 `process.env`，
->    而 `process.env` 里若已经 `export` 过 `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_RUNTIME_URL`
->    （比如会话启动时 `.env` 还没注释、被 dotenv 读进了进程环境），`.env` 里注释掉也不生效。
->    先 `unset` 掉再打包。
-> 2. **Gradle 的 up-to-date 检查**：`createBundleReleaseJsAndAssets` 只看 JS 源文件、
->    不看 `.env`，会复用旧 bundle。
-> 3. **Metro 的 transform 缓存**（`/tmp/metro-cache`）：babel 在 transform 时把
->    `process.env.EXPO_PUBLIC_*` 内联进输出；缓存键只按源文件内容算、不含环境变量，
->    所以即使删掉 bundle 文件重新打包，也会拿到旧的 transform 结果。
->
-> 改 `.env` 后要这样强制重建（**三步都做**）：
->
-> ```bash
-> unset EXPO_PUBLIC_API_URL EXPO_PUBLIC_RUNTIME_URL   # ① 清掉进程里的旧值
-> rm -rf /tmp/metro-cache /tmp/metro-file-map-*        # ② 清 Metro transform 缓存
-> rm android/app/build/generated/assets/react/release/index.android.bundle  # ③ 清旧 bundle
-> cd android && ./gradlew assembleRelease
-> ```
->
-> 快速验证内联值是否干净（应无输出，`localhost:8081` 是 CopilotKit 自带默认、可忽略）：
->
-> ```bash
-> grep -aoE "192\.168\.[0-9.]+|127\.0\.0\.1|10\.0\.2\.2" \
->   android/app/build/generated/assets/react/release/index.android.bundle
-> ```
->
-> （`./gradlew clean && ./gradlew assembleRelease` 只清 gradle 那一层，清不掉
-> `/tmp/metro-cache`，所以仍要删 Metro 缓存；而且 `clean` 会重编原生代码、更慢。）
-
-**Symptom of the stale bundle:** a release APK that keeps connecting to an old
-local/dev server even after you commented the variable out.
+To point a release APK at a local server, turn on **Me → Settings → Debug** on
+the phone and type the address.
 
 ## 6. Waydroid (Android on a Linux desktop)
 
