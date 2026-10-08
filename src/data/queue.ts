@@ -11,7 +11,7 @@
  * 本地写操作与入队必须放在**同一个事务**里（`withReadingTransaction`），
  * 保证「本地状态」与「待同步状态」不会半途不一致。
  */
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { SqlDb } from "../reading/db";
 import { isLoggedIn } from "../user/userScope";
 
 /** 是否入队：仅登录用户（游客永远不同步）。 */
@@ -41,7 +41,7 @@ export function localKey(
 
 /** 入队一条 upsert（存在待推送）。`serverId` 是此前同步回填的服务器 id。 */
 export function outboxUpsert(
-  db: SQLiteDatabase,
+  db: SqlDb,
   key: string,
   kind: SyncKind,
   payload: Record<string, unknown>,
@@ -58,7 +58,7 @@ export function outboxUpsert(
 
 /** 入队一条 delete（已删除，待服务器删除）。 */
 export function outboxDelete(
-  db: SQLiteDatabase,
+  db: SqlDb,
   key: string,
   kind: SyncKind,
   payload: Record<string, unknown>,
@@ -74,7 +74,7 @@ export function outboxDelete(
 }
 
 /** 移除某条本地记录对应的待同步行（无服务器操作，如「清空阅读记录」）。 */
-export function outboxRemove(db: SQLiteDatabase, key: string): Promise<unknown> {
+export function outboxRemove(db: SqlDb, key: string): Promise<unknown> {
   if (!syncable()) return Promise.resolve();
   return db.runAsync("DELETE FROM sync_outbox WHERE local_key = ?", [key]);
 }

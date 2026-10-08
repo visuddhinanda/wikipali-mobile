@@ -16,7 +16,6 @@ import {
 } from "../api/read-chapter";
 import { fetchReadParas, type ReadParaItem } from "../api/read-para";
 import {
-  openReadingDb,
   withReadingTransaction,
   withReadingWrite,
 } from "./db";
@@ -335,8 +334,7 @@ export async function cachedParaCount(
   channelId: string,
   book: number,
 ): Promise<number> {
-  // 读也走串行队列：expo-sqlite 并发调用（读+写）会触发 SharedObjectRegistry
-  // 竞争 → prepareAsync NPE（见 expo/expo #50855）。
+  // 读也持连接锁：不要读到正在进行的下载事务的中间态（并发模型见 reading/db.ts）。
   return withReadingWrite(async (db) => {
     const row = await db.getFirstAsync<{ n: number }>(
       "SELECT count(html) n FROM para_html WHERE channel = ? AND book = ?",

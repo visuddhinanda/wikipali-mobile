@@ -429,8 +429,8 @@ CREATE TABLE IF NOT EXISTS download_state (
   等链轮到它才转 `downloading`；排队中可「暂停」撤出队列（有数据 → `paused`，
   无数据 → `pending`）。
 - 暂停（`pauseDownload`）：跑着的置取消、下一块边界写 `paused`；排队中的撤出队列。
-- 写库都走 `withReadingTransaction` / `withReadingWrite` 串行队列，避免
-  expo-sqlite 的 `withTransactionAsync`（非独占事务）被同连接的其它查询打断。
+- 读写库都走 `withReadingTransaction` / `withReadingWrite`（持连接锁），事务执行期间
+  同连接的其它查询插不进来（并发模型见 `docs/user-data-db.md` §8）。
 
 **切换用户时的「全部暂停」**（`pauseAllDownloads`，登录/登出前由 auth 层调用）：
 

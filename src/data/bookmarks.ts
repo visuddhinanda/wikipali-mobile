@@ -6,7 +6,7 @@
  * `likes`（type=bookmark，target_id=progress_chapters.uid）。
  * 契约见 `docs/multi-user-sync.md` §6.2。
  */
-import { openReadingDb, withReadingTransaction, withReadingWrite } from "../reading/db";
+import { withReadingTransaction, withReadingWrite } from "../reading/db";
 import { localKey, outboxDelete, outboxUpsert } from "./queue";
 
 export interface Bookmark {
@@ -50,7 +50,7 @@ function toRecord(r: Row): Bookmark {
 /** 读取全部书签（按时间倒序）。 */
 export async function loadBookmarks(): Promise<Bookmark[]> {
   try {
-    return withReadingWrite(async (db) => {
+    return await withReadingWrite(async (db) => {
       const rows = await db.getAllAsync<Row>(
         `SELECT book, paragraph, title, heading, channel_id, updated_at
            FROM bookmarks
@@ -141,7 +141,7 @@ export async function isBookmarked(
   paragraph: number,
 ): Promise<boolean> {
   try {
-    return withReadingWrite(async (db) => {
+    return await withReadingWrite(async (db) => {
       const row = await db.getFirstAsync<{ n: number }>(
         "SELECT count(*) n FROM bookmarks WHERE book = ? AND paragraph = ?",
         [book, paragraph],

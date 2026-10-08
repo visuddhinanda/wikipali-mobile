@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS sync_outbox (
 
 ## 7. 迁移策略
 
-所有迁移都在 `openReadingDbFor()` 里做，幂等可重复：
+所有迁移都在 `src/reading/db.ts` 的 `readingDbFor()`（某用户库**首次打开**时）里做，幂等可重复：
 
 1. **建目录**：`SQLite/users/<uuid>/` 不存在则 `create({ intermediates: true })`。
 2. **旧文件搬迁**（一次性）：若共享的 `SQLite/reading.db3` 还在、且目标 `<uuid>/reading.db3` 不存在，`move` 过去（旧库 = 上一个游客的库）。
@@ -241,6 +241,16 @@ CREATE TABLE IF NOT EXISTS sync_outbox (
 ## 8. 取舍与约束
 
 - **`para_html` 按用户分存**：正文缓存本可共享，但「下载进度 = 已缓存段数」强耦合，拆开共享会让下载进度依赖别的用户写入的缓存，语义变脏；磁盘换正确性（离线优先定位）。
-- **写事务串行化**：`withReadingTransaction()` 用 promise 链把写事务排成队列（`withTransactionAsync` 是裸 BEGIN/COMMIT，同连接并发会嵌套失败）。
-- **连接生命周期**：切用户时 `onScopeChange` 关闭旧连接、清空缓存 promise；`openReadingDbFor(scopeId)` 用于 guest 合并等需要「打开指定用户库」的场景（独立连接，用完关闭）。
+- **并发模型**（`src/reading/db.ts` 文件头有完整说明）——都是为了绕开 expo-sqlite 在 Android 上的
+  `NativeDatabase.xxxAsync rejected → NullPointerException`：
+  - **每个库文件只开一个 JS 句柄，进程内常驻、永不关闭**：同一路径开第二个句柄后，任何一个被
+    `closeAsync` 或 GC 都会把共享的原生连接关掉。句柄登记在 globalThis 上（Fast Refresh 不重开）；
+    业务代码只拿到受控的 `SqlDb`，拿不到原始句柄。
+  - **全局闸门**：所有原生调用一次只放行一条（expo-modules-core 的 SharedObjectRegistry
+    并发读不安全）。闸门只包原生调用本身，不包业务代码，无需可重入。
+  - **连接锁**：`withReadingWrite` / `withReadingTransaction`（以及指定用户库的
+    `withReadingWriteFor` / `withReadingTransactionFor`）持有该库的锁，事务期间别的语句插不进来。
+    锁**不可重入**：回调里只能用传入的 `db`，不要再调同一个库的 `withReading*`；读 tipitaka 不受限。
+- **连接生命周期**：切用户只改作用域，下一次 `withReading*` 落到新库；guest 合并、旧数据迁移用
+  `withReading*For(scopeId)` 访问「非当前用户库」，同样复用唯一句柄。
 - **主键即业务唯一键**：四张用户行为表的主键直接表达业务去重规则（阅读/收藏按书、书签按书+段、下载按版本+书），与服务器唯一键 `(type, target_id, user_id)` / `(type, article_id, user_uid)` 一一对应。

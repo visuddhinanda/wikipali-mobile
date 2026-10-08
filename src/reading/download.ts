@@ -17,6 +17,7 @@ import {
   tipitakaRunner,
   withReadingTransaction,
   withReadingWrite,
+  type SqlDb,
 } from "./db";
 import { firstReadingParagraph, level1ParagraphOf } from "./unit";
 import { localKey, outboxDelete, outboxUpsert } from "../data/queue";
@@ -104,7 +105,7 @@ async function writeState(
 
 /** 下载完成时入队一条下载记录同步（幂等，local_key 唯一）。 */
 async function enqueueDownloadSync(
-  db: import("expo-sqlite").SQLiteDatabase,
+  db: SqlDb,
   channel: string,
   book: number,
   anchorParagraph?: number,
@@ -133,7 +134,7 @@ export function getDownloadProgress(
   channelId: string,
   book: number,
 ): Promise<DownloadProgress> {
-  // 读也走串行队列，避免与下载写并发（expo-sqlite 并发调用会触发 NPE）。
+  // 读也持连接锁，不读到下载事务的中间态（并发模型见 reading/db.ts）。
   return withReadingWrite(async (db) => {
     const row = await db.getFirstAsync<{
       status: DownloadStatus;
@@ -313,6 +314,8 @@ export function pauseDownload(channelId: string, book: number): void {
         "UPDATE download_state SET status = ?, updated_at = ? WHERE channel = ? AND book = ?",
         [status, Date.now(), channelId, book],
       );
+    }).catch(() => {
+      /* 状态没改成也无妨：冷启动对账会把残留的 queued 收成 paused */
     });
   }
 }
@@ -372,7 +375,7 @@ async function runDownloadLoop(
   };
 
   try {
-    // 断点续传：上次没取完的游标与分母（读也走串行队列）。
+    // 断点续传：上次没取完的游标与分母。
     const stored = await withReadingWrite((wdb) =>
       wdb.getFirstAsync<{
         total: number;

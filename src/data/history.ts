@@ -7,7 +7,7 @@
  *
  * 接口签名保持不变，上层（书架「在读」、阅读器）无需改动。
  */
-import { openReadingDb, withReadingTransaction, withReadingWrite } from "../reading/db";
+import { withReadingTransaction, withReadingWrite } from "../reading/db";
 import { localKey, outboxRemove, outboxUpsert } from "./queue";
 
 export interface ReadingRecord {
@@ -53,7 +53,7 @@ function toRecord(r: Row): ReadingRecord {
 /** 读取全部阅读记录（按最近阅读时间倒序；同一本书只保留最后一次位置）。 */
 export async function loadReadingHistory(): Promise<ReadingRecord[]> {
   try {
-    return withReadingWrite(async (db) => {
+    return await withReadingWrite(async (db) => {
       const rows = await db.getAllAsync<Row>(
         `SELECT book, paragraph, title, heading, channel_id, updated_at
            FROM reading_history

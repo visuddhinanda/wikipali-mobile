@@ -19,7 +19,14 @@ import {
   type ProgressChapterInfo,
 } from "../api/like";
 import { recentListByUser, recentUpsert } from "../api/recent";
-import { openReadingDb, openReadingDbFor, tipitakaRunner, withDbQueue, withReadingTransaction, withReadingWrite } from "../reading/db";
+import {
+  tipitakaRunner,
+  withReadingTransaction,
+  withReadingTransactionFor,
+  withReadingWrite,
+  withReadingWriteFor,
+  type SqlDb,
+} from "../reading/db";
 import {
   chapterParagraphOf,
   firstReadingParagraph,
@@ -193,7 +200,7 @@ async function level1Paragraph(
 export async function pendingSyncCount(): Promise<number> {
   if (!isLoggedIn()) return 0;
   try {
-    return withReadingWrite(async (db) => {
+    return await withReadingWrite(async (db) => {
       const row = await db.getFirstAsync<{ n: number }>(
         "SELECT count(*) n FROM sync_outbox",
       );
@@ -319,7 +326,7 @@ function parseBookmarkContext(context: string | null): number | null {
   return Number.isFinite(para) ? para : null;
 }
 
-type SyncDb = import("expo-sqlite").SQLiteDatabase;
+type SyncDb = SqlDb;
 
 /** 较新者胜：本地 updated_at 不比服务器旧就跳过覆盖。 */
 async function localIsNewer(
@@ -458,12 +465,10 @@ export async function mergeGuestIntoUser(userId: string): Promise<number> {
   const guestId = await getDeviceUuid();
   if (!guestId || guestId === userId) return 0;
 
-  return withDbQueue(async () => {
-    // 共享句柄，不要 close（见 reading/db.ts `readingHandles`）。
-    const guest = await openReadingDbFor(guestId);
-    const user = await openReadingDbFor(userId);
-    let count = 0;
-    await user.withTransactionAsync(async () => {
+  // 用户库开事务、游客库只读；两把连接锁的顺序固定为 user → guest（只有这里同时持两把）。
+  const count = await withReadingTransactionFor(userId, (user) =>
+    withReadingWriteFor(guestId, async (guest) => {
+      let count = 0;
       // 阅读记录
       const histories = await guest.getAllAsync<{
         book: number;
@@ -574,12 +579,13 @@ export async function mergeGuestIntoUser(userId: string): Promise<number> {
         );
         count += 1;
       }
-    });
+      return count;
+    }),
+  );
 
-    // 标记游客已合并（下一次登录不再重复询问）。
-    await AsyncStorage.setItem(`${MERGED_KEY}:${userId}`, "1");
-    return count;
-  });
+  // 标记游客已合并（下一次登录不再重复询问）。
+  await AsyncStorage.setItem(`${MERGED_KEY}:${userId}`, "1");
+  return count;
 }
 
 /** 该账户是否已并入过游客数据。 */
@@ -595,8 +601,7 @@ export async function guestMergedFor(userId: string): Promise<boolean> {
 export async function guestHasData(): Promise<boolean> {
   try {
     const guestId = await getDeviceUuid();
-    return withDbQueue(async () => {
-      const db = await openReadingDbFor(guestId); // 共享句柄，不要 close
+    return await withReadingWriteFor(guestId, async (db) => {
       const tables = ["reading_history", "bookmarks", "starred", "download_state"];
       for (const t of tables) {
         const row = await db.getFirstAsync<{ n: number }>(

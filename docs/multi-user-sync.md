@@ -35,7 +35,7 @@ SQLite/
 
 要点：
 
-- **`tipitaka.db3` 永远共享、只读**：它只是章节树 / `pali_text` 索引，不含用户数据；更新时覆盖文件即可（现状 `refreshTipitakaDbIfStale()` 不变）。
+- **`tipitaka.db3` 永远共享、只读**：它只是章节树 / `pali_text` 索引，不含用户数据；更新时覆盖文件即可（**尚未实现**：目前只在文件不存在时从 assets 拷贝，App 升级不会替换旧库）。
 - **每个用户一个 `reading.db3`**：正文缓存 `para_html`、版本名 `channels`、下载状态 `download_state`、以及新增的历史 / 收藏 / 书签 / 同步队列都放这里。切用户 = 切整个库文件。
 - **目录名就是 uuid**：`guest` 目录名是设备 uuid（§3），登录用户目录名是 `/auth/current` 返回的 `id`（已确认 `AuthController::getUserInfoByToken` 的 `id = curr['user_uid']`，即 uuid）。
 - **不迁移旧数据到新目录？迁移**：首次升级时，把旧的共享 `SQLite/reading.db3` 视为「上一个游客」的库，整体搬到 `<guest-uuid>/reading.db3`（§9）。
@@ -87,7 +87,7 @@ SQLite/
 ```
 
 「当前目录」由一个全局作用域模块（`src/user/userScope.ts`）持有：`{ kind: 'guest' | 'user', id: string }`。
-所有 `openReadingDb()` 都从这里取目录名；切换时关闭旧连接、清空缓存 promise、指向新库。
+所有 `withReadingWrite()` / `withReadingTransaction()` 都按它取目录名；切换后下一次调用自然落到新库。旧库连接不关闭（每个库文件进程内只开一个句柄，见 `docs/user-data-db.md` §8）。
 
 ---
 

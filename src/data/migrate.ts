@@ -6,7 +6,7 @@
  * 之后登录时再按 `mergeGuestIntoUser` 并入账户。只跑一次（AsyncStorage flag 标记）。
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { openReadingDbFor, withDbQueue } from "../reading/db";
+import { withReadingTransactionFor, type SqlDb } from "../reading/db";
 import { getDeviceUuid } from "../user/deviceUuid";
 
 const DONE_KEY = "@wikipali/legacy-migrated";
@@ -28,16 +28,18 @@ function parseArray(raw: string | null): unknown[] {
 
 export function migrateLegacyAsyncStorage(): Promise<void> {
   if (!running) {
-    running = withDbQueue(async () => {
+    running = (async () => {
       try {
         if (await AsyncStorage.getItem(DONE_KEY)) return;
         const guestId = await getDeviceUuid();
-        // 共享句柄，不要 close（见 reading/db.ts `readingHandles`）。
-        const db = await openReadingDbFor(guestId);
-        await db.withTransactionAsync(async () => {
-          await migrateHistory(db, parseArray(await AsyncStorage.getItem(HISTORY_KEY)));
-          await migrateBookmarks(db, parseArray(await AsyncStorage.getItem(BOOKMARKS_KEY)));
-          await migrateStarred(db, parseArray(await AsyncStorage.getItem(STARRED_KEY)));
+        // 先把 AsyncStorage 读完，事务里只做 SQL。
+        const history = parseArray(await AsyncStorage.getItem(HISTORY_KEY));
+        const bookmarks = parseArray(await AsyncStorage.getItem(BOOKMARKS_KEY));
+        const starred = parseArray(await AsyncStorage.getItem(STARRED_KEY));
+        await withReadingTransactionFor(guestId, async (db) => {
+          await migrateHistory(db, history);
+          await migrateBookmarks(db, bookmarks);
+          await migrateStarred(db, starred);
         });
         await AsyncStorage.multiRemove([HISTORY_KEY, BOOKMARKS_KEY, STARRED_KEY]);
         await AsyncStorage.setItem(DONE_KEY, "1");
@@ -45,7 +47,7 @@ export function migrateLegacyAsyncStorage(): Promise<void> {
         running = null; // 失败下次再试
         throw new Error("legacy migration failed");
       }
-    });
+    })();
   }
   return running;
 }
@@ -64,7 +66,7 @@ function num(v: unknown): number | null {
 }
 
 async function migrateHistory(
-  db: import("expo-sqlite").SQLiteDatabase,
+  db: SqlDb,
   rows: unknown[],
 ): Promise<void> {
   const byBook = new Map<number, LegacyRecord>();
@@ -94,7 +96,7 @@ async function migrateHistory(
 }
 
 async function migrateBookmarks(
-  db: import("expo-sqlite").SQLiteDatabase,
+  db: SqlDb,
   rows: unknown[],
 ): Promise<void> {
   for (const r of rows as LegacyRecord[]) {
@@ -118,7 +120,7 @@ async function migrateBookmarks(
 }
 
 async function migrateStarred(
-  db: import("expo-sqlite").SQLiteDatabase,
+  db: SqlDb,
   rows: unknown[],
 ): Promise<void> {
   for (const r of rows as LegacyRecord[]) {
