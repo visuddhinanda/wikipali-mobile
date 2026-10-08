@@ -27,10 +27,10 @@ info "环境检查"
 DEVICE=$(adb devices | awk 'NR==2{print $1}')
 if [ -n "$DEVICE" ]; then pass "adb 设备在线：$DEVICE"; else fail "adb 无设备"; fi
 
-TOKEN=$(curl -s -m 5 -X POST "$SERVER/api/v2/sign-in" \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"$USER_ACCOUNT\",\"password\":\"$USER_PASSWORD\"}" \
-  | python3 -c "import sys,json;print(json.load(sys.stdin).get('data',''))" 2>/dev/null)
+TOKEN=$(curl -s -m 5 -X POST "$SERVER/api/v3/sessions" \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d "{\"login\":\"$USER_ACCOUNT\",\"password\":\"$USER_PASSWORD\"}" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin).get('data',{}).get('token',''))" 2>/dev/null)
 if [ -n "$TOKEN" ]; then pass "服务器登录成功，token 长度 ${#TOKEN}"; else fail "服务器登录失败（$SERVER）"; fi
 
 if [ -x "$SQLITE" ] || command -v sqlite3 >/dev/null 2>&1; then
@@ -63,8 +63,8 @@ DIRS=$(adb shell run-as com.iapt.mobile ls "$APP_DB_ROOT/users/" 2>/dev/null | t
 GUEST_UUID=$(echo "$DIRS" | grep -vE '^$' | head -1)
 echo "$DIRS" | grep -qE '^[0-9a-f-]{36}$' && pass "users/ 下有 uuid 子目录：$(echo "$DIRS" | tr '\n' ' ')" || fail "users/ 目录异常"
 
-# 用户 uuid = /auth/current 的 id（= user_uid）
-USER_UUID=$(curl -s -m 8 "$SERVER/api/v2/auth/current" -H "Authorization: Bearer $TOKEN" \
+# 用户 uuid = /v3/me 的 id（= user_uid）
+USER_UUID=$(curl -s -m 8 "$SERVER/api/v3/me" -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])" 2>/dev/null)
 
 # ── guest 库 ──

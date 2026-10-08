@@ -25,18 +25,18 @@ py() { python3 -c "import sys,json;d=json.load(sys.stdin);print($1)" 2>/dev/null
 
 info "目标 $SERVER（book=$BOOK para=$PARA channel=${CHANNEL:0:8}…）"
 
-# 1. 登录
-TOKEN=$(curl -s -m 8 -X POST "$SERVER/api/v2/sign-in" \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"$USER_ACCOUNT\",\"password\":\"$USER_PASSWORD\"}" \
-  | py "d.get('data','') if d.get('ok') else ''")
-[ -n "$TOKEN" ] && pass "sign-in（token 长度 ${#TOKEN}）" || fail "sign-in"
+# 1. 登录（v3：一次返回 token 与用户；失败是 422 / 429，不再有 ok 字段）
+TOKEN=$(curl -s -m 8 -X POST "$SERVER/api/v3/sessions" \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d "{\"login\":\"$USER_ACCOUNT\",\"password\":\"$USER_PASSWORD\"}" \
+  | py "d.get('data',{}).get('token','')")
+[ -n "$TOKEN" ] && pass "sessions（token 长度 ${#TOKEN}）" || fail "sessions"
 AUTH="Authorization: Bearer $TOKEN"
 
 # 2. 当前用户
-USER_UID=$(curl -s -m 8 "$SERVER/api/v2/auth/current" -H "$AUTH" \
-  | py "d.get('data',{}).get('id','') if d.get('ok') else ''")
-[ -n "$USER_UID" ] && pass "auth/current（id=$USER_UID）" || fail "auth/current"
+USER_UID=$(curl -s -m 8 "$SERVER/api/v3/me" -H "$AUTH" -H "Accept: application/json" \
+  | py "d.get('data',{}).get('id','')")
+[ -n "$USER_UID" ] && pass "me（id=$USER_UID）" || fail "me"
 
 # 3. progress?view=ids —— 正向解析 (book,para,channel) → progress_chapter uid
 PC_UID=$(curl -s -m 8 "$SERVER/api/v2/progress?view=ids&book=$BOOK&par=$PARA&channel=$CHANNEL" \
