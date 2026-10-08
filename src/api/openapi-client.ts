@@ -23,6 +23,23 @@ const authMiddleware: Middleware = {
   },
 };
 
+/**
+ * openapi-fetch 把请求封成 `Request` 对象再 `fetch(request)`；而 CopilotKit 装的
+ * streaming fetch polyfill 只从 `request.body` 取请求体 —— RN 的 `Request` 没有
+ * 这个属性（体存在内部 `_bodyInit`），于是所有 POST 都以空体发出（登录、收藏、
+ * 阅读记录同步全挂）。这里拆回 `fetch(url, init)` 的形式，请求体用 `text()` 读出。
+ */
+async function requestFetch(request: Request): Promise<Response> {
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const body = hasBody ? await request.text() : "";
+  return globalThis.fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: body || undefined,
+    signal: request.signal,
+  });
+}
+
 type ApiClient = ReturnType<typeof createClient<paths>>;
 
 /** 按 base 缓存的客户端实例，避免每次调用都重建。 */
@@ -36,7 +53,7 @@ export async function getApiClient(): Promise<ApiClient> {
   const baseUrl = await resolveApiRoot();
   let client = cache.get(baseUrl);
   if (!client) {
-    client = createClient<paths>({ baseUrl });
+    client = createClient<paths>({ baseUrl, fetch: requestFetch });
     client.use(authMiddleware);
     cache.set(baseUrl, client);
   }
