@@ -2,7 +2,8 @@
  * 全局登录状态。
  *
  * 冷启动流程：读本地 token → 有则先用缓存的用户信息渲染（避免闪「未登录」）
- * → 后台向 `/auth/current` 校验；校验失败（token 过期 / 被吊销）即清会话。
+ * → 后台向 `/auth/current` 校验：只有服务端明确拒绝（token 过期 / 被吊销）才清会话；
+ * 断网 / 超时 / 服务故障保留会话，等回到前台时再校验（`isTokenRejected`）。
  *
  * 多用户：登录/登出会切换「用户作用域」（`src/user/userScope.ts`），
  * 使 `reading.db3` 指向该用户自己的子目录；登录后询问是否合并游客数据并触发同步。
@@ -18,8 +19,7 @@ import React, {
   useState,
 } from "react";
 import { Alert, AppState } from "react-native";
-import { fetchCurrentUser, signIn as apiSignIn } from "../api/auth";
-import { ApiError } from "../api/client";
+import { fetchCurrentUser, isTokenRejected, signIn as apiSignIn } from "../api/auth";
 import { setUserScope } from "../user/userScope";
 import { getDeviceUuid } from "../user/deviceUuid";
 import { migrateLegacyAsyncStorage } from "../data/migrate";
@@ -88,48 +88,65 @@ async function afterSignIn(userId: string): Promise<void> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [restoring, setRestoring] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setTokenState] = useState<string | null>(null);
+  /** 当前会话 token 的同步副本：异步校验回来时据此判断会话是否已被换掉（登出/换号）。 */
+  const tokenRef = useRef<string | null>(null);
+  const setToken = useCallback((next: string | null) => {
+    tokenRef.current = next;
+    setTokenState(next);
+  }, []);
   const [user, setUser] = useState<AuthUser | null>(null);
+  /** 有 token 但还没跟服务端确认过（冷启动校验时连不上），回到前台时再校验。 */
+  const unverifiedToken = useRef<string | null>(null);
+  const alive = useRef(true);
+
+  /** 向服务端确认会话：成功刷新用户，明确被拒则登出，连不上则保留会话稍后重试。 */
+  const verifySession = useCallback(async (saved: string) => {
+    // 校验期间用户登出或换了号：结果作废，别把旧会话写回来。
+    const stale = () => !alive.current || tokenRef.current !== saved;
+    try {
+      const fresh = await fetchCurrentUser(saved);
+      if (stale()) return;
+      unverifiedToken.current = null;
+      setUser(fresh);
+      await saveUser(fresh);
+      void syncNow();
+    } catch (err) {
+      if (stale()) return;
+      if (!isTokenRejected(err)) {
+        unverifiedToken.current = saved;
+        return;
+      }
+      unverifiedToken.current = null;
+      await clearSession();
+      setToken(null);
+      setUser(null);
+    }
+  }, [setToken]);
 
   useEffect(() => {
-    let alive = true;
+    alive.current = true;
     // 一次性把旧的 AsyncStorage 行为数据搬进游客库（docs/multi-user-sync.md §9）。
     void migrateLegacyAsyncStorage().catch(() => {
       /* 迁移失败不阻断启动，下次再试 */
     });
     (async () => {
       const saved = await loadToken();
-      if (!alive) return;
+      if (!alive.current) return;
       if (!saved) {
         setRestoring(false);
         return;
       }
       setToken(saved);
       const cached = await loadUser();
-      if (alive && cached) setUser(cached);
+      if (alive.current && cached) setUser(cached);
       setRestoring(false);
-
-      try {
-        const fresh = await fetchCurrentUser(saved);
-        if (!alive) return;
-        setUser(fresh);
-        await saveUser(fresh);
-        void syncNow();
-      } catch (err) {
-        // 网络不可达时保留本地会话，只有服务端明确拒绝才登出。
-        if (err instanceof ApiError && err.status === undefined && !cached) {
-          return;
-        }
-        if (!alive) return;
-        await clearSession();
-        setToken(null);
-        setUser(null);
-      }
+      await verifySession(saved);
     })();
     return () => {
-      alive = false;
+      alive.current = false;
     };
-  }, []);
+  }, [setToken, verifySession]);
 
   // 用户状态 → 用户作用域：登录切到 <user.id>，登出回到 <guest>。
   useEffect(() => {
@@ -151,17 +168,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, [restoring]);
 
-  // 回到前台且已登录时，补推一次待同步项。
+  // 回到前台：冷启动没校验成的会话再校验一次；已登录则补推一次待同步项。
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active" && user?.id) void syncNow();
+      if (state !== "active") return;
+      if (unverifiedToken.current) void verifySession(unverifiedToken.current);
+      else if (user?.id) void syncNow();
     });
     return () => sub.remove();
-  }, [user]);
+  }, [user, verifySession]);
 
   const signIn = useCallback(async (username: string, password: string) => {
     const fresh = await apiSignIn(username, password);
     await saveToken(fresh);
+    unverifiedToken.current = null;
     setToken(fresh);
     const me = await fetchCurrentUser(fresh);
     await saveUser(me);
@@ -170,16 +190,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(me);
     setUserScope({ kind: "user", id: me.id });
     void afterSignIn(me.id);
-  }, []);
+  }, [setToken]);
 
   const signOut = useCallback(async () => {
+    unverifiedToken.current = null;
     await clearSession();
     // 先暂停该账号仍在跑/排队的下载（此刻作用域仍为该用户），再切回游客。
     await pauseAllDownloads();
     setToken(null);
     setUser(null);
     void getDeviceUuid().then((id) => setUserScope({ kind: "guest", id }));
-  }, []);
+  }, [setToken]);
 
   const value = useMemo<AuthState>(
     () => ({ restoring, token, user, signIn, signOut }),

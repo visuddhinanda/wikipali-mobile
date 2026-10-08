@@ -71,9 +71,10 @@ SQLite/
 
 ```
 冷启动
-  ├─ 有 token → 校验 /auth/current
-  │     ├─ 成功 → 当前目录 = <user.id>/          （该用户自己的库）
-  │     └─ 失败 → 清会话 → 当前目录 = <guest-uuid>/
+  ├─ 有 token → 先按缓存用户进 <user.id>/，后台校验 /auth/current（10 秒超时）
+  │     ├─ 成功 → 刷新用户信息，留在 <user.id>/          （该用户自己的库）
+  │     ├─ 明确被拒（401/403，或 200 + ok:false）→ 清会话 → 当前目录 = <guest-uuid>/
+  │     └─ 断网 / 超时 / 5xx / 其它 → 保留会话（离线优先），App 回到前台时再校验
   └─ 无 token → 当前目录 = <guest-uuid>/
 
 登录成功

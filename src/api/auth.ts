@@ -30,22 +30,53 @@ export async function signIn(
   return data.data;
 }
 
+/** 校验会话的超时：弱网下别一直挂着，超时按「网络不可达」处理。 */
+const CURRENT_USER_TIMEOUT_MS = 10_000;
+
 /**
  * 读取当前登录用户。
  * `token` 省略时用已保存的会话 token（用于冷启动校验）。
+ *
+ * 失败时：服务端有响应的抛带 `status` 的 `ApiError`（`ok:false` 也带上 HTTP 状态码），
+ * 断网 / 超时抛的是 fetch 自己的错误 —— 用 `isTokenRejected()` 区分两者。
  */
 export async function fetchCurrentUser(token?: string): Promise<AuthUser> {
   const client = await getApiClient();
   const bearer = token ?? getTokenSync();
-  const { data, error, response } = await client.GET("/v2/auth/current", {
-    headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CURRENT_USER_TIMEOUT_MS);
+  let result;
+  try {
+    result = await client.GET("/v2/auth/current", {
+      headers: bearer ? { Authorization: `Bearer ${bearer}` } : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  const { data, error, response } = result;
   if (error) throw new ApiError(t("signIn.expired"), response.status);
   if (!data?.ok || !data.data) {
-    throw new ApiError(data?.message || t("signIn.expired"));
+    throw new ApiError(data?.message || t("signIn.expired"), response.status);
   }
   const user = data.data as AuthUser;
   // 后端 avatar 是相对路径（`/storage/...`），RN 的 <Image> 解析不了相对地址，
   // 这里按当前 API 服务器补成绝对 URL 再交给 UI（见 config.ts `resolveAssetUrl`）。
   return { ...user, avatar: await resolveAssetUrl(user.avatar) };
+}
+
+/**
+ * 服务端是否**明确拒绝**了这个 token（该登出），而不是网络 / 服务故障（该保留会话）。
+ *
+ * 只认 401 / 403，以及 2xx 但 `ok:false`（后端对无效 token 返回 401，见
+ * `AuthController::getUserInfoByToken`）。断网、超时（非 ApiError）、5xx、404
+ * （如调试地址填错）都不算 —— 离线优先，不能因为一次连不上就把用户踢下线。
+ */
+export function isTokenRejected(err: unknown): boolean {
+  if (!(err instanceof ApiError) || err.status === undefined) return false;
+  return (
+    err.status === 401 ||
+    err.status === 403 ||
+    (err.status >= 200 && err.status < 300)
+  );
 }
