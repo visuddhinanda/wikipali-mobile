@@ -164,6 +164,8 @@ cd /home/deploy/workspace/wikipali-mobile
 - [x] 修复 streamdown/worklets 崩溃 ✅（2.5 节的 patch-package 补丁已在真机验证生效）
 - [ ] git 提交：`wikipali-mobile` 有大量未跟踪文件（源码全是 `??`），且新增了 `patches/`、`package.json`（postinstall + patch-package），务必一起 commit
 - [ ] 可选：app 显示名还是 `mobile`，如需可改 `app.json` 的 `name`/`slug`
+- [ ] 正式签名：生成 release keystore（仓库外保存、备份）+ config plugin 在 prebuild 时写入 `signingConfigs.release`；首次公开发布前必须完成（详见 `docs/development.md` §5 Open items）
+- [ ] GitHub Actions 发布：推 `v*` tag → 构建签名 APK（arm64）→ 自动建 GitHub Release 并上传；依赖正式签名，且仓库需公开（详见 `docs/development.md` §5 Open items）
 
 ## 8. 沙箱权限提示（重要）
 

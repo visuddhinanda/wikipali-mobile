@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 22.2.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -15,7 +15,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_RUNTIME_URL": "https://agent.wikipali.cc/api/copilotkit"
       }

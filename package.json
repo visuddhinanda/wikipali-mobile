@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "main": "index.ts",
   "expo": {
     "autolinking": {
@@ -67,7 +67,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "version:bump": "node scripts/bump-version.mjs"
   },
   "private": true
 }

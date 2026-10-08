@@ -367,15 +367,37 @@ intent filters and config plugins all come from `app.json`; editing only
 
 #### Version number
 
-- `expo.version` in `app.json` → Android `versionName` (shown to users, e.g. `0.1.0`).
-- `expo.android.versionCode` in `app.json` → Android `versionCode` (integer; must
-  increase for every build installed as an upgrade or uploaded to Play). Not set
-  today, so local builds use `1`.
-- Bump them in `app.json`, then `npx expo prebuild -p android`.
-- Current values: name `Wikipali`, version `0.1.0`, versionCode `1`.
-- EAS builds ignore the local `versionCode`: `eas.json` has
-  `"appVersionSource": "remote"` and `production.autoIncrement: true`, so EAS
-  keeps and increments it on its servers.
+There is **one** version to maintain: `expo.version` in `app.json` (semantic
+version `major.minor.patch`). Everything else is derived from it:
+
+| Field | Comes from | Example (`0.2.3`) |
+|---|---|---|
+| Android `versionName` (shown to users, About page) | `expo.version` | `0.2.3` |
+| Android `versionCode` (must grow for every upgrade) | `app.config.ts`: `major × 10000 + minor × 100 + patch` | `203` |
+| iOS `buildNumber` | same number as a string | `"203"` |
+| `package.json` `version` | kept in sync by the bump script | `0.2.3` |
+
+Raising the version therefore always raises `versionCode`; the cost is that
+`minor` and `patch` must stay ≤ 99 (the build fails otherwise).
+
+To release a new version:
+
+```bash
+npm run version:bump -- patch        # 0.1.0 → 0.1.1   (or minor / major / an explicit 0.3.0)
+npx expo prebuild -p android         # writes versionCode/versionName into android/
+cd android && ./gradlew assembleRelease
+```
+
+- `scripts/bump-version.mjs` edits `app.json` + `package.json` only — it does not
+  commit or tag; refuses a version that isn't higher than the current one.
+- `node scripts/check-version.mjs` checks that the two files agree and that the
+  config Expo actually resolves (`npx expo config`) carries the expected
+  `versionCode`.
+- EAS builds use the same numbers: `eas.json` has `"appVersionSource": "local"`
+  (no `autoIncrement`), so EAS reads the version from `app.config.ts` instead of
+  keeping its own counter.
+- Current: `0.1.0` → versionCode `100` (builds before this scheme were `1`, so
+  they upgrade cleanly).
 
 #### Signing
 
@@ -466,7 +488,18 @@ host adb server (§4). The current manual checklist is `docs/testing.md`.
 
 #### Open items
 
-- Release signing still uses the debug keystore — see *Signing* above.
+- [ ] **Release signing** — still the debug keystore (see *Signing* above). Must be
+      done **before the first public release**: the key can never change afterwards
+      without breaking upgrades. Steps: generate an upload keystore (kept outside
+      the repo, backed up); add a config plugin that writes
+      `signingConfigs.release` on every prebuild, reading
+      `WIKIPALI_UPLOAD_*` from env / `~/.gradle/gradle.properties`.
+- [ ] **GitHub Releases via GitHub Actions** — on a pushed tag `v*`:
+      `npm ci` → `expo prebuild` → restore the keystore from repository secrets →
+      `./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a` → create the
+      GitHub Release and attach the APK, with commit messages since the previous
+      tag as release notes. Depends on release signing. Prerequisite: the
+      repository must be public for anyone to download the APK.
 - (Resolved) The release bundle used to inline the dev machine's
   `EXPO_PUBLIC_RUNTIME_URL`; addresses now come from Me → Settings → Debug (§3).
 
