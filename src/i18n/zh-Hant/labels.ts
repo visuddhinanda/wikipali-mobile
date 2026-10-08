@@ -131,6 +131,7 @@ const labels = {
   "script.traditional": "傳統",
   "settings.about": "關於 / 意見回饋",
   "settings.apiServer": "API 伺服器",
+  "settings.debug": "除錯",
   "settings.display": "顯示設定（字級 / 主題）",
   "settings.downloads": "下載管理",
   "settings.language": "語言偏好",

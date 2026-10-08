@@ -131,6 +131,7 @@ const labels = {
   "script.traditional": "traditional",
   "settings.about": "About / Feedback",
   "settings.apiServer": "API server",
+  "settings.debug": "Debug",
   "settings.display": "Display (text size / theme)",
   "settings.downloads": "Downloads",
   "settings.language": "Language",

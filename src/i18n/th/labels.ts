@@ -131,6 +131,7 @@ const labels = {
   "script.traditional": "ดั้งเดิม",
   "settings.about": "เกี่ยวกับ / แจ้งปัญหา",
   "settings.apiServer": "เซิร์ฟเวอร์ API",
+  "settings.debug": "ดีบัก",
   "settings.display": "การแสดงผล (ขนาดตัวอักษร / ธีม)",
   "settings.downloads": "การดาวน์โหลด",
   "settings.language": "ภาษา",

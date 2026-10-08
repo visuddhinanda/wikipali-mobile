@@ -131,6 +131,7 @@ const labels = {
   "script.traditional": "ရိုးရာ",
   "settings.about": "အကြောင်း / အကြံပြုရန်",
   "settings.apiServer": "API ဆာဗာ",
+  "settings.debug": "Debug",
   "settings.display": "ပြသမှု (စာလုံးအရွယ် / အပြင်အဆင်)",
   "settings.downloads": "ဒေါင်းလုဒ် စီမံခန့်ခွဲမှု",
   "settings.language": "ဘာသာစကား",
