@@ -2,15 +2,17 @@
  * 后端地址解析。
  *
  * 优先级：
- *   1. `.env` 的 `EXPO_PUBLIC_API_URL`（开发/测试临时覆盖，真机不设）
+ *   1. 「我 → 设置 → 调试」打开时手填的 API 地址（`src/settings/debug.ts`）
  *   2. 「我 → 设置 → API 服务器」里选择的服务器（默认 next.wikipali.org）
+ *
+ * `.env` 的 `EXPO_PUBLIC_API_URL` 不再直接生效，只作调试项的初始值。
  */
 import { getApiServer, serverToBaseUrl } from "../settings/server";
-
-const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim() ?? "";
+import { debugApiUrl, loadDebugConfig } from "../settings/debug";
 
 export async function resolveBaseUrl(): Promise<string> {
-  if (envUrl) return envUrl.replace(/\/+$/, "");
+  const debugUrl = debugApiUrl(await loadDebugConfig());
+  if (debugUrl) return debugUrl;
   const server = await getApiServer();
   return serverToBaseUrl(server);
 }
@@ -47,5 +49,3 @@ export async function resolveAssetUrl(
   const origin = base.replace(/\/api\/v\d+\/?$/, "").replace(/\/+$/, "");
   return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
 }
-
-export const ENV_API_URL = envUrl;

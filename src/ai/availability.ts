@@ -7,11 +7,7 @@
  */
 import { Alert } from "react-native";
 import type { MessageKey } from "../i18n";
-
-const RUNTIME_URL = (
-  process.env.EXPO_PUBLIC_RUNTIME_URL ||
-  "https://agent.wikipali.cc/api/copilotkit"
-).replace(/\/+$/, "");
+import { effectiveRuntimeUrl, loadDebugConfig } from "../settings/debug";
 
 const PROBE_TIMEOUT_MS = 3000;
 /** 通了就先信一分钟，省得每次点击都探。 */
@@ -29,13 +25,19 @@ async function probe(): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(`${RUNTIME_URL}/info`, { signal: controller.signal });
+    const runtimeUrl = effectiveRuntimeUrl(await loadDebugConfig());
+    const res = await fetch(`${runtimeUrl}/info`, { signal: controller.signal });
     return res.ok;
   } catch {
     return false;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** 调试设置改了 Runtime 地址后要丢掉旧地址的探测结果。 */
+export function resetAiRuntimeProbe(): void {
+  cache = null;
 }
 
 /** Runtime 是否可达（带 TTL 缓存）。 */

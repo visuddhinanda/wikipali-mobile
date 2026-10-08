@@ -1,7 +1,7 @@
 /**
  * API 服务器选择页（「我 → 设置 → API 服务器」下钻）。
  *
- * `.env` 的 `EXPO_PUBLIC_API_URL` 一旦设置就会盖过这里的选择
+ * 「设置 → 调试」打开且填了 API 地址时会盖过这里的选择
  * （见 `src/api/config.ts`），所以此时把列表置灰并明确说明，
  * 避免用户以为选了没生效是 bug。
  */
@@ -15,14 +15,15 @@ import {
   getApiServer,
   setApiServer,
 } from "../settings/server";
-import { ENV_API_URL } from "../api/config";
+import { debugApiUrl, useDebugConfig } from "../settings/debug";
 import { colors, radius, spacing, type } from "../theme";
 import { useT } from "../i18n/I18nContext";
 
 export function ApiServerSettingsScreen() {
   const t = useT();
   const [server, setServer] = useState<string>(DEFAULT_SERVER);
-  const overridden = !!ENV_API_URL;
+  const overrideUrl = debugApiUrl(useDebugConfig());
+  const overridden = !!overrideUrl;
 
   useEffect(() => {
     getApiServer().then(setServer);
@@ -39,7 +40,7 @@ export function ApiServerSettingsScreen() {
 
       {overridden ? (
         <Text style={styles.overrideNote}>
-          {t("settings.envOverride", { url: ENV_API_URL })}
+          {t("settings.debugOverride", { url: overrideUrl })}
         </Text>
       ) : null}
 

@@ -6,12 +6,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/auth/AuthContext';
 import { I18nProvider } from './src/i18n/I18nContext';
 import { useUposathaNotifications } from './src/calendar/useUposathaNotifications';
-
-// Runtime 地址：EXPO_PUBLIC_* 会在 `npx expo start` 时从 .env 内联进 bundle。
-// 未设置时回退到线上 CopilotKit Runtime（本地联调 runtime 可在 .env 里覆盖成局域网地址）。
-const runtimeUrl =
-  process.env.EXPO_PUBLIC_RUNTIME_URL ||
-  'https://agent.wikipali.cc/api/copilotkit';
+import { effectiveRuntimeUrl, useDebugConfig } from './src/settings/debug';
 
 /**
  * 布萨日通知的重排要在 I18nProvider **之内**（要拿 t 与 locale 写通知文案），
@@ -23,6 +18,8 @@ function UposathaNotifications() {
 }
 
 export default function App() {
+  // Runtime 地址：默认线上；「我 → 设置 → 调试」打开时用手填的地址（src/settings/debug.ts）。
+  const runtimeUrl = effectiveRuntimeUrl(useDebugConfig());
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
