@@ -125,6 +125,42 @@ Runs the same development build APK in an Android container on a Linux desktop �
 no phone, no AVD. `10.0.2.2` does **not** work here; use the host's LAN IP.
 Full command list: [6. Waydroid](#6-waydroid-android-on-a-linux-desktop).
 
+### Physical Android device from a container (host adb server)
+
+When development happens in a container (or VM) that has **no USB passthrough** —
+`/dev/bus/usb` missing, `lsusb` prints nothing — the phone is invisible even with
+the cable plugged in, and wireless debugging may not work either (a phone hotspot
+with client isolation blocks even ARP). Run the adb **server** on the host the
+phone is plugged into and point the container's adb client at it:
+
+```bash
+# host (the machine with the USB cable)
+adb kill-server
+adb -a -P 5037 nodaemon server
+
+# container
+export ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
+adb devices -l          # the phone shows up
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+adb logcat -v brief
+```
+
+Notes for driving the phone from scripts:
+
+- **Xiaomi / Redmi** also need **"USB debugging (Security settings)"** enabled in
+  developer options; otherwise `adb shell input tap/swipe` fails with
+  `SecurityException: Injecting input events requires ... INJECT_EVENTS`.
+- **Coordinates**: `adb shell wm size` gives the screen size (override size if
+  set); the `bounds` in `adb shell uiautomator dump` use the same coordinates and
+  can be fed straight into `input tap`. Keep taps on the bottom tab bar above the
+  gesture-navigation strip (on a 1080×2400 phone: y ≈ 2300, lower gets eaten).
+- **Injected taps don't reach everything**: on the reader page, controls over the
+  WebView body (e.g. the "ask about this paragraph" button) never responded to
+  `adb shell input tap` but work when tapped by hand. Don't trust injected-tap
+  results for controls inside the reader body — confirm manually.
+- **System font scaling** enlarges both WebView and RN text (the test phone used
+  1.45×). Check it first when investigating "text too large".
+
 ### Web
 
 `npm run web` exists but is **not a supported target** — the reader relies on
@@ -275,23 +311,164 @@ one-time install.
 | Native config in `app.json` (permissions, package id, icons, plugins) | **Yes** |
 | Upgrade `expo-dev-client` or the Expo SDK major | **Yes** |
 
-### Local release build (`assembleRelease`)
+### Release builds
 
-The release APK is built locally with Gradle (not EAS — see `STATUS.md` §12):
+A release build bundles the JS into the APK — it runs without Metro. There are two
+ways to make one:
+
+| Path | Output | Use for |
+|---|---|---|
+| Local Gradle (`assembleRelease`) | `.apk` | Self-test / internal testing (the current routine) |
+| EAS `preview` profile | `.apk` | Internal testing built in the cloud (Expo account needed) |
+| EAS `production` profile | `.aab` | Google Play submission |
+
+#### Local release APK (`assembleRelease`)
 
 ```bash
+npx expo prebuild -p android    # only if android/ is missing or app.json changed (see below)
 cd android && ./gradlew assembleRelease
 # → android/app/build/outputs/apk/release/app-release.apk
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-**No need to comment out `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_RUNTIME_URL`
-before building release.** They only pre-fill the debug fields (§3); a release
-build starts with **Debug off** and uses the built-in addresses. The local IPs
-still end up inlined in the bundle as the fields' initial values — harmless, and
-the reason the old "grep the bundle for `192.168.`" check no longer applies.
+- **Toolchain**: JDK 17 + Android SDK (no EAS, no Expo account needed).
+- **Time**: a full first build takes ~16 min; after JS-only changes ~30 s–8 min.
+- **No need to comment out `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_RUNTIME_URL`.**
+  They only pre-fill the debug fields (§3); a release build starts with
+  **Debug off** and uses the built-in addresses. The local IPs still end up
+  inlined in the bundle as the fields' initial values — harmless. To point a
+  release APK at a local server, turn on **Me → Settings → Debug** on the phone
+  and type the address.
+- **Size**: the APK contains all four ABIs (`reactNativeArchitectures` in
+  `android/gradle.properties`; 157 MB in Sept 2026, ~195 MB now). For a phone-only
+  test build, limit it to 64-bit ARM, or enable ABI splits (~60–70 MB per APK):
+  ```bash
+  ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+  ```
+- **Installing over the dev client**: release and development builds share the
+  package id `com.iapt.mobile` and (today) the same keystore, so installing one
+  replaces the other. Re-install the dev client (`./gradlew assembleDebug`) to go
+  back to Metro development.
 
-To point a release APK at a local server, turn on **Me → Settings → Debug** on
-the phone and type the address.
+#### `android/` is generated — re-run prebuild after `app.json` changes
+
+`android/` is git-ignored and generated from `app.json` by
+`npx expo prebuild -p android`. App name, icons, version, package id, permissions,
+intent filters and config plugins all come from `app.json`; editing only
+`app.json` (or only the files under `assets/`) and re-running `assembleRelease`
+**keeps the old values** in the APK. (This happened once: only the icon files in
+`assets/` were replaced, and the installed app still showed the default name
+`mobile` with the Expo default icon.)
+
+> Changed `app.json` (name / version / icon / plugins)? → `npx expo prebuild -p android`
+> first, then `assembleRelease`. Use `--clean` only when you want `android/`
+> regenerated from scratch — it discards any hand edits in `android/` (such as a
+> release signing config, below).
+
+#### Version number
+
+- `expo.version` in `app.json` → Android `versionName` (shown to users, e.g. `0.1.0`).
+- `expo.android.versionCode` in `app.json` → Android `versionCode` (integer; must
+  increase for every build installed as an upgrade or uploaded to Play). Not set
+  today, so local builds use `1`.
+- Bump them in `app.json`, then `npx expo prebuild -p android`.
+- Current values: name `Wikipali`, version `0.1.0`, versionCode `1`.
+- EAS builds ignore the local `versionCode`: `eas.json` has
+  `"appVersionSource": "remote"` and `production.autoIncrement: true`, so EAS
+  keeps and increments it on its servers.
+
+#### Signing
+
+⚠️ The local release build is currently signed with the template's **debug
+keystore** (`android/app/debug.keystore`, `signingConfigs.release` → `debug`).
+That is fine for self-testing, **not** for distribution: Google Play rejects it,
+and anyone can sign an "update" with the same public debug key.
+
+Before distributing outside the team:
+
+1. Generate an upload keystore once and keep it **outside the repo** (back it up —
+   losing it means you can no longer update the app):
+   ```bash
+   keytool -genkeypair -v -storetype PKCS12 -keystore wikipali-upload.keystore \
+     -alias wikipali -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Put the credentials in `~/.gradle/gradle.properties` (never commit them):
+   ```properties
+   WIKIPALI_UPLOAD_STORE_FILE=/absolute/path/to/wikipali-upload.keystore
+   WIKIPALI_UPLOAD_KEY_ALIAS=wikipali
+   WIKIPALI_UPLOAD_STORE_PASSWORD=...
+   WIKIPALI_UPLOAD_KEY_PASSWORD=...
+   ```
+3. In `android/app/build.gradle`, add a `release` entry under `signingConfigs`
+   reading those properties and point `buildTypes.release.signingConfig` at it.
+   Because `android/` is generated, this edit is lost on `prebuild --clean` — keep
+   it in a config plugin, or sign through EAS instead (next section), which
+   stores the keystore for you.
+
+Changing the signing key changes the app's identity: Android refuses to install
+the new APK over one signed with the old key (uninstall first), and
+`ANDROID_ID` — used for the guest uuid — changes too (see
+`docs/multi-user-sync.md` §3).
+
+#### EAS release builds (cloud)
+
+Needs an Expo account (`eas login`, see "Do I need an Expo account?" above).
+Both profiles set `EXPO_PUBLIC_RUNTIME_URL` to the production runtime in
+`eas.json`, and EAS does not read `.env`.
+
+```bash
+eas build -p android --profile preview      # installable .apk for testers (internal distribution)
+eas build -p android --profile production   # .aab for Google Play
+eas submit -p android --profile production  # upload the latest production build to Play
+```
+
+On the first run EAS offers to generate and store an Android keystore; reuse
+that same keystore for every later build. Add `--local` to run the same build on
+this machine instead of EAS servers (the keystore still comes from EAS).
+
+#### Release-only pitfalls
+
+Bugs that only showed up in a release build on a real device (2026-09-07), kept
+here because they explain code that looks over-defensive:
+
+| Symptom | Root cause | Fix / current state |
+|---|---|---|
+| Reader: `no such table: pali_text` | Copying the 46 MB `tipitaka.db3` out of the APK into `SQLite/` failed and left an empty file; `ensureTipitakaFile()` only checked "file exists", and SQLite happily opens an empty file as an empty database | After copying, compare source/target byte counts; after opening, check `sqlite_master` and re-copy once if the table is missing (`bc48172`, `src/reading/db.ts`) |
+| Turning chapters: `cannot rollback - no transaction is active` | `withTransactionAsync` is a bare `BEGIN`/`COMMIT` on one shared connection; three layers prefetching at once nested a second `BEGIN` | First serialised with a promise chain (`e49b7d5`); now superseded by the connection lock in `src/reading/db.ts` (see `docs/user-data-db.md` §8) |
+| "Explore" opened a chat page that always failed | The CopilotKit runtime wasn't online and the bundle had the dev machine's LAN address inlined | `src/ai/availability.ts` probes `{runtimeUrl}/info` and blocks the three AI entry points with a dialog when unreachable (`26817aa`). The address now comes from Me → Settings → Debug or the production fallback (§3) |
+| Whole-book download stuck after some batch; "continue" did nothing until the app was killed | The 12 s `AbortController` in `src/api/client.ts` only covered `fetch()`; `clearTimeout` ran in `finally`, so when the server stalled after sending headers, `await res.text()` hung forever and the loop never got back to its cancel check | Moved `res.ok` and `res.text()` inside the timed `try` (`e00ee75`). ⚠️ The later migration to openapi-fetch (`3805e63`) removed that timeout altogether — content requests currently have **no timeout** again (only `/auth/current` has one) |
+
+#### Real-device regression baseline (2026-09-07)
+
+Release build on a Redmi 2304FPN6DC (Android 16, 1080×2400), driven through the
+host adb server (§4). The current manual checklist is `docs/testing.md`.
+
+- **Passed**: cold start; all five tabs; four-level Tipiṭaka tree; bookshelf
+  tabs and empty states; channel list (43 channels); reader rendering;
+  previous/next chapter; TOC drawer jumps; channel switching (Claude ↔ deepseek);
+  layer switching (mūla / aṭṭhakathā / ṭīkā); four font sizes; dark/light theme;
+  whole-book download 1507/1507; pause/continue; offline reading and chapter
+  turning in airplane mode; language switch (简中 ↔ English); API server list;
+  About page; sign-in error handling; AI entry points blocked when unavailable.
+- **Placeholders at the time (not bugs)**: category search box; the three Tools
+  entries (dictionary / Buddhist calendar / script converter); Settings "Display"
+  and "Downloads".
+- **Fixed the same day**: paragraph numbers absolutely positioned (no longer
+  overlap ordered-list numbers); long titles wrap; unified sign-in error text
+  (instead of the server's raw `invalid token`); About page name taken from
+  `app.json` (was still "法音"); AI dialog no longer stacks on repeated taps;
+  reader font steps 15/18/21/24 → 11/13/16/19.
+- **Correction**: "offline only shows the mūla layer" was not a network issue —
+  opening a commentary book (e.g. sumaṅgalavilāsinī) directly starts the
+  companion chain at that book, so there is no layer above it; online behaves the
+  same. Whether a commentary may link down to its sub-commentary from there is a
+  design decision.
+
+#### Open items
+
+- Release signing still uses the debug keystore — see *Signing* above.
+- (Resolved) The release bundle used to inline the dev machine's
+  `EXPO_PUBLIC_RUNTIME_URL`; addresses now come from Me → Settings → Debug (§3).
 
 ## 6. Waydroid (Android on a Linux desktop)
 

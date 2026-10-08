@@ -5,7 +5,7 @@
 
 ## 0. 环境与驱动方式
 
-容器没有 USB 透传，经宿主机的 adb server 驱动（详见 `STATUS.md` §12.3）：
+容器没有 USB 透传，经宿主机的 adb server 驱动（详见 `docs/development.md` §4「Physical Android device from a container」）：
 
 ```bash
 export ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
