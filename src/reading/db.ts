@@ -39,9 +39,8 @@ let readingDb: SQLite.SQLiteDatabase | null = null;
 let readingScopeId: string | null = null;
 
 // 切用户：清空缓存 promise，下次 open 时指向新库。
-// 不主动 closeAsync：`old.then(db => close)` 会在「刚打开还没用完」时把连接关掉，
-// 导致使用旧连接的代码 `prepareAsync` 抛 NullPointerException。旧连接交给
-// expo-sqlite 的 SharedRef 随 JS 对象 GC 自动关闭。
+// 不 closeAsync 旧库：句柄由 `readingHandles` 按用户目录常驻复用，切回来时直接拿回同一个
+// （关掉或重开都会让仍在用旧句柄的代码抛 NullPointerException）。
 onScopeChange(() => {
   readingPromise = null;
   readingScopeId = null;
@@ -188,21 +187,42 @@ async function migrateLegacyReadingDb(scopeId: string): Promise<void> {
 }
 
 /**
- * 打开指定用户（目录 id）的读写库并初始化 schema。
- * 供「当前用户」与「guest 数据合并」两类场景复用。
+ * 每个用户目录只开**一个** JS 连接句柄，进程内复用、永不关闭（也起强引用防 GC 的作用）。
+ *
+ * 同一路径再 `openDatabaseAsync` 一次，原生层会复用同一个 `NativeDatabase`（引用计数），
+ * 但 JS 侧会多出一个 SharedObject 指向它；之后任何一个句柄 `closeAsync` / 被 GC，
+ * 另一个句柄的原生引用就失效，下一次调用抛
+ * `NativeDatabase.execAsync has been rejected → NullPointerException`
+ * （登录时 guestHasData / 合并游客数据 打开又关闭游客库，正好把当前库打掉）。
  */
-export async function openReadingDbFor(
+const readingHandles = new Map<string, Promise<SQLite.SQLiteDatabase>>();
+
+/**
+ * 打开指定用户（目录 id）的读写库并初始化 schema。
+ * 供「当前用户」与「guest 数据合并」两类场景复用；返回的是共享句柄，**调用方不要 close**。
+ */
+export function openReadingDbFor(
   scopeId: string,
 ): Promise<SQLite.SQLiteDatabase> {
-  const dirUri = await readingDirUri(scopeId); // 先建目录，migrate 才能把 legacy 文件搬进来
-  await migrateLegacyReadingDb(scopeId);
-  const db = await SQLite.openDatabaseAsync(READING_DB, undefined, dirUri);
-  await db.execAsync(SCHEMA);
-  await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
-  await ensureColumn(db, "download_state", "server_id", "server_id TEXT");
-  await ensureColumn(db, "download_state", "cursor", "cursor TEXT");
-  await migrateParaHtmlNullable(db);
-  return db;
+  let handle = readingHandles.get(scopeId);
+  if (!handle) {
+    handle = (async () => {
+      const dirUri = await readingDirUri(scopeId); // 先建目录，migrate 才能把 legacy 文件搬进来
+      await migrateLegacyReadingDb(scopeId);
+      const db = await SQLite.openDatabaseAsync(READING_DB, undefined, dirUri);
+      await db.execAsync(SCHEMA);
+      await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
+      await ensureColumn(db, "download_state", "server_id", "server_id TEXT");
+      await ensureColumn(db, "download_state", "cursor", "cursor TEXT");
+      await migrateParaHtmlNullable(db);
+      return db;
+    })().catch((err) => {
+      readingHandles.delete(scopeId);
+      throw err;
+    });
+    readingHandles.set(scopeId, handle);
+  }
+  return handle;
 }
 
 /** 可写的当前用户读写库（`para_html` / `download_state` / 历史 / 收藏 / 书签 / 同步队列）。 */

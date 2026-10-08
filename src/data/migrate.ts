@@ -32,16 +32,13 @@ export function migrateLegacyAsyncStorage(): Promise<void> {
       try {
         if (await AsyncStorage.getItem(DONE_KEY)) return;
         const guestId = await getDeviceUuid();
+        // 共享句柄，不要 close（见 reading/db.ts `readingHandles`）。
         const db = await openReadingDbFor(guestId);
-        try {
-          await db.withTransactionAsync(async () => {
-            await migrateHistory(db, parseArray(await AsyncStorage.getItem(HISTORY_KEY)));
-            await migrateBookmarks(db, parseArray(await AsyncStorage.getItem(BOOKMARKS_KEY)));
-            await migrateStarred(db, parseArray(await AsyncStorage.getItem(STARRED_KEY)));
-          });
-        } finally {
-          await db.closeAsync();
-        }
+        await db.withTransactionAsync(async () => {
+          await migrateHistory(db, parseArray(await AsyncStorage.getItem(HISTORY_KEY)));
+          await migrateBookmarks(db, parseArray(await AsyncStorage.getItem(BOOKMARKS_KEY)));
+          await migrateStarred(db, parseArray(await AsyncStorage.getItem(STARRED_KEY)));
+        });
         await AsyncStorage.multiRemove([HISTORY_KEY, BOOKMARKS_KEY, STARRED_KEY]);
         await AsyncStorage.setItem(DONE_KEY, "1");
       } catch {

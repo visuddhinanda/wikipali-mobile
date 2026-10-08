@@ -459,129 +459,125 @@ export async function mergeGuestIntoUser(userId: string): Promise<number> {
   if (!guestId || guestId === userId) return 0;
 
   return withDbQueue(async () => {
+    // 共享句柄，不要 close（见 reading/db.ts `readingHandles`）。
     const guest = await openReadingDbFor(guestId);
     const user = await openReadingDbFor(userId);
     let count = 0;
-    try {
-      await user.withTransactionAsync(async () => {
-        // 阅读记录
-        const histories = await guest.getAllAsync<{
-          book: number;
-          paragraph: number;
-          title: string;
-          heading: string | null;
-          channel_id: string | null;
-          updated_at: number;
-        }>("SELECT book, paragraph, title, heading, channel_id, updated_at FROM reading_history");
-        for (const r of histories) {
-          const cur = await user.getFirstAsync<{ updated_at: number }>(
-            "SELECT updated_at FROM reading_history WHERE book = ?",
-            [r.book],
-          );
-          if (cur && cur.updated_at >= r.updated_at) continue;
-          await user.runAsync(
-            `INSERT OR REPLACE INTO reading_history
-               (book, paragraph, title, heading, channel_id, updated_at, server_id)
-             VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-            [r.book, r.paragraph, r.title, r.heading, r.channel_id, r.updated_at],
-          );
-          await outboxUpsert(
-            user,
-            localKey("reading", r.book),
-            "reading",
-            { book: r.book, paragraph: r.paragraph, title: r.title, heading: r.heading, channelId: r.channel_id, updatedAt: r.updated_at },
-            null,
-          );
-          count += 1;
-        }
+    await user.withTransactionAsync(async () => {
+      // 阅读记录
+      const histories = await guest.getAllAsync<{
+        book: number;
+        paragraph: number;
+        title: string;
+        heading: string | null;
+        channel_id: string | null;
+        updated_at: number;
+      }>("SELECT book, paragraph, title, heading, channel_id, updated_at FROM reading_history");
+      for (const r of histories) {
+        const cur = await user.getFirstAsync<{ updated_at: number }>(
+          "SELECT updated_at FROM reading_history WHERE book = ?",
+          [r.book],
+        );
+        if (cur && cur.updated_at >= r.updated_at) continue;
+        await user.runAsync(
+          `INSERT OR REPLACE INTO reading_history
+             (book, paragraph, title, heading, channel_id, updated_at, server_id)
+           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          [r.book, r.paragraph, r.title, r.heading, r.channel_id, r.updated_at],
+        );
+        await outboxUpsert(
+          user,
+          localKey("reading", r.book),
+          "reading",
+          { book: r.book, paragraph: r.paragraph, title: r.title, heading: r.heading, channelId: r.channel_id, updatedAt: r.updated_at },
+          null,
+        );
+        count += 1;
+      }
 
-        // 书签
-        const marks = await guest.getAllAsync<{
-          book: number;
-          paragraph: number;
-          title: string;
-          heading: string | null;
-          channel_id: string | null;
-          updated_at: number;
-        }>("SELECT book, paragraph, title, heading, channel_id, updated_at FROM bookmarks");
-        for (const r of marks) {
-          const cur = await user.getFirstAsync<{ updated_at: number }>(
-            "SELECT updated_at FROM bookmarks WHERE book = ? AND paragraph = ?",
-            [r.book, r.paragraph],
-          );
-          if (cur && cur.updated_at >= r.updated_at) continue;
-          await user.runAsync(
-            `INSERT OR REPLACE INTO bookmarks
-               (book, paragraph, title, heading, channel_id, updated_at, server_id)
-             VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-            [r.book, r.paragraph, r.title, r.heading, r.channel_id, r.updated_at],
-          );
-          await outboxUpsert(
-            user,
-            localKey("bookmark", r.book, r.paragraph),
-            "bookmark",
-            { book: r.book, paragraph: r.paragraph, title: r.title, heading: r.heading, channelId: r.channel_id, updatedAt: r.updated_at },
-            null,
-          );
-          count += 1;
-        }
+      // 书签
+      const marks = await guest.getAllAsync<{
+        book: number;
+        paragraph: number;
+        title: string;
+        heading: string | null;
+        channel_id: string | null;
+        updated_at: number;
+      }>("SELECT book, paragraph, title, heading, channel_id, updated_at FROM bookmarks");
+      for (const r of marks) {
+        const cur = await user.getFirstAsync<{ updated_at: number }>(
+          "SELECT updated_at FROM bookmarks WHERE book = ? AND paragraph = ?",
+          [r.book, r.paragraph],
+        );
+        if (cur && cur.updated_at >= r.updated_at) continue;
+        await user.runAsync(
+          `INSERT OR REPLACE INTO bookmarks
+             (book, paragraph, title, heading, channel_id, updated_at, server_id)
+           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          [r.book, r.paragraph, r.title, r.heading, r.channel_id, r.updated_at],
+        );
+        await outboxUpsert(
+          user,
+          localKey("bookmark", r.book, r.paragraph),
+          "bookmark",
+          { book: r.book, paragraph: r.paragraph, title: r.title, heading: r.heading, channelId: r.channel_id, updatedAt: r.updated_at },
+          null,
+        );
+        count += 1;
+      }
 
-        // 收藏
-        const stars = await guest.getAllAsync<{
-          book: number;
-          paragraph: number | null;
-          title: string;
-          channel_id: string | null;
-          updated_at: number;
-        }>("SELECT book, paragraph, title, channel_id, updated_at FROM starred");
-        for (const r of stars) {
-          const cur = await user.getFirstAsync<{ updated_at: number }>(
-            "SELECT updated_at FROM starred WHERE book = ?",
-            [r.book],
-          );
-          if (cur && cur.updated_at >= r.updated_at) continue;
-          await user.runAsync(
-            `INSERT OR REPLACE INTO starred
-               (book, paragraph, title, channel_id, updated_at, server_id)
-             VALUES (?, ?, ?, ?, ?, NULL)`,
-            [r.book, r.paragraph, r.title, r.channel_id, r.updated_at],
-          );
-          await outboxUpsert(
-            user,
-            localKey("favorite", r.book),
-            "favorite",
-            { book: r.book, paragraph: r.paragraph, title: r.title, channelId: r.channel_id, updatedAt: r.updated_at },
-            null,
-          );
-          count += 1;
-        }
+      // 收藏
+      const stars = await guest.getAllAsync<{
+        book: number;
+        paragraph: number | null;
+        title: string;
+        channel_id: string | null;
+        updated_at: number;
+      }>("SELECT book, paragraph, title, channel_id, updated_at FROM starred");
+      for (const r of stars) {
+        const cur = await user.getFirstAsync<{ updated_at: number }>(
+          "SELECT updated_at FROM starred WHERE book = ?",
+          [r.book],
+        );
+        if (cur && cur.updated_at >= r.updated_at) continue;
+        await user.runAsync(
+          `INSERT OR REPLACE INTO starred
+             (book, paragraph, title, channel_id, updated_at, server_id)
+           VALUES (?, ?, ?, ?, ?, NULL)`,
+          [r.book, r.paragraph, r.title, r.channel_id, r.updated_at],
+        );
+        await outboxUpsert(
+          user,
+          localKey("favorite", r.book),
+          "favorite",
+          { book: r.book, paragraph: r.paragraph, title: r.title, channelId: r.channel_id, updatedAt: r.updated_at },
+          null,
+        );
+        count += 1;
+      }
 
-        // 下载记录：只入队 upsert（不复制正文），让服务器记下「下载过这本书」。
-        const downloads = await guest.getAllAsync<{
-          channel: string;
-          book: number;
-          updated_at: number;
-        }>("SELECT channel, book, updated_at FROM download_state");
-        const sql = await tipitakaRunner();
-        for (const r of downloads) {
-          const paragraph = await firstReadingParagraph(sql, r.book);
-          await outboxUpsert(
-            user,
-            localKey("download", r.book, undefined, r.channel),
-            "download",
-            { channel: r.channel, book: r.book, paragraph, updatedAt: r.updated_at },
-            null,
-          );
-          count += 1;
-        }
-      });
+      // 下载记录：只入队 upsert（不复制正文），让服务器记下「下载过这本书」。
+      const downloads = await guest.getAllAsync<{
+        channel: string;
+        book: number;
+        updated_at: number;
+      }>("SELECT channel, book, updated_at FROM download_state");
+      const sql = await tipitakaRunner();
+      for (const r of downloads) {
+        const paragraph = await firstReadingParagraph(sql, r.book);
+        await outboxUpsert(
+          user,
+          localKey("download", r.book, undefined, r.channel),
+          "download",
+          { channel: r.channel, book: r.book, paragraph, updatedAt: r.updated_at },
+          null,
+        );
+        count += 1;
+      }
+    });
 
-      // 标记游客已合并（下一次登录不再重复询问）。
-      await AsyncStorage.setItem(`${MERGED_KEY}:${userId}`, "1");
-    } finally {
-      await guest.closeAsync();
-      await user.closeAsync();
-    }
+    // 标记游客已合并（下一次登录不再重复询问）。
+    await AsyncStorage.setItem(`${MERGED_KEY}:${userId}`, "1");
     return count;
   });
 }
@@ -600,22 +596,18 @@ export async function guestHasData(): Promise<boolean> {
   try {
     const guestId = await getDeviceUuid();
     return withDbQueue(async () => {
-      const db = await openReadingDbFor(guestId);
-      try {
-        const tables = ["reading_history", "bookmarks", "starred", "download_state"];
-        for (const t of tables) {
-          const row = await db.getFirstAsync<{ n: number }>(
-            `SELECT count(*) n FROM ${t}`,
-          );
-          if ((row?.n ?? 0) > 0) return true;
-        }
-        const q = await db.getFirstAsync<{ n: number }>(
-          "SELECT count(*) n FROM sync_outbox",
+      const db = await openReadingDbFor(guestId); // 共享句柄，不要 close
+      const tables = ["reading_history", "bookmarks", "starred", "download_state"];
+      for (const t of tables) {
+        const row = await db.getFirstAsync<{ n: number }>(
+          `SELECT count(*) n FROM ${t}`,
         );
-        return (q?.n ?? 0) > 0;
-      } finally {
-        await db.closeAsync();
+        if ((row?.n ?? 0) > 0) return true;
       }
+      const q = await db.getFirstAsync<{ n: number }>(
+        "SELECT count(*) n FROM sync_outbox",
+      );
+      return (q?.n ?? 0) > 0;
     });
   } catch {
     return false;
