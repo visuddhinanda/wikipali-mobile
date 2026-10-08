@@ -2,7 +2,7 @@
  * 当前用户作用域：决定 `reading.db3` 落在哪个用户子目录。
  *
  * - 未登录 → `guest`（设备 uuid，见 `deviceUuid.ts`）。
- * - 已登录 → `user`（`/auth/current` 返回的 `id` = user_uid，uuid）。
+ * - 已登录 → `user`（`/v3/me` 返回的 `id` = user_uid，uuid）。
  *
  * 数据库层（`src/reading/db.ts`）订阅 `onScopeChange`，在用户切换时关闭旧连接、
  * 指向新库。设计见 `docs/multi-user-sync.md` §4。

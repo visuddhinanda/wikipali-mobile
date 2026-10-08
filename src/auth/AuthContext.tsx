@@ -2,7 +2,7 @@
  * 全局登录状态。
  *
  * 冷启动流程：读本地 token → 有则先用缓存的用户信息渲染（避免闪「未登录」）
- * → 后台向 `/auth/current` 校验：只有服务端明确拒绝（token 过期 / 被吊销）才清会话；
+ * → 后台向 `/v3/me` 校验：只有服务端明确拒绝（token 过期 / 被吊销）才清会话；
  * 断网 / 超时 / 服务故障保留会话，等回到前台时再校验（`isTokenRejected`）。
  *
  * 多用户：登录/登出会切换「用户作用域」（`src/user/userScope.ts`），
@@ -179,11 +179,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, verifySession]);
 
   const signIn = useCallback(async (username: string, password: string) => {
-    const fresh = await apiSignIn(username, password);
+    // 登录接口一次返回 token 与用户资料，不再单独查 /me
+    const { token: fresh, user: me } = await apiSignIn(username, password);
     await saveToken(fresh);
     unverifiedToken.current = null;
     setToken(fresh);
-    const me = await fetchCurrentUser(fresh);
     await saveUser(me);
     // 先暂停游客仍在跑/排队的下载（此刻作用域仍为 guest），再切到登录用户。
     await pauseAllDownloads();

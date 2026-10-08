@@ -33,9 +33,10 @@ export function SignInScreen() {
   const [error, setError] = useState<string>();
 
   const name = username.trim();
-  const pwd = password.trim();
+  // 密码不去首尾空格：空格也是密码的一部分（与 Web 端、后端 /v3/sessions 一致）
+  const pwd = password;
   const valid =
-    name.length >= 4 && name.length <= 255 && pwd.length >= 4 && pwd.length <= 32;
+    name.length >= 4 && name.length <= 255 && pwd.length >= 4 && pwd.length <= 64;
 
   async function onSubmit() {
     if (!valid || busy) return;

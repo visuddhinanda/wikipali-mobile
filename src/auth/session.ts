@@ -22,7 +22,7 @@ const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
 
-/** 后端 `/api/v2/auth/current` 返回的用户信息。 */
+/** 后端 `/api/v3/me`（及登录 `/api/v3/sessions` 的 user）返回的用户信息。 */
 export interface AuthUser {
   id: string;
   nickName: string;
