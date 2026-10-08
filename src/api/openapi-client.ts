@@ -8,17 +8,25 @@
  */
 import createClient, { type Middleware } from "openapi-fetch";
 import { getTokenSync } from "../auth/session";
+import { getActiveLocale } from "../i18n";
 import { resolveApiRoot } from "./config";
 import { ApiError } from "./client";
 import type { paths } from "./schema";
 
-/** 每次请求注入 Bearer token，等价于 `src/api/auth.ts` 里 `authHeaders()` 做的事。 */
+/**
+ * 每次请求注入 Bearer token，并用界面语言设置 Accept-Language。
+ *
+ * 后端 v3 按 Accept-Language 本地化错误文案（mint `V3\NegotiateLocale`，与 Web 端
+ * dashboard-v6 同一做法）。系统自带的 Accept-Language 是系统语言，用户在「我 → 设置」
+ * 里选的语言可能不同，所以显式覆盖。Locale 的 8 个取值与后端支持的语言一一对应。
+ */
 const authMiddleware: Middleware = {
   onRequest({ request }) {
     const token = getTokenSync();
     if (token) {
       request.headers.set("Authorization", `Bearer ${token}`);
     }
+    request.headers.set("Accept-Language", getActiveLocale());
     return request;
   },
 };

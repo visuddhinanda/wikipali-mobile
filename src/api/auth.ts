@@ -52,7 +52,7 @@ export async function signIn(
     body: { login, password },
   });
   if (error || !data?.data?.token) {
-    // 服务端的原文是英文（api 组还没有语言协商），对用户统一显示本地化文案。
+    // 账号或密码错（422）、过频（429）用本地固定文案：比服务端的字段级原文更适合登录页。
     const message =
       response.status === 429
         ? t("signIn.tooManyAttempts")
