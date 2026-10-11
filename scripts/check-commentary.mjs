@@ -4,6 +4,9 @@
  *   node scripts/check-commentary.mjs            # 跑内置样例
  *   node scripts/check-commentary.mjs 98 1969    # 查指定章节
  *
+ * 每个样例还会打印阅读页段级联动（§7）：作品级各层对应书，以及当前段在
+ * 各层的落点（链式，缺 cs_para 停在上一个）。
+ *
  * 直接跑 TypeScript 源码里的算法：用 node:sqlite 提供 SqlRunner，
  * 避免脚本与 App 各写一份逻辑。
  */
@@ -26,7 +29,7 @@ const runner = {
 const args = process.argv.slice(2);
 const cases = args.length >= 2
   ? [[Number(args[0]), Number(args[1])]]
-  : [[69, 2835], [98, 1969], [174, 1111], [1, 159], [88, 1616]];
+  : [[69, 2835], [98, 1969], [174, 1111], [1, 159], [88, 1616], [215, 135], [215, 144]];
 
 for (const [book, paragraph] of cases) {
   const self = db
@@ -45,6 +48,23 @@ for (const [book, paragraph] of cases) {
       `  层次=${own ? mod.LAYER_LABEL[own.layer] : "未知"}` +
       (own ? `（据 ${own.source.book}:${own.source.paragraph} ${JSON.stringify(own.source.toc)}）` : ""),
   );
+  // §7 段级联动：作品级层次 + 链式落点
+  const work = await mod.findWorkLayers(runner, book, paragraph);
+  const chain = [];
+  let from = { book, paragraph };
+  for (const o of work.others) {
+    if (mod.COMMENTARY_LAYERS.indexOf(o.layer) < mod.COMMENTARY_LAYERS.indexOf(work.self ?? "mula")) continue;
+    const c = await mod.alignCoordinate(runner, from.book, from.paragraph);
+    const at = c ? await mod.findCounterpartParagraph(runner, o.book, c) : null;
+    chain.push(`${mod.LAYER_LABEL[o.layer]} ${o.book}:${at ?? "—"}`);
+    if (at == null) break;
+    from = { book: o.book, paragraph: at };
+  }
+  console.log(
+    `  作品 ${work.key}  各层 ${work.others.map((o) => `${mod.LAYER_LABEL[o.layer]}=${o.book}`).join(" ") || "无"}` +
+      `  落点 ${chain.join(" → ") || "无"}`,
+  );
+
   const related = await mod.findRelatedChapters(runner, book, paragraph);
   if (!related.length) {
     console.log("  无对应章节");
