@@ -118,9 +118,56 @@ paragraph=6  level=100 (正文)                          cs_para=1   ← 真正�
 - `resolveLayer(db, book, paragraph)` —— §4 第 1 步，返回层次或 `null`
 - `chapterCoordinate(db, row)` —— §4 第 2 步，返回查询坐标或 `null`
 - `findRelatedChapters(db, book, paragraph)` —— §4 第 2–6 步，返回按层次排序的章节数组
+- `findWorkLayers` / `alignCoordinate` / `findCounterpartParagraph` —— §7 阅读页段级联动
 - 均以 `SqlRunner` 接口取数，与具体的 SQLite 驱动解耦（App 用 `expo-sqlite`，
   Node 端校验脚本用内置 `node:sqlite`）
 
 校验脚本：`node scripts/check-commentary.mjs [book] [paragraph]`
 
 > 章级对应之上，阅读页还把下一层注释书内容**段级内嵌**进段落（不收敛到章节行），见 [`docs/reading-annotations.md`](./reading-annotations.md)。
+
+## 7. 阅读页三层联动（段级）
+
+§4 的章级对应只适合「从某章跳到对应章」。阅读页并排对读时按章对齐有两个毛病：
+标签栏随章节时有时无（某章的标题下第一段在义注里缺坐标，「义注」就没了），
+注释栏只在换章时才动。现在拆成两件事：
+
+**层次按作品算，载入时算一次。** `findWorkLayers(book, paragraph)`：作品 =
+当前段所在的 level=1 段 + 当前段的 `book_name`（一个 level=1 可能横跨多个
+`book_name`，如书 202 Pācityādiyojanā 含 vin2–vin5）。在其他书里找同
+`book_name` 的正文段，按书归组、判层，每层选一部：先排除带 `yojanā` 标签的
+逐词释义本，再取覆盖 `cs_para` 最多的，最后按书号。律藏大品（215）得到
+义注 140、复注 206（Sāratthadīpanī；同层还有 202/209/210）。同一作品内
+滚动、翻章都不重算，标签栏始终是「原文 / 义注 / 复注」；跨进另一部作品才换。
+
+**落点按段算，随滚动联动。**
+
+- 对齐坐标 `alignCoordinate`：视口顶部段是正文就用它自己的
+  `(book_name, cs_para)`，是标题就用它后面第一个正文段的（§3：标题的 `cs_para`
+  不可靠）。
+- 对应段 `findCounterpartParagraph`：对应书里同 `book_name`、`cs_para` 取
+  **不超过**它的最大一个，同一 `cs_para` 下取段号最小的那段。注释书缺这个
+  `cs_para` 时就停在上一个 —— 律藏大品根本 478 个 `cs_para`，义注缺 211 个，
+  根本滑过这些段时义注栏原地不动，不再跳。
+- 链式带动：第 i 层带第 i+1 层，第 i+1 层的**落点**再带第 i+2 层
+  （`getCounterparts`）。义注停在上一个 `cs_para` 时复注也跟着停。
+- 方向只往外：根本滚 → 义注、复注跟；义注滚 → 复注跟、根本不动；复注滚 → 都不动。
+- 只有用户自己滚的才带动。判定反过来做 —— 标出**程序滚动**，其余都算用户滚的
+  （不靠 `touchstart`：Waydroid 的鼠标滚轮、键盘、滚动条都不发触摸事件）：
+  首屏 / 整页重载后的那次上报、`__wlFollow` 跟随、懒加载增删段的滚动补偿、
+  `resize` 之后 300–500ms 内的变化都不算。点目录 / 上一章 / 下一章后重载的
+  首屏上报算用户的（要带动下一层）。
+- 已带过去的落点会记下：上一层还在同一个 `cs_para` 范围内滚动，下一层不重复滚；
+  用户手动滚过下一层后，上一层再动会把它重新带回对应处。
+- 跟随栏的目标段已在 DOM 里就地滚动（`__wlFollow`），不在就按目标段重载窗口。
+
+已知局限：巴他那五册根本（书 81、69–72）共用 `book_name = abhi7` 且各自从
+`cs_para = 1` 重新编号，从义注（98）进来时根本只能选一册（覆盖最多的 81，
+第一册），与 §5 的稠密重复属同一问题。
+
+双栏的分隔线要浮在右栏上（不占宽度）：两栏净宽差 1px，一层从右栏换到左栏
+时 `readerWidth` 变化会让正文 HTML 重建、WebView 整页重载，位置丢回初始窗口。
+
+实现：`src/reading/companion.ts`（`getChapterLayers` / `getCounterparts`）、
+`src/screens/ReaderScreen.tsx`（`refreshLayers` / `handleTopPara` /
+`syncFollowers`）、`src/screens/ReaderLayerPane.tsx`（`followTo` / `onTopPara`）。
