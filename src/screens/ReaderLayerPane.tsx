@@ -185,6 +185,11 @@ export interface ReaderLayerPaneHandle {
   openMore: () => void;
   /** 立即把当前视口顶部段落盘到阅读记录（App 转后台 flush 用）。 */
   savePosition: () => void;
+  /**
+   * 跟随上一层滚动：把视口顶部挪到 `para`（已在 DOM 里就地滚，否则重载窗口）。
+   * 之后本栏上报的顶部段标为「跟随」，不再带动下一层，直到用户自己碰它。
+   */
+  followTo: (para: number) => void;
 }
 
 export interface ReaderLayerPaneProps {
@@ -211,6 +216,12 @@ export interface ReaderLayerPaneProps {
   preferredChannelUid?: string;
   preferredChannelName?: string;
   settings: ReaderSettings;
+  /**
+   * 视口顶部段变化（防抖后）。`driving` 为 false 表示这次位置是跟随上一层
+   * 滚过来的（`followTo`），外层不该再拿它带动下一层。
+   */
+  onTopPara?: (para: number, driving: boolean) => void;
+
   /** 每次这一层的阅读单元变化都会调用（含首次进入），供外层算/重算义注复注章节。 */
   onChapterAnchor: (
     book: number,
@@ -705,7 +716,10 @@ function buildReaderHtml(
           }
           // 顶部卸载后补偿滚动，保持视口内容不动
           var removedTopH = beforeH - scroller.scrollHeight;
-          if (removedTopH > 0) scroller.scrollTop = beforeScroll - removedTopH;
+          if (removedTopH > 0) {
+            progUntil = Date.now() + 300;
+            scroller.scrollTop = beforeScroll - removedTopH;
+          }
         } else {
           var bottomRemove = [];
           for (var b = ps.length - 1; b >= 0; b--) {
@@ -733,7 +747,11 @@ function buildReaderHtml(
       // 跳一下（40↔41），若不滞回就会被误判成反向，从而误卸载另一侧、挖出洞。
       var scrollDir = "down";
       var dirAccum = 0;
-      function reportAnchor() {
+      // 程序滚动（跟随上一层的 __wlFollow）后这段时间内的位置变化不算用户滚的。
+      // 不靠 touchstart 判断「用户滚」：鼠标滚轮、键盘、滚动条都不发触摸事件。
+      var progUntil = 0;
+      // init：首屏 / 整页重载后的那一次上报，同样不算用户滚的。
+      function reportAnchor(init) {
         var ps = paper.querySelectorAll("div[data-para]");
         for (var i = 0; i < ps.length; i++) {
           var r = ps[i].getBoundingClientRect();
@@ -746,7 +764,7 @@ function buildReaderHtml(
                 else if (dirAccum <= -2) { scrollDir = "up"; dirAccum = 0; }
               }
               lastAnchor = p;
-              post({ type: "wl-anchor", para: p });
+              post({ type: "wl-anchor", para: p, user: !init && Date.now() > progUntil });
             }
             break;
           }
@@ -790,7 +808,10 @@ function buildReaderHtml(
         paper.insertBefore(tpl.content, marker);
         window.__wlNumberParas(paper);
         var addedH = scroller.scrollHeight - beforeH;
-        if (addedH > 0) scroller.scrollTop = beforeScroll + addedH;
+        if (addedH > 0) {
+          progUntil = Date.now() + 300;
+          scroller.scrollTop = beforeScroll + addedH;
+        }
         needUp = false; // 同 down：补齐后仍贴顶则继续请求上一批
         checkEdges();
       };
@@ -802,17 +823,42 @@ function buildReaderHtml(
         requestAnimationFrame(function () {
           rafPending = false;
           checkEdges();
-          reportAnchor();       // 先据顶部段号更新滚动方向
+          reportAnchor(false);  // 先据顶部段号更新滚动方向
           unloadFar(scrollDir); // 再按方向只卸载离开的那一侧
         });
       }
 
+      // 跟随上一层：把 >= target 的第一段顶到视口顶部；target 不在当前 DOM
+      // 区间里就告诉 RN 重载窗口（wl-follow-miss）。
+      window.__wlFollow = function (target) {
+        var ps = paper.querySelectorAll("div[data-para]");
+        if (!ps.length) { post({ type: "wl-follow-miss", para: target }); return; }
+        var first = Number(ps[0].getAttribute("data-para"));
+        var last = Number(ps[ps.length - 1].getAttribute("data-para"));
+        if (target < first || target > last) {
+          post({ type: "wl-follow-miss", para: target });
+          return;
+        }
+        for (var i = 0; i < ps.length; i++) {
+          if (Number(ps[i].getAttribute("data-para")) >= target) {
+            var top = ps[i].getBoundingClientRect().top + scroller.scrollTop;
+            progUntil = Date.now() + 500;
+            scroller.scrollTop = Math.max(0, top - 4);
+            return;
+          }
+        }
+      };
+
       window.addEventListener("scroll", onScroll, { passive: true });
-      window.addEventListener("resize", onScroll, { passive: true });
+      // 栏宽 / 字体排版变化引起的顶部段变化也不是用户滚的。
+      window.addEventListener("resize", function () {
+        progUntil = Date.now() + 300;
+        onScroll();
+      }, { passive: true });
 
       // 首屏：编号 → 上报锚点 → 检查边缘（首屏不足 1.5 屏时立即补加载）
       window.__wlNumberParas(paper);
-      reportAnchor();
+      reportAnchor(true);
       checkEdges();
     })();
   </script>
@@ -882,6 +928,7 @@ export const ReaderLayerPane = forwardRef<
     preferredChannelName,
     settings,
     onChapterAnchor,
+    onTopPara,
     onChannelChange,
     onAnnoJump,
     onCrossHighlight,
@@ -965,6 +1012,17 @@ export const ReaderLayerPane = forwardRef<
   const reportedAnchorRef = useRef<{ book: number; paragraph: number } | null>(
     null,
   );
+  /**
+   * 防抖窗口内是否有过「用户滚的」顶部段变化（WebView 判定：不是首屏 / 整页
+   * 重载、也不在 __wlFollow 程序滚动之后）。只有这种才带动下一层。
+   */
+  const userScrolledRef = useRef(false);
+  /** 用户在本栏点了目录 / 上一章 / 下一章：重载后的首屏上报也要带动下一层。 */
+  const driveNextRef = useRef(false);
+  /** 最近一次 `followTo` 的目标段：外层随后把它写进 `paragraph`，不必再重载。 */
+  const followTargetRef = useRef<number | null>(null);
+  const onTopParaRef = useRef(onTopPara);
+  onTopParaRef.current = onTopPara;
 
   const c = readerColorsFor(settings.background);
   const isDark = settings.background === "dark";
@@ -1001,6 +1059,15 @@ export const ReaderLayerPane = forwardRef<
       reportedAnchorRef.current.book === book &&
       reportedAnchorRef.current.paragraph === paragraph
     ) {
+      return;
+    }
+    // 外层把本栏自己当前的顶部段写回来（双栏窗口挪动前记位置）：本来就在这儿。
+    if (paragraph != null && paragraph === topParaRef.current && unitRef.current) {
+      return;
+    }
+    // 外层把刚 followTo 过的目标段写回 `paragraph`：位置已经由 followTo 处理了。
+    if (paragraph != null && followTargetRef.current === paragraph) {
+      followTargetRef.current = null;
       return;
     }
     let alive = true;
@@ -1049,11 +1116,11 @@ export const ReaderLayerPane = forwardRef<
     [],
   );
 
-  // 上报当前阅读单元的锚点：外层用它算 / 重算义注复注对应章节（仅原文层
-  // 触发重算，见 `ReaderScreen.tsx`），也用它刷新标签页顶部的章节标题。
-  // 锚点 para 用「章节标题的段号」（unit.chapter.paragraph）而非 unit.from：
-  // 硬切单元（如 [464..475]）的 from 是正文段，findRelatedChapters 对正文段
-  // 查不到义注/复注，会在标题段↔正文段之间让伴读层时有时无、标签栏闪。
+  // 上报当前阅读单元的锚点：外层用它刷新标签页顶部的章节标题，并在用户所在
+  // 那层换章时检查是否跨进了另一部作品（是才换标签栏，见 `ReaderScreen.tsx`
+  // 的 refreshLayers）。各层段级对齐走的是 onTopPara，不是这个锚点。
+  // 锚点 para 用「章节标题的段号」（unit.chapter.paragraph）而非 unit.from，
+  // 同一章内的锚点保持稳定。
   useEffect(() => {
     if (unit) {
       const anchorPara = unit.chapter?.paragraph ?? unit.from;
@@ -1357,12 +1424,42 @@ export const ReaderLayerPane = forwardRef<
   // 连续滚动下「章节」只是锚点概念，正文窗口跨章节无缝衔接。
   const jumpTo = useCallback(
     (u: ReadingUnit, para: number) => {
+      // 用户自己翻章 / 点目录：落到新位置要带动下一层。
+      driveNextRef.current = true;
       unitRef.current = u;
       setUnit(u);
       jumpTargetRef.current = para;
       setJumpNonce((n) => n + 1);
     },
     [],
+  );
+
+  /** 把窗口重新锚到 `para` 载入（跟随目标不在当前 DOM 里时）。 */
+  const reloadAt = useCallback((para: number) => {
+    getReadingUnitAt(book, para).then((u) => {
+      if (u) {
+        unitRef.current = u;
+        setUnit(u);
+      }
+      jumpTargetRef.current = para;
+      setJumpNonce((n) => n + 1);
+    });
+  }, [book]);
+
+  const followTo = useCallback(
+    (para: number) => {
+      driveNextRef.current = false;
+      followTargetRef.current = para;
+      if (doc && webViewRef.current) {
+        // 不在 DOM 里时 WebView 回 wl-follow-miss，再走 reloadAt。
+        webViewRef.current.injectJavaScript(
+          `window.__wlFollow && window.__wlFollow(${para}); true;`,
+        );
+      } else {
+        reloadAt(para);
+      }
+    },
+    [doc, reloadAt],
   );
 
   const navigateTo = (b: number, para: number) => {
@@ -1665,14 +1762,19 @@ export const ReaderLayerPane = forwardRef<
    * 锚点单元（触发标题刷新、阅读记录、伴读层坐标重算）。
    */
   const handleWlAnchor = useCallback(
-    (para: number) => {
+    (para: number, user: boolean) => {
       topParaRef.current = para;
+      if (user) userScrolledRef.current = true;
       // 滚动中位置变化 → 防抖落盘，保证「恢复位置」始终接近真实视口顶部段。
       schedulePersist();
       // 防抖提交：滚动补偿的 ±1px 抖动会让顶部段在章节边界（尤其空标题段，如
       // 435↔437 中间隔着空段 436）来回跳，直接跟会连锁触发标题/伴读层反复刷新。
       if (anchorTimerRef.current) clearTimeout(anchorTimerRef.current);
       anchorTimerRef.current = setTimeout(() => {
+        const driving = userScrolledRef.current || driveNextRef.current;
+        userScrolledRef.current = false;
+        driveNextRef.current = false;
+        onTopParaRef.current?.(para, driving);
         const ht = headingTocFor(book, para, headingTextsRef.current).toc;
         if (ht !== headingTocRef.current) {
           headingTocRef.current = ht;
@@ -1714,10 +1816,14 @@ export const ReaderLayerPane = forwardRef<
         return;
       }
       if (msg.type === "wl-anchor" && typeof msg.para === "number") {
-        handleWlAnchor(msg.para);
+        handleWlAnchor(msg.para, msg.user === true);
         return;
       }
       if (msg.type === "wl-unload" && (msg.dir === "up" || msg.dir === "down")) {
+        return;
+      }
+      if (msg.type === "wl-follow-miss" && typeof msg.para === "number") {
+        reloadAt(msg.para);
         return;
       }
       if (msg.type === "pane-focus") {
@@ -1757,6 +1863,7 @@ export const ReaderLayerPane = forwardRef<
       openVersion,
       openMore,
       savePosition: persistPosition,
+      followTo,
     }),
     [goPrev, goNext, openVersion, openMore, persistPosition],
   );

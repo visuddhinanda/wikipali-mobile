@@ -28,7 +28,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { bookEntryAt, bookLayerAt } from "../catalog";
 import type { CommentaryLayer } from "../catalog/commentary";
-import { getChapterLayers } from "../reading";
+import { getChapterLayers, getCounterparts } from "../reading";
 import {
   NavBtn,
   ReaderLayerPane,
@@ -302,19 +302,159 @@ export function ReaderScreen({ route, navigation }: Props) {
   );
 
 
+  // ---- 三层联动（docs/commentary-layers.md §7）----
+  // 标签栏按「作品」定：同一作品内滚动、跨章都不重算层次，只有跨进另一部
+  // 作品（level=1 或 book_name 变了）才换。滚动对齐按段：第 i 层的视口顶部段
+  // 带动第 i+1、i+2… 层（根本→义注→复注），反方向不联动。
+  /** 当前标签栏对应的作品身份（`getChapterLayers().key`）。 */
+  const workKeyRef = useRef<string | null>(null);
+  /** 各层最近上报的视口顶部段。 */
+  const topParaRef = useRef<Record<number, number>>({});
+  /** 各跟随层最近一次被带到的段：上一层还在同一个 cs_para 范围内就不重复滚。 */
+  const syncedRef = useRef<Record<number, number>>({});
+  /** 联动查询的代际号：较新的驱动上报会让在途的旧查询作废。 */
+  const syncSeqRef = useRef(0);
+  /**
+   * 标签栏建好后，各跟随层是否已按 self 层的视口顶部段落过位。首屏顶部段
+   * 常比章节锚点晚到（那时层次已按章首算完），晚到的这一次要补带一下。
+   */
+  const placedRef = useRef(false);
+
+  /**
+   * 第 `index` 层停在 `para`：带动它后面各层（`snapshot` 是此刻的层次列表）。
+   * 按 `(book_name, cs_para)` 找对应段，缺坐标就停在上一个 cs_para；某层一个
+   * 对应段都没有就到此为止，不再往后带。
+   */
+  const syncFollowers = useCallback(
+    (index: number, b: number, para: number, snapshot: PageMeta[]) => {
+      const followers = snapshot.slice(index + 1);
+      if (followers.length === 0) return;
+      const seq = ++syncSeqRef.current;
+      getCounterparts(
+        b,
+        para,
+        followers.map((f) => f.book),
+      ).then((targets) => {
+        if (seq !== syncSeqRef.current) return;
+        const cur = pagesRef.current;
+        // 期间层次换了（跨作品），这批落点已经对不上。
+        if (
+          cur.length !== snapshot.length ||
+          cur.some((p, i) => p.book !== snapshot[i].book)
+        )
+          return;
+        const moved: Record<number, number> = {};
+        for (let k = 0; k < targets.length; k++) {
+          const target = targets[k];
+          if (target == null) break;
+          const j = index + 1 + k;
+          if (syncedRef.current[j] === target) continue;
+          syncedRef.current[j] = target;
+          paneRefs.current[j]?.followTo(target);
+          moved[j] = target;
+        }
+        if (Object.keys(moved).length === 0) return;
+        setPages((prev) =>
+          prev.map((p, i) =>
+            i in moved ? { ...p, paragraph: moved[i] } : p,
+          ),
+        );
+      });
+    },
+    [],
+  );
+
+  /** 按 self 层当前位置重算标签栏；作品没变就只刷新 self 的标题。 */
+  const refreshLayers = useCallback(
+    (b: number, para: number, toc: string | null) => {
+      const at = topParaRef.current[selfIndexRef.current] ?? para;
+      getChapterLayers(b, at).then(({ key, chapters, selfIndex }) => {
+        // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
+        if (
+          selfAnchorRef.current?.book !== b ||
+          selfAnchorRef.current?.paragraph !== para
+        )
+          return;
+        if (chapters.length === 0) return;
+        if (key === workKeyRef.current) {
+          setPages((prev) => {
+            const cur = prev[selfIndexRef.current];
+            if (!cur || (cur.paragraph === para && cur.toc === toc)) return prev;
+            const next = [...prev];
+            next[selfIndexRef.current] = { ...cur, paragraph: para, toc };
+            return next;
+          });
+          return;
+        }
+        workKeyRef.current = key;
+        const prevSelfIndex = selfIndexRef.current;
+        const prevPages = pagesRef.current;
+        syncedRef.current = {};
+        chapters.forEach((ch, i) => {
+          if (i === selfIndex) return;
+          syncedRef.current[i] = ch.paragraph;
+          // 同一下标仍是同一部书且已挂载：就地跟随，不重建。
+          const old = prevPages[i];
+          if (old && old.book === ch.book && old.layer === ch.layer) {
+            paneRefs.current[i]?.followTo(ch.paragraph);
+          }
+        });
+        const nextPages: PageMeta[] = chapters.map((ch, i) => {
+          const existing = prevPages.find((p) => p.layer === ch.layer);
+          return i === selfIndex
+            ? {
+                ...(existing ?? { layer: ch.layer }),
+                layer: ch.layer,
+                book: b,
+                paragraph: para,
+                title: bookTitleOf(b, para),
+                toc,
+              }
+            : {
+                layer: ch.layer,
+                book: ch.book,
+                paragraph: ch.paragraph,
+                title: bookTitleOf(ch.book, ch.paragraph),
+                toc:
+                  existing && existing.book === ch.book ? existing.toc : null,
+              };
+        });
+        setPages(nextPages);
+        pagesRef.current = nextPages;
+        selfIndexRef.current = selfIndex;
+        const selfTop = topParaRef.current[prevSelfIndex];
+        topParaRef.current = selfTop != null ? { [selfIndex]: selfTop } : {};
+        // self 层顶部段还没报上来：等它到了在 handleTopPara 里补带一次。
+        placedRef.current = selfTop != null;
+        // 查询期间顶部段报上来了、且跟查询用的不同，按最新的再带一次。
+        if (selfTop != null && selfTop !== at) {
+          syncFollowers(selfIndex, b, selfTop, nextPages);
+        }
+        // 相关层集合变了（如 [mula,atthakatha,tika] ↔ [atthakatha,tika]），self 层
+        // 下标随之移动：同步 activeIndex，并把新下标标为已挂载（否则增长场景会
+        // 看到 spinner），最后在 useLayoutEffect 里把 PagerView 无动画挪过去。
+        if (selfIndex !== prevSelfIndex) {
+          setActiveIndex(selfIndex);
+          setDualAnchor(Math.max(0, Math.min(selfIndex, chapters.length - 2)));
+          setVisited((prev) =>
+            prev.has(selfIndex) ? prev : new Set(prev).add(selfIndex),
+          );
+          pendingPagerSyncRef.current = true;
+        }
+      });
+    },
+    [syncFollowers],
+  );
+
   const handleChapterAnchor = useCallback(
     (index: number, b: number, para: number, toc: string | null) => {
       if (index !== selfIndexRef.current) {
-        // 别的层自己翻章：只刷新标签标题，不影响当前层与另一层。
+        // 别的层翻章：只刷新标签标题。落点（paragraph）归联动管，这里不动。
         setPages((prev) => {
           const cur = prev[index];
-          if (
-            !cur ||
-            (cur.book === b && cur.paragraph === para && cur.toc === toc)
-          )
-            return prev;
+          if (!cur || cur.toc === toc) return prev;
           const next = [...prev];
-          next[index] = { ...cur, book: b, paragraph: para, toc };
+          next[index] = { ...cur, toc };
           return next;
         });
         return;
@@ -336,10 +476,8 @@ export function ReaderScreen({ route, navigation }: Props) {
         return;
       }
 
-      // 当前层真的换章了。
       const selfLayer = bookLayerAt(b, para) ?? "mula";
       const prevLayer = pagesRef.current[selfIndexRef.current]?.layer;
-
       if (selfLayer !== prevLayer) {
         // 层变了（跳进义注/复注或另一本书）：收成单层、跳回它，再重新算各层。
         setPages([
@@ -352,94 +490,42 @@ export function ReaderScreen({ route, navigation }: Props) {
           },
         ]);
         selfIndexRef.current = 0;
+        workKeyRef.current = null;
+        placedRef.current = false;
+        topParaRef.current = {};
+        syncedRef.current = {};
         setVisited(new Set([0]));
         setActiveIndex(0);
         setDualAnchor(0);
         pagerRef.current?.setPageWithoutAnimation(0);
+      }
+      // 同层跨章：作品没变时 refreshLayers 只改标题，标签栏不闪、各层不重载。
+      refreshLayers(b, para, toc);
+    },
+    [refreshLayers],
+  );
 
-        getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
-          // 期间用户又翻了别的章节，这次查询已经过期，丢弃。
-          if (
-            selfAnchorRef.current?.book !== b ||
-            selfAnchorRef.current?.paragraph !== para
-          )
-            return;
-          if (chapters.length === 0) return;
-          setPages(
-            chapters.map((ch, i) =>
-              i === selfIndex
-                ? {
-                    layer: ch.layer,
-                    book: b,
-                    paragraph: para,
-                    title: bookTitleOf(b, para),
-                    toc,
-                  }
-                : {
-                    layer: ch.layer,
-                    book: ch.book,
-                    paragraph: ch.paragraph,
-                    title: bookTitleOf(ch.book, ch.paragraph),
-                    toc: ch.toc,
-                  },
-            ),
-          );
-          selfIndexRef.current = selfIndex;
-          setVisited(new Set([selfIndex]));
-          setActiveIndex(selfIndex);
-          setDualAnchor(Math.max(0, Math.min(selfIndex, chapters.length - 2)));
-          pagerRef.current?.setPageWithoutAnimation(selfIndex);
-        });
+  /**
+   * 第 `index` 层视口顶部段变了。只有用户自己滚的（`driving`）才带动后面
+   * 各层（根本→义注→复注，反方向不联动）；跟随过来的位置不带动任何层。
+   */
+  const handleTopPara = useCallback(
+    (index: number, b: number, para: number, driving: boolean) => {
+      topParaRef.current[index] = para;
+      if (!driving) {
+        if (index === selfIndexRef.current && !placedRef.current) {
+          placedRef.current = true;
+          if (pagesRef.current.length > 1) {
+            syncFollowers(index, b, para, pagesRef.current);
+          }
+        }
         return;
       }
-
-      // 同一层连续滚动跨章：不 collapse、不重置 visited/activeIndex/pager，
-      // 只原地刷新各层坐标与标题，避免标签栏「原文 ↔ 原文/义注/复注」来回闪。
-      getChapterLayers(b, para).then(({ chapters, selfIndex }) => {
-        if (
-          selfAnchorRef.current?.book !== b ||
-          selfAnchorRef.current?.paragraph !== para
-        )
-          return;
-        if (chapters.length === 0) return;
-        const prevSelfIndex = selfIndexRef.current;
-        setPages((prev) =>
-          chapters.map((ch, i) => {
-            const existing = prev.find((p) => p.layer === ch.layer);
-            return i === selfIndex
-              ? {
-                  ...(existing ?? { layer: ch.layer }),
-                  layer: ch.layer,
-                  book: b,
-                  paragraph: para,
-                  title: bookTitleOf(b, para),
-                  toc,
-                }
-              : {
-                  ...(existing ?? { layer: ch.layer }),
-                  layer: ch.layer,
-                  book: ch.book,
-                  paragraph: ch.paragraph,
-                  title: bookTitleOf(ch.book, ch.paragraph),
-                  toc: ch.toc,
-                };
-          }),
-        );
-        selfIndexRef.current = selfIndex;
-        // 相关层集合变了（如 [mula,atthakatha,tika] ↔ [atthakatha,tika] ↔ [tika]），
-        // self 层下标随之移动：同步 activeIndex，并把新下标标为已挂载（否则增长场景
-        // 会看到 spinner），最后在 useLayoutEffect 里把 PagerView 无动画挪过去 ——
-        // 否则 PagerView 停在旧下标（已变成别的层或越界），跨章时从右侧重拉当前页。
-        if (selfIndex !== prevSelfIndex) {
-          setActiveIndex(selfIndex);
-          setVisited((prev) =>
-            prev.has(selfIndex) ? prev : new Set(prev).add(selfIndex),
-          );
-          pendingPagerSyncRef.current = true;
-        }
-      });
+      // 用户自己滚了这一层：它已不在上一层给的落点上，上一层再动时要重新带它。
+      delete syncedRef.current[index];
+      syncFollowers(index, b, para, pagesRef.current);
     },
-    [],
+    [syncFollowers],
   );
 
   // 同层跨章导致 self 层下标移动时，等 pages/activeIndex 提交到 PagerView 之后
@@ -457,9 +543,21 @@ export function ReaderScreen({ route, navigation }: Props) {
     setVisited((prev) => (prev.has(idx) ? prev : new Set(prev).add(idx)));
   };
 
+  // 双栏窗口挪动会卸掉移出去的那栏，再挪回来时按 pages[i].paragraph 重新
+  // 挂载 —— 先把各栏当前的顶部段记进去，回来时停在原处而不是章首。
+  const rememberPositions = () => {
+    setPages((prev) =>
+      prev.map((p, i) => {
+        const top = topParaRef.current[i];
+        return top != null && top !== p.paragraph ? { ...p, paragraph: top } : p;
+      }),
+    );
+  };
+
   const selectTab = (index: number) => {
     if (index === activeIndex) return;
     if (dual) {
+      rememberPositions();
       // 窗口外的标签才挪窗口：点右边的就把窗口右移到刚好包住它，点左边的
       // 同理左移；已经在窗口里的标签只是换高亮，两栏不动。
       setActiveIndex(index);
@@ -562,6 +660,7 @@ export function ReaderScreen({ route, navigation }: Props) {
         onShare={() => void shareCurrent()}
         settings={settings}
         onChapterAnchor={(b, para, toc) => handleChapterAnchor(i, b, para, toc)}
+        onTopPara={(para, driving) => handleTopPara(i, p.book, para, driving)}
         onAnnoJump={handleAnnoJump}
         onCrossHighlight={handleCrossHighlight}
         // 双栏时只有左栏是「点注释 → 跨栏高亮、不展开」的起点；右栏保持原互动。
@@ -716,15 +815,18 @@ export function ReaderScreen({ route, navigation }: Props) {
             {pairIndices.map((i, slot) => (
               <View
                 key={`${pages[i].layer}-${pages[i].book}`}
-                style={[
-                  styles.dualPane,
-                  slot === 1 && {
-                    borderLeftWidth: StyleSheet.hairlineWidth,
-                    borderLeftColor: c.hairline,
-                  },
-                ]}
+                style={styles.dualPane}
               >
                 {renderPane(i)}
+                {/* 分隔线浮在上面、不占宽度：左右两栏净宽必须一样，否则一层从
+                    右栏换到左栏时 readerWidth 差 1px，正文 HTML 重建、WebView
+                    整页重载，滚动位置丢回初始窗口。 */}
+                {slot === 1 && (
+                  <View
+                    pointerEvents="none"
+                    style={[styles.dualDivider, { backgroundColor: c.hairline }]}
+                  />
+                )}
                 {/* 焦点内框线：覆盖在焦点栏上，不改变 WebView 布局。 */}
                 {i === activeIndex && (
                   <View
@@ -1327,6 +1429,13 @@ const styles = StyleSheet.create({
   },
   dualPane: {
     flex: 1,
+  },
+  dualDivider: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: StyleSheet.hairlineWidth,
   },
   focusRing: {
     position: "absolute",

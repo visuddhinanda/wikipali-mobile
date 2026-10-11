@@ -20,7 +20,7 @@ import {
 } from "./unit";
 
 export type { HeadingRow, ReadingUnit, ReadingUnitMode } from "./unit";
-export { getCompanionLayers, getChapterLayers } from "./companion";
+export { getChapterLayers, getCounterparts } from "./companion";
 export {
   channelHeadingTexts,
   channelHeadingTextsByBook,
@@ -48,7 +48,6 @@ export {
 
 export { tipitakaRunner } from "./db";
 export type { ChapterLayers, LayerChapter } from "./companion";
-export type { CompanionChapter, CompanionLayers } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";
 export type { DownloadProgress, DownloadStatus } from "./download";
 export {

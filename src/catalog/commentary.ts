@@ -267,3 +267,128 @@ export async function findRelatedChapters(
     return ra === rb ? a.book - b.book : ra - rb;
   });
 }
+
+// ---------------------------------------------------------------------------
+// 段级联动（阅读页三层对读）：标签栏按「作品」定，滚动按「段」对齐。
+// 见 `docs/commentary-layers.md` §7。
+// ---------------------------------------------------------------------------
+
+/**
+ * 段落的对齐坐标：正文段用自己的 `(book_name, cs_para)`；标题行（`level <= 7`）
+ * 自己的 `cs_para` 不可靠（§3），改用它后面第一个正文段的坐标。
+ */
+export async function alignCoordinate(
+  db: SqlRunner,
+  book: number,
+  paragraph: number,
+): Promise<{ book_name: string; cs_para: number } | null> {
+  const rows = await db.all<{ book_name: string; cs_para: number }>(
+    `SELECT book_name, cs_para FROM pali_text
+      WHERE book = ? AND paragraph >= ? AND level = 100
+        AND book_name IS NOT NULL AND cs_para IS NOT NULL
+      ORDER BY paragraph LIMIT 1`,
+    [book, paragraph],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * 在 `targetBook` 里找与坐标对应的正文段：同 `book_name`、`cs_para` 取
+ * **不超过**给定值的最大一个（注释书缺这个 `cs_para` 时就停在上一个），
+ * 同一 `cs_para` 下取段号最小的那段。一个都没有返回 `null`。
+ */
+export async function findCounterpartParagraph(
+  db: SqlRunner,
+  targetBook: number,
+  coord: { book_name: string; cs_para: number },
+): Promise<number | null> {
+  const rows = await db.all<{ paragraph: number }>(
+    `SELECT paragraph FROM pali_text
+      WHERE book = ? AND book_name = ? AND level = 100
+        AND cs_para = (SELECT MAX(cs_para) FROM pali_text
+                        WHERE book = ? AND book_name = ? AND level = 100
+                          AND cs_para <= ?)
+      ORDER BY paragraph LIMIT 1`,
+    [targetBook, coord.book_name, targetBook, coord.book_name, coord.cs_para],
+  );
+  return rows[0]?.paragraph ?? null;
+}
+
+export interface WorkLayer {
+  layer: CommentaryLayer;
+  book: number;
+  /** 该书里第一个同 `book_name` 的正文段（没有更好的落点时用它）。 */
+  paragraph: number;
+}
+
+export interface WorkLayers {
+  /**
+   * 「作品」的身份：所在 level=1 段 + 当前段的 `book_name`。一个 level=1 作品
+   * 可能横跨多个 `book_name`（如书 202 Pācityādiyojanā 含 vin2–vin5），
+   * 跨过去要换一套对应书。
+   */
+  key: string;
+  self: CommentaryLayer | null;
+  /** 除自己以外，每层选定的一部对应书，按层次序列排序。 */
+  others: WorkLayer[];
+}
+
+/**
+ * 整部作品级的对应书：只看当前作品（level=1）与当前段的 `book_name`，
+ * 不看当前段的 `cs_para` —— 某段在义注里缺坐标不会让「义注」这一层消失，
+ * 标签栏在整部作品内保持不变。
+ *
+ * 同层有多部候选（如律藏大品的复注有 202/206/209/210 四部）时：先排除
+ * 带 `yojanā` 标签的（逐词释义本，不是正式复注），再取覆盖 `cs_para`
+ * 最多的，最后按书号。
+ */
+export async function findWorkLayers(
+  db: SqlRunner,
+  book: number,
+  paragraph: number,
+): Promise<WorkLayers> {
+  const [selfLayer, coord, workRows] = await Promise.all([
+    resolveLayer(db, book, paragraph),
+    alignCoordinate(db, book, paragraph),
+    db.all<{ work: number | null }>(
+      `SELECT MAX(paragraph) AS work FROM pali_text
+        WHERE book = ? AND level = 1 AND paragraph <= ?`,
+      [book, paragraph],
+    ),
+  ]);
+  const self = selfLayer?.layer ?? null;
+  const work = workRows[0]?.work ?? 0;
+  if (!coord) return { key: `${book}:${work}:`, self, others: [] };
+
+  const candidates = await db.all<{ book: number; cov: number; first: number }>(
+    `SELECT book, COUNT(DISTINCT cs_para) AS cov, MIN(paragraph) AS first
+       FROM pali_text
+      WHERE book_name = ? AND level = 100 AND book <> ?
+        AND parent >= 0
+      GROUP BY book`,
+    [coord.book_name, book],
+  );
+
+  const scored: (WorkLayer & { cov: number; yojana: boolean })[] = [];
+  for (const c of candidates) {
+    const resolved = await resolveLayer(db, c.book, c.first);
+    if (!resolved || resolved.layer === self) continue;
+    const src = await getRow(db, resolved.source.book, resolved.source.paragraph);
+    const yojana = (src?.tags ?? "").split(",").some((t) => t.trim() === "yojanā");
+    scored.push({ layer: resolved.layer, book: c.book, paragraph: c.first, cov: c.cov, yojana });
+  }
+  // 书首的书名行（parent = -1）不挂在任何作品下，判不了层，上面已滤掉。
+  scored.sort(
+    (a, b) =>
+      COMMENTARY_LAYERS.indexOf(a.layer) - COMMENTARY_LAYERS.indexOf(b.layer) ||
+      Number(a.yojana) - Number(b.yojana) ||
+      b.cov - a.cov ||
+      a.book - b.book,
+  );
+  const others: WorkLayer[] = [];
+  for (const s of scored) {
+    if (others.some((o) => o.layer === s.layer)) continue;
+    others.push({ layer: s.layer, book: s.book, paragraph: s.paragraph });
+  }
+  return { key: `${book}:${work}:${coord.book_name}`, self, others };
+}
