@@ -131,6 +131,7 @@ const messages = {
   "error.backend": "後端返回錯誤",
   "error.badJson": "回應不是合法 JSON",
   "error.network": "網路請求失敗",
+  "error.timeout": "請求逾時",
   "error.noOnlineContent": "該版本暫無此章節的線上閱讀內容",
   "profile.signOutConfirm": "登出後將無法同步書架與提問紀錄。",
   "profile.signedOutHint": "登入後同步書架、進度與提問紀錄",

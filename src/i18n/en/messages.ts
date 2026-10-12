@@ -131,6 +131,7 @@ const messages = {
   "error.backend": "The server returned an error",
   "error.badJson": "Response is not valid JSON",
   "error.network": "Network request failed",
+  "error.timeout": "Request timed out",
   "error.noOnlineContent": "This version has no online text for the current chapter",
   "profile.signOutConfirm": "After signing out your library and question history will no longer sync.",
   "profile.signedOutHint": "Sign in to sync your library, progress and question history",

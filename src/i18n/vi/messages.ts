@@ -131,6 +131,7 @@ const messages = {
   "error.backend": "Máy chủ trả về lỗi",
   "error.badJson": "Phản hồi không phải JSON hợp lệ",
   "error.network": "Yêu cầu mạng thất bại",
+  "error.timeout": "Yêu cầu quá thời gian",
   "error.noOnlineContent": "Bản này chưa có nội dung trực tuyến cho chương hiện tại",
   "profile.signOutConfirm": "Sau khi đăng xuất, kệ sách và lịch sử câu hỏi sẽ không còn được đồng bộ.",
   "profile.signedOutHint": "Đăng nhập để đồng bộ kệ sách, tiến độ và lịch sử câu hỏi",

@@ -131,6 +131,7 @@ const messages = {
   "error.backend": "后端返回错误",
   "error.badJson": "响应不是合法 JSON",
   "error.network": "网络请求失败",
+  "error.timeout": "请求超时",
   "error.noOnlineContent": "该版本暂无此章节的在线阅读内容",
   "profile.signOutConfirm": "退出后将无法同步书架与提问历史。",
   "profile.signedOutHint": "登录后同步书架、进度与提问历史",
