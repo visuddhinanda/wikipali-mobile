@@ -125,6 +125,32 @@ export function retryAt(attempts: number, now: number): number | null {
 }
 
 /**
+ * 一次取数失败后该落什么状态：
+ * - 系统确实没网 → 等待网络（不计失败次数，联网后自动续）；
+ * - 系统说有网、请求却发不出去（服务器不可达 / 明文 HTTP 被拦 / DNS / 认证页）或超时、
+ *   HTTP 错误 → 计一次失败，退避重试，耗尽转 error。
+ *   **不能**把「有网却发不出去」也当等网络：调度器看到有网会立刻重排，原地空转。
+ */
+export function afterFailure(
+  offline: boolean,
+  connected: boolean,
+  attempts: number,
+  now: number,
+):
+  | { status: "waiting"; reason: "network"; attempts: number; nextRetryAt: null }
+  | { status: "waiting"; reason: "retry"; attempts: number; nextRetryAt: number }
+  | { status: "error"; reason: null; attempts: number; nextRetryAt: null } {
+  if (offline && !connected) {
+    return { status: "waiting", reason: "network", attempts, nextRetryAt: null };
+  }
+  const next = attempts + 1;
+  const at = retryAt(next, now);
+  return at == null
+    ? { status: "error", reason: null, attempts: next, nextRetryAt: null }
+    : { status: "waiting", reason: "retry", attempts: next, nextRetryAt: at };
+}
+
+/**
  * 速度采样：最近 `windowMs` 内的字节 / 时长，再做一次 EMA 平滑（α=0.3），
  * 免得一块一块地跳。
  */

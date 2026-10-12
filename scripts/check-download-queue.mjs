@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { blocker, settle, pickNext, retryAt, SpeedMeter, estimateTotalBytes, RETRY_DELAYS_MS } =
+const { blocker, settle, pickNext, retryAt, afterFailure, SpeedMeter, estimateTotalBytes, RETRY_DELAYS_MS } =
   await import(join(root, "src/reading/downloadPolicy.ts"));
 
 let failed = 0;
@@ -119,7 +119,14 @@ check("未到点：保持等待", settle(r, ENV, 5000) === null);
 check("到点：回排队", settle(r, ENV, 6000)?.status === "queued");
 check("退避中断网：显示等网络", settle(r, { ...ENV, connected: false }, 1000)?.reason === "network");
 
-// 11. 测速与总量估算
+// 11. 失败后的落点：真没网才等网络；有网却连不上必须计失败，不能空转
+check("系统没网的失败：等待网络、不计次数", (() => { const f = afterFailure(true, false, 0, 0); return f.status === "waiting" && f.reason === "network" && f.attempts === 0; })());
+check("有网却连不上服务器：计一次失败、5 秒后重试", (() => { const f = afterFailure(true, true, 0, 1000); return f.reason === "retry" && f.attempts === 1 && f.nextRetryAt === 6000; })());
+check("有网却连不上：settle 不会立刻把它排回队列", settle({ status: "waiting", reason: "retry", queuePos: 1, allowCellular: false, nextRetryAt: 6000 }, ENV, 1500) === null);
+check("连续 3 次后第 4 次失败转 error", afterFailure(true, true, 3, 0).status === "error");
+check("超时 / HTTP 错误同样走退避", afterFailure(false, true, 1, 0).nextRetryAt === 30000);
+
+// 12. 测速与总量估算
 const m = new SpeedMeter();
 m.add(100_000, 0);
 m.add(100_000, 1000);

@@ -20,11 +20,27 @@
  * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`）。
  */
 import { getApiClient, throwHttpError } from "./openapi-client";
+import { t } from "../i18n";
 import { metaInt, unwrapV3Collection } from "./v3";
 import type { ReadParaItem } from "./read-para";
 
 /** 整本下载的每块大小：5000 字节原文长度，**服务端的字节上限**。 */
 export const DOWNLOAD_PAGE_SIZE = 5000;
+
+/**
+ * 整本下载每块请求的超时。服务端发完响应头后卡住时，没有超时的话这一块会永远挂着，
+ * 而下载是单写者逐本跑的，整个队列都会停住（`docs/download-manager.md` §5.2）。
+ * 一块 5000 字节原文，正常一两秒内回来，30 秒足够宽。
+ */
+export const DOWNLOAD_TIMEOUT_MS = 30_000;
+
+/** 请求超时（区别于「没网」：调度器按失败退避重试，而不是当作等网络）。 */
+export class RequestTimeoutError extends Error {
+  constructor() {
+    super(t("error.timeout"));
+    this.name = "RequestTimeoutError";
+  }
+}
 
 /** 每块大小的单位：按段落原文字节数累加（`para` 是按段数）。 */
 export const CHAPTER_PAGE_UNIT = "byte";
@@ -57,6 +73,8 @@ export interface ReadChapterOptions {
   /** 每块大小，含义由 `unit` 决定。 */
   pageSize?: number;
   unit?: "para" | "byte";
+  /** 超时（毫秒），覆盖请求和读响应体；超时抛 `RequestTimeoutError`。不传不设超时。 */
+  timeoutMs?: number;
 }
 
 /**
@@ -72,10 +90,24 @@ export async function fetchReadChapter(
   opts?: ReadChapterOptions,
 ): Promise<ReadChapterOutcome> {
   const client = await getApiClient();
+  // 超时不只靠 abort：这个 App 的 fetch 被 CopilotKit 的 streaming polyfill 接管
+  // （见 openapi-client.ts），abort 能否让 promise 落地取决于 polyfill 的实现。
+  // 所以和计时器赛跑，计时器先到就按超时失败；abort 尽力把底层连接也断掉。
+  const controller = opts?.timeoutMs ? new AbortController() : null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = controller
+    ? new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new RequestTimeoutError());
+        }, opts!.timeoutMs);
+      })
+    : null;
 
   let result;
   try {
-    result = await client.GET("/v3/tipitaka-reading/{channel}", {
+    const request = client.GET("/v3/tipitaka-reading/{channel}", {
+      signal: controller?.signal,
       params: {
         path: { channel: channelId },
         query: {
@@ -89,9 +121,16 @@ export async function fetchReadChapter(
         },
       },
     });
-  } catch {
-    // fetch 本身抛错（网络不可达）→ 离线占位，不写盘。
+    // 赛跑输掉的那个请求之后若再失败，不要成为未处理的 rejection。
+    request.catch(() => undefined);
+    // openapi-fetch 在 GET 里就把响应体读完了，赛跑同时覆盖「卡在读体」的情况。
+    result = await (timeout ? Promise.race([request, timeout]) : request);
+  } catch (err) {
+    // 超时：服务端连上了但没回完，按失败重试；其余 fetch 抛错（网络不可达）→ 离线占位，不写盘。
+    if (err instanceof RequestTimeoutError) throw err;
     return { status: "offline" };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
   const { data, error, response } = result;

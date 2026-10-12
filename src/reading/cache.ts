@@ -12,6 +12,7 @@
 import {
   CHAPTER_PAGE_UNIT,
   DOWNLOAD_PAGE_SIZE,
+  DOWNLOAD_TIMEOUT_MS,
   fetchReadChapter,
 } from "../api/read-chapter";
 import { fetchReadParas, type ReadParaItem } from "../api/read-para";
@@ -358,6 +359,7 @@ export async function fetchChapterBlock(
   const outcome = await fetchReadChapter(book, channelId, after, {
     pageSize,
     unit,
+    timeoutMs: DOWNLOAD_TIMEOUT_MS,
   });
   if (outcome.status === "offline") return null;
   if (outcome.status === "empty") return { nextCursor: null, bytes: 0 };

@@ -27,10 +27,11 @@ import {
   type EnqueueItem,
   type RunOutcome,
 } from "./download";
+import { t } from "../i18n";
 import {
+  afterFailure,
   blocker,
   pickNext,
-  retryAt,
   settle,
   SpeedMeter,
   type DownloadEnv,
@@ -329,24 +330,13 @@ async function finish(
   }
   if (outcome.kind === "stopped") return setRowState(channel, book, "queued", null);
 
-  // 失败：没网 → 等网络（不算重试次数）；有网 → 退避重试，耗尽转失败。
+  // 失败：系统没网 → 等网络；有网却失败（含连不上服务器）→ 退避重试，耗尽转失败。
   await refreshNetwork();
-  if (outcome.offline || !env.connected) {
-    return setRowState(channel, book, "waiting", "network");
-  }
-  const attempts = row.attempts + 1;
-  const at = retryAt(attempts, Date.now());
-  if (at == null) {
-    return setRowState(channel, book, "error", null, {
-      error: outcome.error,
-      attempts,
-      nextRetryAt: null,
-    });
-  }
-  return setRowState(channel, book, "waiting", "retry", {
-    error: outcome.error,
-    attempts,
-    nextRetryAt: at,
+  const next = afterFailure(outcome.offline, env.connected, row.attempts, Date.now());
+  return setRowState(channel, book, next.status, next.reason, {
+    error: outcome.offline ? t("error.network") : outcome.error,
+    attempts: next.attempts,
+    nextRetryAt: next.nextRetryAt,
   });
 }
 
