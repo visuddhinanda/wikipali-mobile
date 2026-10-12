@@ -32,7 +32,7 @@ import {
   syncNow,
 } from "../data/sync";
 import { t } from "../i18n";
-import { pauseAllDownloads, reconcileDownloads } from "../reading";
+import { initDownloadManager, resumeDownloads, suspendDownloads } from "../reading";
 import {
   clearSession,
   loadToken,
@@ -158,13 +158,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, restoring]);
 
-  // 冷启动：作用域解析完后对账一次（残留 downloading→paused）。
+  // 冷启动：作用域解析完后启动下载调度器（对账 downloading→queued，自动续上）。
   const resumed = useRef(false);
   useEffect(() => {
     if (restoring || resumed.current) return;
     resumed.current = true;
-    void reconcileDownloads().catch(() => {
-      /* 对账失败不影响启动，下次下载时自愈 */
+    void initDownloadManager().catch(() => {
+      /* 启动失败不影响 App，下一次下载操作时自愈 */
     });
   }, [restoring]);
 
@@ -185,21 +185,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     unverifiedToken.current = null;
     setToken(fresh);
     await saveUser(me);
-    // 先暂停游客仍在跑/排队的下载（此刻作用域仍为 guest），再切到登录用户。
-    await pauseAllDownloads();
+    // 先停下游客正在跑的下载（回排队，此刻作用域仍为 guest），再切到登录用户；
+    // 调度器在作用域切换后对新库续上。
+    await suspendDownloads();
     setUser(me);
     setUserScope({ kind: "user", id: me.id });
+    resumeDownloads();
     void afterSignIn(me.id);
   }, [setToken]);
 
   const signOut = useCallback(async () => {
     unverifiedToken.current = null;
     await clearSession();
-    // 先暂停该账号仍在跑/排队的下载（此刻作用域仍为该用户），再切回游客。
-    await pauseAllDownloads();
+    // 先停下该账号正在跑的下载（回排队，此刻作用域仍为该用户），再切回游客。
+    await suspendDownloads();
     setToken(null);
     setUser(null);
-    void getDeviceUuid().then((id) => setUserScope({ kind: "guest", id }));
+    void getDeviceUuid().then((id) => {
+      setUserScope({ kind: "guest", id });
+      resumeDownloads();
+    });
   }, [setToken]);
 
   const value = useMemo<AuthState>(

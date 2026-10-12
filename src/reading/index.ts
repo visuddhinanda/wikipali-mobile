@@ -49,19 +49,36 @@ export {
 export { tipitakaRunner } from "./db";
 export type { ChapterLayers, LayerChapter } from "./companion";
 export { READING_UNIT_MAX, READING_UNIT_MIN } from "./unit";
-export type { DownloadProgress, DownloadStatus } from "./download";
+export type {
+  DownloadProgress,
+  DownloadStatus,
+  EnqueueItem,
+  WaitReason,
+} from "./download";
+export { getDownloadProgress, listDownloads, percent } from "./download";
+export { estimateTotalBytes, type DownloadEnv } from "./downloadPolicy";
 export {
+  allowCellular,
+  cancelDownload,
   clearDownloadData,
-  downloadBook,
-  getDownloadProgress,
-  isDownloading,
-  listDownloads,
+  downloadKey,
+  enqueueDownloads,
+  getDownloadSnapshot,
+  initDownloadManager,
+  kickDownloads,
+  moveDownloadToTop,
   pauseAllDownloads,
   pauseDownload,
-  percent,
-  reconcileDownloads,
+  refreshDownloads,
   removeDownload,
-} from "./download";
+  resumeAllDownloads,
+  resumeDownload,
+  resumeDownloads,
+  shouldAskCellular,
+  subscribeDownloads,
+  suspendDownloads,
+  type DownloadSnapshot,
+} from "./downloadManager";
 export {
   cacheUsage,
   enforceCacheQuota,

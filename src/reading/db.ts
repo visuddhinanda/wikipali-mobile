@@ -268,6 +268,18 @@ async function migrateParaHtmlNullable(db: SqlDb): Promise<void> {
   `);
 }
 
+/** `download_state` 的下载管理列（老库按需补上）。 */
+const DOWNLOAD_QUEUE_COLUMNS: [string, string][] = [
+  ["pause_reason", "pause_reason TEXT"],
+  ["queue_pos", "queue_pos INTEGER"],
+  ["batch_id", "batch_id TEXT"],
+  ["bytes", "bytes INTEGER NOT NULL DEFAULT 0"],
+  ["attempts", "attempts INTEGER NOT NULL DEFAULT 0"],
+  ["next_retry_at", "next_retry_at INTEGER"],
+  ["anchor_para", "anchor_para INTEGER"],
+  ["allow_cellular", "allow_cellular INTEGER NOT NULL DEFAULT 0"],
+];
+
 /** 指定用户目录的读写库（唯一句柄，首次打开时建表/补列/迁移）。 */
 function readingDbFor(scopeId: string): Promise<SqlDb> {
   return sharedHandle(`reading:${scopeId}`, async () => {
@@ -281,6 +293,10 @@ function readingDbFor(scopeId: string): Promise<SqlDb> {
     await ensureColumn(db, "para_html", "expires_at", "expires_at INTEGER");
     await ensureColumn(db, "download_state", "server_id", "server_id TEXT");
     await ensureColumn(db, "download_state", "cursor", "cursor TEXT");
+    // 下载管理（docs/download-manager.md §9）：持久队列 + 等待原因 + 字节统计。
+    for (const [col, ddl] of DOWNLOAD_QUEUE_COLUMNS) {
+      await ensureColumn(db, "download_state", col, ddl);
+    }
     await migrateParaHtmlNullable(db);
     return db;
   });
@@ -360,6 +376,8 @@ CREATE TABLE IF NOT EXISTS channels (
 -- 用户显式下载过的书，区别于阅读时被动产生的缓存（清理时不误删）。
 -- server_id：同步后回填的服务器 like.id（type=download）。
 -- cursor：断点续传游标（tipitaka-reading 的 meta.next_cursor），null 表示从头 / 取完。
+-- 下载管理列（pause_reason / queue_pos / batch_id / bytes / attempts / next_retry_at /
+-- anchor_para / allow_cellular）由 DOWNLOAD_QUEUE_COLUMNS 补列，见 docs/download-manager.md §9。
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,
   book       INTEGER NOT NULL,

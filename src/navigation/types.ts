@@ -72,6 +72,8 @@ export type RootStackParamList = {
   About: undefined;
   /** 登录页（从「我」进入）。 */
   SignIn: undefined;
+  /** 下载管理（书架「已下载」状态条 / 频道页批次进度 / 设置 → 下载管理）。 */
+  Downloads: undefined;
   /** 译本频道列表（书架 → 批量下载）。 */
   ChannelList: undefined;
   /** 译本频道详情：信息 + 该频道下的书列表。 */

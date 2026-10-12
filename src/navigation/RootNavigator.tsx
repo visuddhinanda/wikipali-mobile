@@ -40,6 +40,7 @@ import { FlightSunScreen } from "../screens/FlightSunScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
+import { DownloadsScreen } from "../screens/DownloadsScreen";
 import { navigationRef } from "../linking/handler";
 import { useDeepLinks } from "../linking/useDeepLinks";
 import { useRestoreLastReading } from "./useRestoreLastReading";
@@ -221,6 +222,11 @@ function readingChainScreens(t: T) {
         options={({ route }) => ({ title: route.params.name })}
       />
       <Stack.Screen
+        name="Downloads"
+        component={DownloadsScreen}
+        options={{ title: t("settings.downloads") }}
+      />
+      <Stack.Screen
         name="NewChat"
         component={NewChatScreen}
         options={{ title: t("nav.newChat") }}
@@ -345,6 +351,11 @@ function ProfileStack() {
         name="ChannelDetail"
         component={ChannelDetailScreen}
         options={({ route }) => ({ title: route.params.name })}
+      />
+      <Stack.Screen
+        name="Downloads"
+        component={DownloadsScreen}
+        options={{ title: t("settings.downloads") }}
       />
       <Stack.Screen
         name="NewChat"

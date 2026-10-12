@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -6,7 +6,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { ChannelRow } from "../components/ChannelRow";
 import { bookEntryAt, bookLayerAt } from "../catalog";
-import { channelNames, listDownloads } from "../reading";
+import { cacheUsage, channelNames, listDownloads } from "../reading";
+import { summarize, useDownloadRows, useRunningDownload } from "../hooks/useDownloads";
+import { formatBytes, formatSpeed } from "../components/downloadText";
 import { fetchChannel, type ChannelSummary } from "../api/channels";
 import { loadReadingHistory, type ReadingRecord } from "../data/history";
 import { loadStarred, type StarredBook } from "../data/starred";
@@ -92,6 +94,11 @@ export function BookshelfScreen() {
   const [channels, setChannels] = useState<DownloadedChannel[] | null>(null);
   // 版本名不存在记录里 —— uid → name 现查，服务端改了名这里立刻跟上。
   const [names, setNames] = useState<Map<string, string>>(new Map());
+  // 下载状态（实时）：「已下载」顶部状态条与各频道的进行中 / 失败计数。
+  const downloadRows = useDownloadRows();
+  const { speed } = useRunningDownload();
+  // 已下载正文占用（按 html 长度近似），回到书架时重算。
+  const [storage, setStorage] = useState(0);
 
   // 每次回到「书架」Tab 时重新加载（读完/下载完返回可即时看到更新）。
   useFocusEffect(
@@ -110,6 +117,11 @@ export function BookshelfScreen() {
       loadDownloadedChannels().then((c) => {
         if (alive) setChannels(c);
       });
+      cacheUsage()
+        .then((u) => {
+          if (alive) setStorage(u.filter((x) => x.downloaded).reduce((n, x) => n + x.bytes, 0));
+        })
+        .catch(() => undefined);
       // 在读 / 收藏 / 书签三类记录的版本名统一现查（uid → name）。
       Promise.all([
         loadReadingHistory(),
@@ -131,7 +143,64 @@ export function BookshelfScreen() {
   const readingList = records ?? [];
   const starred = starredList ?? [];
   const bookmarks = bookmarkList ?? [];
+  // 别处新入队了某个频道的书（列表里还没有这个频道）：重新归拢一次。
+  const downloadUids = useMemo(
+    () => [...new Set(downloadRows.map((r) => r.channel))].sort().join(","),
+    [downloadRows],
+  );
+  useEffect(() => {
+    if (channels === null) return;
+    const known = new Set(channels.map((c) => c.summary.id));
+    if (downloadUids.split(",").every((u) => !u || known.has(u))) return;
+    let alive = true;
+    loadDownloadedChannels().then((c) => alive && setChannels(c));
+    return () => {
+      alive = false;
+    };
+  }, [downloadUids, channels]);
+
   const channelList = channels ?? [];
+  const summary = summarize(downloadRows, speed);
+
+  /** 频道行副标题：n 本已下载 · m 本进行中 · k 本失败（·待下载：有记录没正文）。 */
+  const channelSubtitle = (uid: string, fallback: DownloadedChannel): string => {
+    const rows = downloadRows.filter((r) => r.channel === uid);
+    if (rows.length === 0) {
+      return fallback.pendingBooks > 0
+        ? t("bookshelf.downloadedPending", { done: fallback.books, pending: fallback.pendingBooks })
+        : t("bookshelf.downloadedBooks", { n: fallback.books });
+    }
+    const s = summarize(rows, 0);
+    const pending = rows.filter((r) => r.status === "pending").length;
+    return [
+      // 没有已下完的、但有别的状态时，不写「0 本已下载」。
+      s.done ? t("bookshelf.downloadedBooks", { n: s.done }) : null,
+      s.active ? t("bookshelf.downloadActive", { n: s.active }) : null,
+      s.failed ? t("bookshelf.downloadFailed", { n: s.failed }) : null,
+      s.paused ? t("bookshelf.downloadPaused", { n: s.paused }) : null,
+      pending ? t("bookshelf.downloadPendingOnly", { n: pending }) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || t("bookshelf.downloadedBooks", { n: 0 });
+  };
+
+  // 「已下载」顶部状态条：有进行中 / 暂停 / 失败的书才出现，点进下载管理。
+  const statusBar =
+    summary.active + summary.paused + summary.failed > 0
+      ? [
+          summary.downloading
+            ? t("bookshelf.status.downloading", { n: summary.downloading })
+            : null,
+          summary.queued ? t("bookshelf.status.queued", { n: summary.queued }) : null,
+          summary.waiting ? t("bookshelf.status.waiting", { n: summary.waiting }) : null,
+          !summary.active && summary.paused
+            ? t("bookshelf.downloadPaused", { n: summary.paused })
+            : null,
+          summary.downloading && speed > 0 ? formatSpeed(speed) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
 
   /**
    * 列表标题用 level=1 的作品名，不是丛书名 —— 一个 book 文件
@@ -258,18 +327,28 @@ export function BookshelfScreen() {
         <View>{readingItems.map(renderRow)}</View>
       ) : active === "downloaded" && channelList.length > 0 ? (
         <View>
+          {statusBar ? (
+            <Pressable
+              style={styles.statusBar}
+              onPress={() => navigation.navigate("Downloads")}
+            >
+              <Ionicons name="cloud-download-outline" size={16} color={colors.vermilion} />
+              <Text style={styles.statusText} numberOfLines={1}>
+                {statusBar}
+                {summary.failed ? (
+                  <Text style={styles.statusError}>
+                    {` · ${t("bookshelf.downloadFailed", { n: summary.failed })}`}
+                  </Text>
+                ) : null}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.vermilion} />
+            </Pressable>
+          ) : null}
           {channelList.map((c) => (
             <ChannelRow
               key={c.summary.id}
               channel={c.summary}
-              subtitle={
-                c.pendingBooks > 0
-                  ? t("bookshelf.downloadedPending", {
-                      done: c.books,
-                      pending: c.pendingBooks,
-                    })
-                  : t("bookshelf.downloadedBooks", { n: c.books })
-              }
+              subtitle={channelSubtitle(c.summary.id, c)}
               onPress={() =>
                 navigation.navigate("ChannelDetail", {
                   uid: c.summary.id,
@@ -279,6 +358,17 @@ export function BookshelfScreen() {
               }
             />
           ))}
+          <View style={styles.footer}>
+            {storage > 0 ? (
+              <Text style={styles.footerText}>
+                {t("bookshelf.storage", { size: formatBytes(storage) })}
+                {" · "}
+              </Text>
+            ) : null}
+            <Pressable onPress={() => navigation.navigate("Downloads")} hitSlop={8}>
+              <Text style={styles.footerLink}>{t("downloads.manageLink")}</Text>
+            </Pressable>
+          </View>
         </View>
       ) : active === "starred" && starredItems.length > 0 ? (
         <View>{starredItems.map(renderRow)}</View>
@@ -399,6 +489,37 @@ const styles = StyleSheet.create({
   },
   rowBody: {
     flex: 1,
+  },
+  statusBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: "#f3e6d6",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.md,
+  },
+  statusText: {
+    ...type.caption,
+    color: colors.vermilion,
+    flex: 1,
+  },
+  statusError: {
+    color: "#b0412e",
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: spacing.md,
+  },
+  footerText: {
+    ...type.small,
+  },
+  footerLink: {
+    ...type.small,
+    color: colors.vermilion,
   },
   rowTitle: {
     ...type.body,

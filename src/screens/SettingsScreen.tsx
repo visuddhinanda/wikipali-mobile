@@ -223,7 +223,11 @@ export function SettingsScreen() {
           [
             // 尚未实现的项没有 route，点击暂不响应。
             { icon: "text", label: "settings.display" as MessageKey },
-            { icon: "download", label: "settings.downloads" as MessageKey },
+            {
+              icon: "download",
+              label: "settings.downloads" as MessageKey,
+              route: "Downloads" as const,
+            },
             {
               icon: "information-circle",
               label: "settings.about" as MessageKey,

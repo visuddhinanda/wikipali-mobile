@@ -10,13 +10,7 @@
  * - 分类：复用「分类」栏目的三藏目录树，下钻到叶子后直接显示该频道落在该
  *   分类下的书（按 根本 → 义注 → 复注 排序）。分类视图下隐藏下载漏斗。
  */
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -54,14 +48,15 @@ import {
 } from "../catalog";
 import { label } from "../catalog/labels";
 import {
-  downloadBook,
-  isDownloading,
-  listDownloads,
-  pauseDownload,
+  pauseAllDownloads,
   rememberChannelName,
   resolveBookTitles,
   type DownloadProgress,
+  type WaitReason,
 } from "../reading";
+import { useDownloadRows, useRunningDownload } from "../hooks/useDownloads";
+import { requestDownload } from "../components/downloadRequest";
+import { formatSpeed } from "../components/downloadText";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import type { RootStackParamList } from "../navigation/types";
 import { useI18n } from "../i18n/I18nContext";
@@ -80,6 +75,15 @@ const FILTER_LABEL: Record<Filter, MessageKey> = {
   pending: "download.notDownloaded",
 };
 
+/** 批次全部在等时显示的原因。 */
+const WAIT_LABEL: Partial<Record<WaitReason, MessageKey>> = {
+  background: "download.reason.background",
+  network: "download.reason.network",
+  wifi: "download.reason.wifi",
+  wifi_ready: "download.reason.wifiReady",
+  retry: "download.waiting",
+};
+
 /** 书目分类排序：根本 → 义注 → 复注（与 ChapterListScreen 一致）。 */
 const KIND_RANK: Record<BookKind, number> = {
   root: 0,
@@ -95,10 +99,12 @@ type Row =
   | { key: string; kind: "book"; book: ChannelBook }
   | { key: string; kind: "node"; node: CategoryNode };
 
-/** 下载状态归到哪一档（暂停 / 失败都还没下完，算「未下载」）。 */
+/** 下载状态归到哪一档：排队 / 等待也算「下载中」；暂停 / 失败还没下完，算「未下载」。 */
 function bucket(p?: DownloadProgress): Exclude<Filter, "all"> {
   if (p?.status === "done") return "done";
-  if (p?.status === "downloading") return "downloading";
+  if (p?.status === "downloading" || p?.status === "queued" || p?.status === "waiting") {
+    return "downloading";
+  }
   return "pending";
 }
 
@@ -110,34 +116,28 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
   // 各书的展示名：频道 level=1 译文 > i18n > 服务端 title > 巴利 toc。
   const [titles, setTitles] = useState<Map<number, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
-  // 本地下载记录（并集的另一半，也用来把已下载的排到前面）。
-  const [local, setLocal] = useState<Map<number, DownloadProgress>>(new Map());
-  // 各书的实时状态（卡片回报），只用于过滤。
-  const [status, setStatus] = useState<Map<number, Filter>>(new Map());
+  // 本地下载记录（并集的另一半，也用来把已下载的排到前面）：来自下载调度器快照，实时。
+  const downloadRows = useDownloadRows();
+  const local = useMemo(
+    () =>
+      new Map(
+        downloadRows.filter((r) => r.channel === uid).map((r) => [r.book, r]),
+      ),
+    [downloadRows, uid],
+  );
   const [filter, setFilter] = useState<Filter>("all");
   const [menu, setMenu] = useState(false);
-  // 「全部下载」的进度（第几本 / 共几本）；null 表示没在批量下载。
-  const [bulk, setBulk] = useState<{ done: number; total: number } | null>(
-    null,
-  );
   // 列表｜分类 视图切换。
   const [view, setView] = useState<ViewMode>("list");
   // 分类视图的下钻路径（根 → 当前节点；空数组 = 根层）。叶子也 push 进来，
   // 这样面包屑能显示完整路径，「是否在叶子」由最后一项 `isLeaf` 判定。
   const [catPath, setCatPath] = useState<CategoryNode[]>([]);
-  const stopped = useRef(false);
 
   useEffect(() => {
     let alive = true;
     // 频道名先记进本地 channels 表：书架列表靠它把 uid 显示成人话。
     void rememberChannelName(uid, name);
 
-    listDownloads().then((rows) => {
-      if (!alive) return;
-      setLocal(
-        new Map(rows.filter((r) => r.channel === uid).map((r) => [r.book, r])),
-      );
-    });
     fetchChannel(uid)
       .then((c) => alive && setInfo(c))
       .catch(() => undefined);
@@ -174,15 +174,6 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       alive = false;
     };
   }, [books, locale, uid]);
-
-  // 离开页面就别再往下下一本了 —— 批量下载是用户在这个页面上发起的动作。
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", () => {
-        stopped.current = true;
-      }),
-    [navigation],
-  );
 
   // 标题栏右上角的过滤器：只在「列表」视图出现。
   useEffect(() => {
@@ -222,28 +213,19 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
       }
     }
     const downloaded = (b: ChannelBook) =>
-      (status.get(b.book) ?? bucket(local.get(b.book))) === "done" ? 0 : 1;
+      bucket(local.get(b.book)) === "done" ? 0 : 1;
     return rows.sort(
       (a, b) => downloaded(a) - downloaded(b) || a.book - b.book,
     );
-  }, [books, local, status]);
+  }, [books, local]);
 
   const visible = useMemo(
     () =>
       merged?.filter(
-        (b) =>
-          filter === "all" ||
-          (status.get(b.book) ?? bucket(local.get(b.book))) === filter,
+        (b) => filter === "all" || bucket(local.get(b.book)) === filter,
       ) ?? null,
-    [merged, filter, status, local],
+    [merged, filter, local],
   );
-
-  const onProgress = useCallback((p: DownloadProgress) => {
-    const next = bucket(p);
-    setStatus((prev) =>
-      prev.get(p.book) === next ? prev : new Map(prev).set(p.book, next),
-    );
-  }, []);
 
   /** 书名：优先已解析的（频道译文 / i18n），没解析完就退回本地书目 toc。 */
   const bookTitle = useCallback(
@@ -267,29 +249,40 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
     [navigation, uid, name, bookTitle],
   );
 
-  const downloadAll = async () => {
+  /** 「全部下载」：一次性把没下完的书全部入队（调度器逐本下，离开页面也不停）。 */
+  const downloadAll = () => {
     if (!merged) return;
-    stopped.current = false;
-    setBulk({ done: 0, total: merged.length });
-    // 逐个下载：一本下完再下一本（下载层串行，这里只是按序发起）。
-    for (let i = 0; i < merged.length; i += 1) {
-      if (stopped.current) break;
-      setBulk({ done: i, total: merged.length });
-      try {
-        await downloadBook(uid, merged[i].book, undefined, merged[i].para);
-      } catch {
-        // 单本失败不中断整批：书列表里那一行会显示失败状态。
-      }
-    }
-    setBulk(null);
+    const todo = merged.filter((b) => local.get(b.book)?.status !== "done");
+    void requestDownload(
+      todo.map((b) => ({ channel: uid, book: b.book, anchorPara: b.para })),
+      { batch: true, skipped: merged.length - todo.length },
+    );
   };
 
-  const stopAll = () => {
-    stopped.current = true;
-    const running = merged?.find((b) => isDownloading(uid, b.book));
-    if (running) pauseDownload(uid, running.book);
-    setBulk(null);
-  };
+  // 本频道进行中的下载：有的话「全部下载」换成批次进度（点进下载管理）+ 全部暂停。
+  const active = useMemo(
+    () => [...local.values()].filter((r) => bucket(r) === "downloading"),
+    [local],
+  );
+  const batch = useMemo(() => {
+    if (active.length === 0) return null;
+    // 最近一批（batch_id 越大越新）；单本发起的没有批次，就按进行中的本数算。
+    const id = active.reduce<string | null>(
+      (best, r) => (r.batchId && (!best || r.batchId > best) ? r.batchId : best),
+      null,
+    );
+    const rows = id ? [...local.values()].filter((r) => r.batchId === id) : active;
+    // 都在等（后台 / 没网 / 等 Wi‑Fi）时显示原因，而不是一个不动的速度。
+    const waiting = active.every((r) => r.status === "waiting") ? active[0].reason : null;
+    return {
+      done: rows.filter((r) => r.status === "done").length,
+      total: rows.length,
+      waiting,
+    };
+  }, [active, local]);
+
+  const pauseChannel = () =>
+    void pauseAllDownloads(active.map((r) => ({ channel: r.channel, book: r.book })));
 
   const studio = studioLabel(info?.studio);
   const readonly = mode !== "download";
@@ -376,13 +369,11 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
           channelId={uid}
           paragraph={b.para}
           readonly={readonly}
-          watch={bulk !== null}
           onPress={() => openBook(b)}
-          onProgress={onProgress}
         />
       );
     },
-    [bookTitle, openBook, onProgress, readonly, bulk, t, uid],
+    [bookTitle, openBook, readonly, t, uid],
   );
 
   const renderItem: ListRenderItem<Row> = useCallback(
@@ -448,30 +439,48 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
             {t("channel.books")}
             {visible ? ` · ${t("channel.bookCount", { n: visible.length })}` : ""}
           </Text>
-          {!readonly && merged && merged.length > 0 ? (
-            bulk ? (
-              <Pressable style={styles.action} onPress={stopAll} hitSlop={6}>
-                <Ionicons name="pause" size={16} color={colors.vermilion} />
-                <Text style={styles.actionText}>
-                  {t("channel.downloading", {
-                    done: bulk.done,
-                    total: bulk.total,
-                  })}
-                </Text>
-              </Pressable>
-            ) : (
-              <Pressable style={styles.action} onPress={downloadAll} hitSlop={6}>
-                <Ionicons
-                  name="cloud-download-outline"
-                  size={16}
-                  color={colors.vermilion}
-                />
-                <Text style={styles.actionText}>{t("channel.downloadAll")}</Text>
-              </Pressable>
-            )
+          {!readonly && merged && merged.length > 0 && !batch ? (
+            <Pressable style={styles.action} onPress={downloadAll} hitSlop={6}>
+              <Ionicons
+                name="cloud-download-outline"
+                size={16}
+                color={colors.vermilion}
+              />
+              <Text style={styles.actionText}>{t("channel.downloadAll")}</Text>
+            </Pressable>
           ) : null}
         </View>
-      ) : (
+      ) : null}
+      {view === "list" && !readonly && batch ? (
+        // 本频道有进行中的下载：批次进度（点进下载管理）+ 全部暂停，单独一行。
+        <View style={styles.batch}>
+          <Pressable
+            style={styles.batchMain}
+            onPress={() => navigation.navigate("Downloads")}
+            hitSlop={6}
+          >
+            <Ionicons name="cloud-download" size={16} color={colors.vermilion} />
+            <Text style={styles.actionText} numberOfLines={1}>
+              {t("channel.downloading", { done: batch.done, total: batch.total })}
+              {batch.waiting
+                ? ` · ${t(WAIT_LABEL[batch.waiting] ?? "download.waiting")}`
+                : ""}
+              <BatchSpeed channelId={uid} />
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.vermilion} />
+          </Pressable>
+          <Pressable
+            style={styles.batchPause}
+            onPress={pauseChannel}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Ionicons name="pause" size={14} color={colors.vermilion} />
+            <Text style={styles.actionText}>{t("download.pauseAll")}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {view === "list" ? null : (
         <Breadcrumb
           items={crumb}
           trailing={t("categoryBrowse.count", { n: catTotal })}
@@ -545,6 +554,13 @@ export function ChannelDetailScreen({ route, navigation }: Props) {
   );
 }
 
+/** 批次进度后面的速度：单独订阅，每秒的测速刷新只重画这一小段。 */
+function BatchSpeed({ channelId }: { channelId: string }) {
+  const { key, speed } = useRunningDownload();
+  if (!key?.startsWith(`${channelId}/`) || speed <= 0) return null;
+  return <Text>{` · ${formatSpeed(speed)}`}</Text>;
+}
+
 /**
  * 同一本书可能有多条 level=1 记录（一个文件装多部作品）。下载是按 book
  * 整本下的，同 book 留进度最高的一条，免得列出两行一模一样的下载控件。
@@ -607,6 +623,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+  },
+  batch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: "#f3e6d6",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  batchMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  batchPause: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   actionText: {
     ...type.caption,

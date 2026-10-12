@@ -354,13 +354,13 @@ export async function fetchChapterBlock(
   after: string | null,
   pageSize?: number,
   unit?: "para" | "byte",
-): Promise<{ nextCursor: string | null; total?: number } | null> {
+): Promise<{ nextCursor: string | null; total?: number; bytes: number } | null> {
   const outcome = await fetchReadChapter(book, channelId, after, {
     pageSize,
     unit,
   });
   if (outcome.status === "offline") return null;
-  if (outcome.status === "empty") return { nextCursor: null };
+  if (outcome.status === "empty") return { nextCursor: null, bytes: 0 };
 
   const block = outcome.block;
   if (block.items.length > 0) {
@@ -374,7 +374,7 @@ export async function fetchChapterBlock(
       block.items,
     );
   }
-  return { nextCursor: block.nextCursor, total: block.total };
+  return { nextCursor: block.nextCursor, total: block.total, bytes: block.bytes };
 }
 
 export interface CacheUsage {

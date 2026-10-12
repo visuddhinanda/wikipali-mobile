@@ -2,22 +2,16 @@
  * 紧凑的下载按钮：一个图标 +（下载中时）百分比。
  *
  * 用在空间紧张、又需要「一眼看见 + 一键触发」的地方：
- * 阅读器顶栏、版本列表的每一行。
+ * 阅读器顶栏、版本列表的每一行。状态来自下载调度器快照。
  *
- * 只做「开始 / 暂停」。删除、错误详情等管理操作在 `DownloadControl`
- * （阅读器设置弹层、书架「已下载」）。
+ * 只做「开始 / 暂停 / 继续」。删除、错误详情等管理操作在频道页与下载管理页。
  */
-import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  downloadBook,
-  getDownloadProgress,
-  isDownloading,
-  pauseDownload,
-  percent,
-  type DownloadProgress,
-} from "../reading";
+import { pauseDownload, percent, resumeDownload } from "../reading";
+import { useDownloadRow } from "../hooks/useDownloads";
+import { requestDownload } from "./downloadRequest";
 
 interface Props {
   book: number;
@@ -28,8 +22,8 @@ interface Props {
   size?: number;
   /** 下载时所在段（用于同步时向上搜索到 level=1 锚定「书」）。 */
   paragraph?: number;
-  /** 进度变化后的回调（列表据此刷新）。 */
-  onChanged?: (p: DownloadProgress) => void;
+  /** 移动网络询问面板里显示的书名。 */
+  title?: string;
 }
 
 export function DownloadIconButton({
@@ -39,62 +33,30 @@ export function DownloadIconButton({
   doneColor = "#52c41a",
   size = 20,
   paragraph,
-  onChanged,
+  title,
 }: Props) {
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-
-  const refresh = useCallback(async () => {
-    setProgress(await getDownloadProgress(channelId, book));
-  }, [book, channelId]);
-
-  useEffect(() => {
-    let alive = true;
-    getDownloadProgress(channelId, book).then((p) => {
-      if (alive) setProgress(p);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [book, channelId]);
-
-  // 下载可能是在别处发起的（比如从版本列表点的，再进阅读器），轮询同步状态；
-  // 自身还停在「下载中/排队中」时也继续轮询，直到拉到最终状态。
-  useEffect(() => {
-    if (
-      !isDownloading(channelId, book) &&
-      progress?.status !== "downloading" &&
-      progress?.status !== "queued"
-    )
-      return;
-    const timer = setInterval(refresh, 1000);
-    return () => clearInterval(timer);
-  }, [book, channelId, refresh, progress?.status]);
-
-  const running = progress?.status === "downloading" && isDownloading(channelId, book);
-  const queued = progress?.status === "queued";
-  const done = progress?.status === "done";
-  const pct = progress ? percent(progress) : 0;
+  const { row: p } = useDownloadRow(channelId, book);
+  const status = p?.status ?? "pending";
+  const done = status === "done";
+  const active =
+    status === "downloading" ||
+    status === "queued" ||
+    (status === "waiting" && p?.reason !== "wifi_ready");
 
   const onPress = () => {
     if (done) return;
-    if (running || queued) {
-      pauseDownload(channelId, book);
-      refresh();
-      return;
-    }
-    downloadBook(channelId, book, (p) => {
-      setProgress(p);
-      onChanged?.(p);
-    }, paragraph).finally(refresh);
+    if (active) return void pauseDownload(channelId, book);
+    if (p && status !== "pending") return void resumeDownload(channelId, book);
+    void requestDownload([{ channel: channelId, book, anchorPara: paragraph }], { title });
   };
 
   const icon: keyof typeof Ionicons.glyphMap = done
     ? "cloud-done"
-    : progress?.status === "error"
+    : status === "error"
       ? "alert-circle-outline"
-      : running
+      : status === "downloading"
         ? "pause-circle-outline"
-        : queued
+        : status === "queued" || status === "waiting"
           ? "time-outline"
           : "cloud-download-outline";
 
@@ -102,8 +64,8 @@ export function DownloadIconButton({
     <Pressable style={styles.wrap} onPress={onPress} hitSlop={8}>
       <Ionicons name={icon} size={size} color={done ? doneColor : color} />
       {/* 未开始不显示数字；下载中/暂停显示百分比，便于一眼看进度 */}
-      {!done && progress && progress.done > 0 ? (
-        <Text style={[styles.pct, { color }]}>{pct}%</Text>
+      {!done && p && p.done > 0 ? (
+        <Text style={[styles.pct, { color }]}>{percent(p)}%</Text>
       ) : null}
     </Pressable>
   );

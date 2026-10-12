@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CopilotKitProvider } from '@copilotkit/react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/auth/AuthContext';
+import { DownloadPromptHost } from './src/components/DownloadPromptHost';
 import { I18nProvider } from './src/i18n/I18nContext';
 import { useUposathaNotifications } from './src/calendar/useUposathaNotifications';
 import { effectiveRuntimeUrl, useDebugConfig } from './src/settings/debug';
@@ -29,6 +30,7 @@ export default function App() {
             <AuthProvider>
               <RootNavigator />
             </AuthProvider>
+            <DownloadPromptHost />
           </I18nProvider>
           <StatusBar style="dark" />
         </CopilotKitProvider>

@@ -2,35 +2,26 @@
  * 频道详情里的一本书：两行卡片，底色当进度条。
  *
  *   第一行  作品名
- *   第二行  义注 · 已译 88% · 已下载 · 删除
+ *   第二行  义注 · 已译 88% · 下载中 · 1.2 MB / ~3.4 MB · 180 KB/s
  *
- * 进度不再单列一行环形控件 —— 卡片自己被填满多少就是下到哪了，
- * 一屏能多放几本书，扫一眼也知道整批下到什么程度。
+ * 状态来自下载调度器的快照（`useDownloadRow`），不再自己轮询。
+ * 已下载的整张卡点了就去读，右侧只留一个删除图标；没下完的右侧是
+ * 下载 / 暂停 / 继续 / 重试。
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   clearDownloadData,
-  downloadBook,
-  getDownloadProgress,
-  isDownloading,
   pauseDownload,
   removeDownload,
-  type DownloadProgress,
+  resumeDownload,
 } from "../reading";
+import { useDownloadRow } from "../hooks/useDownloads";
+import { requestDownload } from "./downloadRequest";
+import { statusLine } from "./downloadText";
 import { colors, radius, spacing, type, serifFont } from "../theme";
 import { useT } from "../i18n/I18nContext";
-import type { MessageKey } from "../i18n";
-
-const STATUS_LABEL: Record<DownloadProgress["status"], MessageKey> = {
-  pending: "download.notDownloaded",
-  queued: "download.queued",
-  downloading: "download.downloading",
-  paused: "download.paused",
-  done: "download.done",
-  error: "download.failed",
-};
 
 interface Props {
   book: number;
@@ -40,108 +31,82 @@ interface Props {
   channelId: string;
   /** 下载时所在段（用于同步时向上搜索到 level=1 锚定「书」）。 */
   paragraph?: number;
-  /** 外部（「全部下载」）正在跑时强制轮询，见 DownloadControl 同名参数。 */
-  watch?: boolean;
   /** 只读模式：不显示下载动作，仅书名 + 信息。 */
   readonly?: boolean;
   onPress: () => void;
-  /** 进度变化（用于父级筛选与排序）。 */
-  onProgress?: (p: DownloadProgress) => void;
 }
 
-export function BookDownloadCard({
+export const BookDownloadCard = React.memo(BookDownloadCardImpl, (a, b) =>
+  // onPress 每次都是新的箭头函数，比较时跳过；它依赖的书名变了 title 也会变。
+  a.book === b.book &&
+  a.title === b.title &&
+  a.meta === b.meta &&
+  a.channelId === b.channelId &&
+  a.paragraph === b.paragraph &&
+  a.readonly === b.readonly,
+);
+
+function BookDownloadCardImpl({
   book,
   title,
   meta,
   channelId,
   paragraph,
-  watch = false,
   readonly = false,
   onPress,
-  onProgress,
 }: Props) {
   const t = useT();
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { row: p, speed } = useDownloadRow(channelId, book);
 
-  // 回调放 ref 里：父级通常传的是行内箭头函数，直接进依赖会让下面的
-  // 「取一次进度」effect 每次渲染都重跑，setState 再触发渲染，转成死循环。
-  const report = useRef(onProgress);
-  report.current = onProgress;
-
-  const apply = useCallback((p: DownloadProgress) => {
-    setProgress(p);
-    report.current?.(p);
-  }, []);
-
-  const refresh = useCallback(async () => {
-    apply(await getDownloadProgress(channelId, book));
-  }, [apply, book, channelId]);
-
-  useEffect(() => {
-    let alive = true;
-    getDownloadProgress(channelId, book).then((p) => {
-      if (alive) apply(p);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [apply, book, channelId]);
-
-  useEffect(() => {
-    // 卡片自身还停在「下载中/排队中」时也继续轮询：外部批量下载结束后，最后一次
-    // 轮询可能晚于完成，靠这里再拉一次把「已下载/失败/暂停」刷新出来。
-    if (
-      !watch &&
-      !isDownloading(channelId, book) &&
-      progress?.status !== "downloading" &&
-      progress?.status !== "queued"
-    )
-      return;
-    const timer = setInterval(refresh, 1000);
-    return () => clearInterval(timer);
-  }, [book, channelId, refresh, watch, progress?.status]);
-
-  const p = progress;
-  const running = p?.status === "downloading" && isDownloading(channelId, book);
-  const queued = p?.status === "queued";
+  const status = p?.status ?? "pending";
   const ratio = p && p.total > 0 ? Math.min(1, p.done / p.total) : 0;
+  const line = statusLine(t, p, { speed });
 
-  const start = async () => {
-    setBusy(true);
-    try {
-      await downloadBook(channelId, book, apply, paragraph);
-    } finally {
-      setBusy(false);
-      void refresh();
-    }
-  };
+  const start = () =>
+    void requestDownload([{ channel: channelId, book, anchorPara: paragraph }], {
+      title,
+    });
 
   const remove = () => {
     Alert.alert(t("download.delete"), t("download.deleteChoose"), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("download.deleteDataOnly"),
-        onPress: async () => {
-          if (isDownloading(channelId, book)) pauseDownload(channelId, book);
-          await clearDownloadData(channelId, book);
-          await refresh();
-        },
+        onPress: () => void clearDownloadData(channelId, book),
       },
       {
         text: t("download.deleteDataAndRecord"),
         style: "destructive",
-        onPress: async () => {
-          if (isDownloading(channelId, book)) pauseDownload(channelId, book);
-          await removeDownload(channelId, book);
-          await refresh();
-        },
+        onPress: () => void removeDownload(channelId, book),
       },
     ]);
   };
 
-  const status = p ? t(STATUS_LABEL[p.status]) : "";
-  const sub = [meta, status].filter(Boolean).join(" · ");
+  const action = (() => {
+    if (readonly) return null;
+    if (status === "done") {
+      return <IconAction icon="trash-outline" muted label={t("download.delete")} onPress={remove} />;
+    }
+    if (status === "downloading" || status === "queued") {
+      return (
+        <Action icon="pause" label={t("download.pause")} onPress={() => void pauseDownload(channelId, book)} />
+      );
+    }
+    if (status === "waiting") {
+      return p?.reason === "wifi_ready" ? (
+        <Action icon="play" label={t("download.start")} onPress={() => void resumeDownload(channelId, book)} />
+      ) : (
+        <Action icon="pause" label={t("download.pause")} onPress={() => void pauseDownload(channelId, book)} />
+      );
+    }
+    if (status === "paused") {
+      return <Action icon="play" label={t("download.resume")} onPress={() => void resumeDownload(channelId, book)} />;
+    }
+    if (status === "error") {
+      return <Action icon="refresh" label={t("download.retry")} onPress={() => void resumeDownload(channelId, book)} />;
+    }
+    return <Action icon="cloud-download-outline" label={t("download.start")} onPress={start} />;
+  })();
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -151,13 +116,7 @@ export function BookDownloadCard({
           右边仍留一条没填上的白边。 */}
       {ratio > 0 ? (
         <View style={styles.fillLayer} pointerEvents="none">
-          <View
-            style={[
-              styles.fill,
-              { flex: ratio },
-              p?.status === "done" && styles.fillDone,
-            ]}
-          />
+          <View style={[styles.fill, { flex: ratio }, status === "done" && styles.fillDone]} />
           <View style={{ flex: 1 - ratio }} />
         </View>
       ) : null}
@@ -166,44 +125,26 @@ export function BookDownloadCard({
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.sub} numberOfLines={1}>
-          {sub}
-          {running && p ? ` · ${Math.round(ratio * 100)}%` : ""}
+        <Text style={styles.sub} numberOfLines={2}>
+          {meta ? `${meta} · ` : ""}
+          <Text
+            style={
+              line.tone === "warn"
+                ? styles.warn
+                : line.tone === "error"
+                  ? styles.error
+                  : undefined
+            }
+          >
+            {line.text}
+          </Text>
         </Text>
       </View>
 
       {readonly ? (
         <Ionicons name="chevron-forward" size={18} color={colors.vermilion} />
       ) : (
-        <View style={styles.actions}>
-          {running || queued ? (
-            <Action
-              icon="pause"
-              label={t("download.pause")}
-              onPress={() => {
-                pauseDownload(channelId, book);
-                void refresh();
-              }}
-            />
-          ) : p?.status !== "done" ? (
-            <Action
-              icon="cloud-download-outline"
-              label={
-                p && p.done > 0 ? t("download.resume") : t("download.start")
-              }
-              disabled={busy}
-              onPress={start}
-            />
-          ) : null}
-          {p && p.done > 0 ? (
-            <Action
-              icon="trash-outline"
-              label={t("download.delete")}
-              muted
-              onPress={remove}
-            />
-          ) : null}
-        </View>
+        <View style={styles.actions}>{action}</View>
       )}
     </Pressable>
   );
@@ -212,26 +153,41 @@ export function BookDownloadCard({
 function Action({
   icon,
   label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.action} onPress={onPress} hitSlop={8}>
+      <Ionicons name={icon} size={16} color={colors.vermilion} />
+      <Text style={styles.actionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** 只有图标的按钮（已下载的删除）；label 给读屏用。 */
+function IconAction({
+  icon,
+  label,
   muted,
-  disabled,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   muted?: boolean;
-  disabled?: boolean;
   onPress: () => void;
 }) {
-  const color = muted ? colors.inkSoft : colors.vermilion;
   return (
     <Pressable
-      style={[styles.action, disabled && styles.actionDisabled]}
+      style={styles.iconAction}
       onPress={onPress}
-      disabled={disabled}
-      hitSlop={8}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
-      <Ionicons name={icon} size={16} color={color} />
-      <Text style={[styles.actionText, { color }]}>{label}</Text>
+      <Ionicons name={icon} size={19} color={muted ? colors.inkSoft : colors.vermilion} />
     </Pressable>
   );
 }
@@ -276,20 +232,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: colors.inkSoft,
   },
+  warn: {
+    color: colors.ochre,
+  },
+  error: {
+    color: "#b0412e",
+  },
   actions: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    marginLeft: spacing.sm,
   },
   action: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
   },
-  actionDisabled: {
-    opacity: 0.5,
-  },
   actionText: {
     ...type.small,
+    color: colors.vermilion,
+  },
+  iconAction: {
+    padding: 4,
   },
 });

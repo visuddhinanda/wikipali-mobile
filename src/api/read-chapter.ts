@@ -39,6 +39,11 @@ export interface ReadChapterBlock {
   total?: number;
   /** 本块之后过滤范围内还剩多少段有译文。仅在带 `book` 过滤时给。 */
   remaining?: number;
+  /**
+   * 本块传输的数据量（字节）：优先响应头 `Content-Length`；压缩 / 分块传输时
+   * 没有该头，退回按响应 JSON 文本长度估算。用于下载管理的数据量与速度。
+   */
+  bytes: number;
 }
 
 export type ReadChapterOutcome =
@@ -95,6 +100,10 @@ export async function fetchReadChapter(
   const { items, meta } = unwrapV3Collection<ReadParaItem>(data);
   if (items.length === 0) return { status: "empty" };
 
+  const header = Number(response.headers.get("content-length"));
+  const bytes =
+    Number.isFinite(header) && header > 0 ? header : JSON.stringify(data).length;
+
   const nextCursor =
     typeof meta.next_cursor === "string" && meta.next_cursor !== ""
       ? meta.next_cursor
@@ -106,6 +115,7 @@ export async function fetchReadChapter(
       nextCursor,
       total: metaInt(meta, "total"),
       remaining: metaInt(meta, "remaining"),
+      bytes,
     },
   };
 }
