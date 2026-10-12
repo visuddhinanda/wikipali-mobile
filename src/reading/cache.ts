@@ -11,7 +11,7 @@
  */
 import {
   CHAPTER_PAGE_UNIT,
-  DOWNLOAD_PAGE_SIZE,
+  READ_PAGE_SIZE,
   DOWNLOAD_TIMEOUT_MS,
   fetchReadChapter,
 } from "../api/read-chapter";
@@ -142,7 +142,7 @@ async function fillGap(
       from,
       to,
       channelId,
-      { after, pageSize: DOWNLOAD_PAGE_SIZE, unit: CHAPTER_PAGE_UNIT },
+      { after, pageSize: READ_PAGE_SIZE, unit: CHAPTER_PAGE_UNIT },
     );
     if (items.length === 0) {
       exhausted = true;

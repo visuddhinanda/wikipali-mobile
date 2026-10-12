@@ -24,15 +24,22 @@ import { t } from "../i18n";
 import { metaInt, unwrapV3Collection } from "./v3";
 import type { ReadParaItem } from "./read-para";
 
-/** 整本下载的每块大小：5000 字节原文长度，**服务端的字节上限**。 */
-export const DOWNLOAD_PAGE_SIZE = 5000;
+/**
+ * 整本下载的每块大小：按段落累加的**巴利原文**字节数，不是响应体大小 —— 返回的是渲染好的
+ * HTML，实际一块约为它的 4～8 倍（50000 → 约 200～400 KB）。块越大往返越少；下载单写者逐本跑，
+ * 往返延迟是速度的大头。依赖服务端放宽 `page_size` 上限（原上限 5000）。
+ */
+export const DOWNLOAD_PAGE_SIZE = 50000;
+
+/** 阅读补缺口（区间接口）的每块大小：只取一个阅读单元的范围，保持小块、首屏快。 */
+export const READ_PAGE_SIZE = 5000;
 
 /**
  * 整本下载每块请求的超时。服务端发完响应头后卡住时，没有超时的话这一块会永远挂着，
  * 而下载是单写者逐本跑的，整个队列都会停住（`docs/download-manager.md` §5.2）。
- * 一块 5000 字节原文，正常一两秒内回来，30 秒足够宽。
+ * 一块约 200～400 KB：本地实测 1 秒内；慢速移动网络（约 10 KB/s）也要在 40 秒内，取 60 秒。
  */
-export const DOWNLOAD_TIMEOUT_MS = 30_000;
+export const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 /** 请求超时（区别于「没网」：调度器按失败退避重试，而不是当作等网络）。 */
 export class RequestTimeoutError extends Error {
