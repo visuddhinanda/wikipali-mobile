@@ -99,15 +99,28 @@ CREATE TABLE IF NOT EXISTS channels (
 CREATE TABLE IF NOT EXISTS download_state (
   channel    TEXT    NOT NULL,   -- 版本 uid
   book       INTEGER NOT NULL,   -- 书 id
-  status     TEXT    NOT NULL,   -- pending | downloading | paused | done | error
+  status     TEXT    NOT NULL,   -- pending | queued | downloading | waiting | paused | done | error
   total      INTEGER NOT NULL,   -- 分母：该版本本书有译文的段数
   done       INTEGER NOT NULL,   -- 分子：已缓存到有正文的段数
   error      TEXT,               -- 最近一次错误信息
   updated_at INTEGER NOT NULL,   -- epoch ms
   server_id  TEXT,               -- 同步后回填的服务器 like.id（type=download）
+  cursor     TEXT,               -- 断点续传游标（tipitaka-reading 的 next_cursor）
+  -- 下载管理（docs/download-manager.md §9，ensureColumn 补列）
+  pause_reason   TEXT,           -- waiting/paused 的原因：background | network | wifi | wifi_ready | retry | user
+  queue_pos      INTEGER,        -- 排队顺序（置顶 = min-1）
+  batch_id       TEXT,           -- 「全部下载」批次，频道页批次进度据此聚合
+  bytes          INTEGER NOT NULL DEFAULT 0, -- 已传输字节（续传累加）
+  attempts       INTEGER NOT NULL DEFAULT 0, -- 连续失败次数（退避重试）
+  next_retry_at  INTEGER,        -- 退避到点时间
+  anchor_para    INTEGER,        -- 发起下载时所在段（完成时同步锚点向上搜到 level=1）
+  allow_cellular INTEGER NOT NULL DEFAULT 0, -- 用户放行了移动网络（「立即下载」）
   PRIMARY KEY (channel, book)
 );
 ```
+
+- **队列的唯一真源**：排队 / 等待 / 暂停都落在这张表里，进程被杀后冷启动对账
+  （`downloading` 与系统等待 → `queued`）原样续上；调度见 `src/reading/downloadManager.ts`。
 
 - 主键 `(channel, book)` = 「某版本下的一整本书」为一条下载记录。
 - `status=done` 时入队一条下载同步（`type=download`），**只同步记录、不同步正文**。
@@ -232,7 +245,7 @@ CREATE TABLE IF NOT EXISTS sync_outbox (
 
 1. **建目录**：`SQLite/users/<uuid>/` 不存在则 `create({ intermediates: true })`。
 2. **旧文件搬迁**（一次性）：若共享的 `SQLite/reading.db3` 还在、且目标 `<uuid>/reading.db3` 不存在，`move` 过去（旧库 = 上一个游客的库）。
-3. **补列**（`ensureColumn`）：`PRAGMA table_info` 探测后按需 `ALTER TABLE` —— 现在补 `para_html.expires_at`、`download_state.server_id`。
+3. **补列**（`ensureColumn`）：`PRAGMA table_info` 探测后按需 `ALTER TABLE` —— 现在补 `para_html.expires_at`、`download_state.server_id` / `cursor` 与下载管理那批列（`DOWNLOAD_QUEUE_COLUMNS`）。
 4. **旧 AsyncStorage 搬迁**（一次性，`src/data/migrate.ts`）：把 `@wikipali/reading-history` / `@wikipali/bookmarks` / `@wikipali/starred-books` 三条 JSON 灌进游客库对应表，随后删除旧 key。
 5. **`migrateParaHtmlNullable`**：老库 `para_html.html` 是 NOT NULL 且空段写空串，重建表改成可空、空串转 NULL。
 

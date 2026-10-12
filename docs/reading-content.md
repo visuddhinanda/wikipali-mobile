@@ -421,25 +421,16 @@ CREATE TABLE IF NOT EXISTS download_state (
 5. `next_cursor == null` 即取完；暂停 / 取消 = 停止循环，已写入的数据全部
    有效，`status` 置 `paused`、游标保留。
 
-**串行下载**（`src/reading/download.ts`）：
+**排队、暂停、前后台与网络切换**由下载调度器负责（`src/reading/downloadManager.ts`），
+设计与状态机见 [`download-manager.md`](./download-manager.md)。要点：
 
-- 同一时刻**只跑一个下载循环**（并发 1，逐个下载）：`downloadBook` 内部用一个
-  promise 链（`chain`）串行化，后点的那本等前面那本结束才开跑；同一本书重复点
-  直接回当前进度。
-- 排队中：当有别的书在跑/在排队时，新点的书 `status='queued'`（「排队中」），
-  等链轮到它才转 `downloading`；排队中可「暂停」撤出队列（有数据 → `paused`，
-  无数据 → `pending`）。
-- 暂停（`pauseDownload`）：跑着的置取消、下一块边界写 `paused`；排队中的撤出队列。
-- 读写库都走 `withReadingTransaction` / `withReadingWrite`（持连接锁），事务执行期间
-  同连接的其它查询插不进来（并发模型见 `docs/user-data-db.md` §8）。
-
-**切换用户时的「全部暂停」**（`pauseAllDownloads`，登录/登出前由 auth 层调用）：
-
-- 当前正在下载 → `paused`（保留 cursor，登录回来可续传）；
-- 等待中的不再开跑（`suspended` 标志，`runDownloadLoop` 开头检查后直接返回）；
-- 清空执行体，**防止旧账号的下载循环把数据写进新账号的 `reading.db3`**。
-
-冷启动对账（`reconcileDownloads`）：上次进程被杀残留的 `downloading` / `queued` → `paused`。
+- `download_state` 是队列的唯一真源（`queue_pos` / `pause_reason` / `anchor_para` 落库），
+  「全部下载」一次事务把整批写成 `queued`；
+- **单写者**：同一时刻只跑一本（expo-sqlite 并发原生调用会 NPE，见 `download-manager.md` §5.2）；
+- 系统原因（后台 / 断网 / 等 Wi‑Fi / 失败退避）记 `waiting`，条件满足自动恢复；只有用户暂停记 `paused`；
+- 冷启动对账：`downloading` 与系统等待 → `queued`，自动续传；
+- 切用户前 `suspendDownloads` 停下当前循环（回排队、保留 cursor），作用域切换后对新库续上，
+  **防止旧账号的下载循环把数据写进新账号的 `reading.db3`**。
 
 整本取完时把 `done` 按 `total` 写满：服务端数的是「有句子的段」，客户端数的是
 「渲染出正文的段」，个别段两边会差一点，不补的话进度条永远停在 99%。

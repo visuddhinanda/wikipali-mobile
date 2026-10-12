@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>下载管理原型</title>
+<!-- 下载管理重构的交互原型（只演示操作与 UI，数据全是模拟的）。设计见 docs/download-manager.md -->
+<style>
+  :root {
+    --paper: #f7f3ea;
+    --paper-raised: #fdfaf1;
+    --paper-sunken: #efe8d8;
+    --ink: #3a3128;
+    --ink-soft: #6b5f4e;
+    --ink-faint: #9a8c76;
+    --vermilion: #8c3b2e;
+    --ochre: #a06b2c;
+    --jade: #4f7a5a;
+    --danger: #b0412e;
+    --hairline: #e4dbc6;
+    --border: #d8cdb4;
+    --on-accent: #fdfaf1;
+    --stage: #d9d3c6;
+    --stage-ink: #3a3128;
+    --stage-soft: #6b5f4e;
+    --panel: #f1ece1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --stage: #1d1a16; --stage-ink: #ece5d8; --stage-soft: #b3a892; --panel: #2a2620;
+    }
+  }
+  :root[data-theme="dark"] { --stage: #1d1a16; --stage-ink: #ece5d8; --stage-soft: #b3a892; --panel: #2a2620; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--stage); color: var(--stage-ink);
+    font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh; padding: 20px 16px 40px;
+  }
+  button { font: inherit; cursor: pointer; }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lead { font-size: 13px; color: var(--stage-soft); line-height: 1.6; margin: 0 0 16px; }
+  .lead code { font-size: 12px; }
+  .layout { display: flex; gap: 24px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+
+  /* ---------- 手机 ---------- */
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .seg { display: flex; background: var(--panel); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: var(--stage-soft); padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+  .seg button.on { background: var(--paper-raised); color: var(--vermilion); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .phone {
+    width: 380px; max-width: 100%; height: 760px;
+    border-radius: 40px; background: #0f0d0a; padding: 10px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.35);
+  }
+  .screen {
+    position: relative; width: 100%; height: 100%; border-radius: 30px; overflow: hidden;
+    background: var(--paper); color: var(--ink); display: flex; flex-direction: column;
+  }
+  .statusbar { flex: 0 0 auto; height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 11px; color: var(--ink-soft); }
+  .appbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--hairline); background: var(--paper-raised); }
+  .appbar .back { color: var(--vermilion); font-size: 22px; line-height: 1; }
+  .appbar .title { font-size: 16px; font-weight: 600; flex: 1; }
+  .appbar .icon { color: var(--ink-soft); font-size: 13px; border: 0; background: none; }
+  .body { flex: 1; overflow-y: auto; padding: 12px 14px 20px; }
+  .body::-webkit-scrollbar { width: 0; }
+
+  .card { background: var(--paper-raised); border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 14px; }
+  .muted { color: var(--ink-soft); font-size: 12px; }
+  .faint { color: var(--ink-faint); font-size: 11px; }
+  .row-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--border); background: var(--paper-raised); color: var(--ink); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+  .btn.primary { background: var(--vermilion); color: var(--on-accent); border-color: var(--vermilion); }
+  .btn.ghost { border-color: transparent; color: var(--vermilion); background: transparent; padding: 5px 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--vermilion); color: var(--vermilion); border-radius: 999px; padding: 5px 12px; font-size: 13px; background: transparent; }
+  .pill .spin { width: 10px; height: 10px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 2px 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .section-h .act { font-weight: 400; color: var(--vermilion); border: 0; background: none; font-size: 12px; padding: 0; }
+
+  .item { position: relative; display: flex; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--hairline); }
+  .item:last-child { border-bottom: 0; }
+  .item .main { flex: 1; min-width: 0; }
+  .item .name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.45; }
+  .item .sub.warn { color: var(--ochre); }
+  .item .sub.err { color: var(--danger); }
+  .item .sub.ok { color: var(--jade); }
+  .bar { height: 4px; border-radius: 2px; background: var(--paper-sunken); margin-top: 6px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--vermilion); border-radius: 2px; transition: width .25s linear; }
+  .bar.waiting > i { background: var(--ochre); }
+  .bar.paused > i { background: var(--ink-faint); }
+  .ibtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--paper-raised); color: var(--vermilion); display: grid; place-items: center; font-size: 13px; flex: 0 0 auto; padding: 0; }
+  .ibtn.trash { color: var(--ink-soft); border-color: transparent; background: none; }
+  .item.tappable { cursor: pointer; }
+  .item.tappable:active { background: var(--paper-sunken); }
+  .alert-scrim { position: absolute; inset: 0; background: rgba(20,15,10,.45); z-index: 15; display: grid; place-items: center; padding: 0 28px; }
+  .alert { width: 100%; background: var(--paper-raised); border-radius: 18px; padding: 20px 20px 10px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .alert h3 { margin: 0 0 8px; font-size: 17px; }
+  .alert p { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; }
+  .alert .acts { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .alert .acts button { border: 0; background: none; color: var(--vermilion); font-size: 14px; font-weight: 600; padding: 9px 4px; }
+  .alert .acts button.destructive { color: var(--danger); }
+  .ibtn.more { border: 0; background: none; color: var(--ink-faint); width: 24px; font-size: 16px; }
+  .chk { width: 18px; height: 18px; border-radius: 4px; border: 1.5px solid var(--border); flex: 0 0 auto; display: grid; place-items: center; font-size: 12px; color: var(--on-accent); }
+  .chk.on { background: var(--vermilion); border-color: var(--vermilion); }
+
+  .menu { position: absolute; right: 30px; top: 34px; z-index: 5; background: var(--paper-raised); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.16); overflow: hidden; min-width: 150px; }
+  .menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 10px 14px; font-size: 13px; color: var(--ink); }
+  .menu button.danger { color: var(--danger); }
+  .menu button + button { border-top: 1px solid var(--hairline); }
+
+  .summary .big { font-size: 15px; font-weight: 600; }
+  .summary .bar { height: 6px; margin: 10px 0 6px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); border: 0; background: none; padding: 0; }
+  .sw { width: 30px; height: 18px; border-radius: 9px; background: var(--border); position: relative; transition: background .2s; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .2s; }
+  .sw.on { background: var(--vermilion); }
+  .sw.on::after { left: 14px; }
+
+  .banner { display: flex; align-items: center; gap: 8px; background: #f3e6d6; color: var(--vermilion); border-radius: 10px; padding: 9px 12px; font-size: 13px; margin-bottom: 10px; border: 0; width: 100%; text-align: left; }
+  .tabs { display: flex; gap: 18px; font-size: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--hairline); }
+  .tabs span { padding: 8px 0; color: var(--ink-soft); }
+  .tabs span.on { color: var(--vermilion); border-bottom: 2px solid var(--vermilion); font-weight: 600; }
+  .chrow { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--hairline); background: none; width: 100%; text-align: left; color: var(--ink); }
+  .chrow:last-child { border-bottom: 0; }
+  .chrow .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--on-accent); flex: 0 0 auto; }
+  .chrow .txt { flex: 1; min-width: 0; }
+  .chrow .t { font-size: 14.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chrow .d { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  .chrow .d .run { color: var(--vermilion); }
+  .chrow .d .bad { color: var(--danger); }
+  .chrow .go { color: var(--vermilion); font-size: 18px; }
+  .appbar .plus { margin-left: auto; font-size: 22px; color: var(--ink); line-height: 1; border: 0; background: none; padding: 0 2px; }
+  .linkrow { display: flex; justify-content: center; gap: 6px; font-size: 12px; color: var(--ink-faint); margin-top: 14px; }
+  .linkrow button { border: 0; background: none; color: var(--vermilion); font-size: 12px; padding: 0; }
+  .empty { text-align: center; padding: 40px 10px; color: var(--ink-faint); font-size: 13px; }
+
+  /* 底部确认面板 */
+  .scrim { position: absolute; inset: 0; background: rgba(20,15,10,.38); z-index: 10; display: flex; align-items: flex-end; }
+  .sheet { width: 100%; background: var(--paper-raised); border-radius: 18px 18px 0 0; padding: 10px 18px 22px; }
+  .sheet .grip { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 12px; }
+  .sheet h3 { margin: 0 0 6px; font-size: 16px; }
+  .sheet .line { display: flex; justify-content: space-between; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--hairline); color: var(--ink-soft); }
+  .sheet .line b { color: var(--ink); font-weight: 600; }
+  .sheet .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .sheet .btns .btn { flex: 1; padding: 10px; font-size: 14px; }
+  .sheet .stack { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .sheet .stack .btn { padding: 11px; font-size: 14px; border-radius: 12px; }
+  .sheet .stack .btn.text { border-color: transparent; background: none; color: var(--ink-soft); }
+  .sheet .warnbox { display: flex; gap: 8px; background: #f6ead8; color: #7a4b16; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; margin: 6px 0 4px; }
+  .sheet .check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); margin-top: 12px; border: 0; background: none; padding: 0; text-align: left; }
+  .setrow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hairline); border-left: 0; border-right: 0; border-top: 0; background: none; width: 100%; text-align: left; color: var(--ink); }
+  .setrow .txt { flex: 1; }
+  .setrow .t { font-size: 14px; }
+  .setrow .d { font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; line-height: 1.45; }
+  .warnrow { display: flex; align-items: center; gap: 8px; background: #f6ead8; color: #7a4b16; border-radius: 10px; padding: 8px 10px; font-size: 12.5px; margin-top: 10px; }
+  .warnrow .btn { margin-left: auto; padding: 4px 10px; font-size: 12px; }
+
+  /* toast */
+  .toast { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: rgba(40,32,24,.92); color: #fff; font-size: 12.5px; padding: 8px 14px; border-radius: 18px; z-index: 20; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 后台：系统桌面 + 通知 */
+  .home { position: absolute; inset: 0; z-index: 30; background: linear-gradient(160deg, #3b4a5a, #1f2731); color: #fff; display: flex; flex-direction: column; }
+  .home .sb { height: 28px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-size: 11px; opacity: .85; }
+  .notif { margin: 8px 10px; background: rgba(250,248,243,.96); color: #222; border-radius: 16px; padding: 12px 14px; font-size: 12.5px; }
+  .notif .app { font-size: 11px; color: #777; margin-bottom: 4px; }
+  .notif .t { font-weight: 600; font-size: 13.5px; }
+  .notif .bar { margin: 8px 0 6px; }
+  .notif .acts { display: flex; gap: 18px; margin-top: 6px; color: var(--vermilion); font-weight: 600; font-size: 12px; }
+  .home .hint { margin: auto 24px 40px; text-align: center; font-size: 12.5px; line-height: 1.7; opacity: .85; }
+  .home .apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 24px 28px; }
+  .home .apps i { aspect-ratio: 1; border-radius: 14px; background: rgba(255,255,255,.14); }
+
+  /* ---------- 控制台 ---------- */
+  .panel { width: 400px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .box { background: var(--panel); border-radius: 14px; padding: 12px 14px; }
+  .box h2 { font-size: 13px; margin: 0 0 8px; color: var(--stage-soft); font-weight: 600; letter-spacing: .3px; }
+  .ctrls { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ctrls button { border: 1px solid rgba(128,110,90,.35); background: transparent; color: var(--stage-ink); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; }
+  .ctrls button.on { background: var(--vermilion); border-color: var(--vermilion); color: #fff; }
+  .note { font-size: 12px; color: var(--stage-soft); line-height: 1.6; margin: 8px 0 0; }
+  .log { font-size: 12px; line-height: 1.55; max-height: 230px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+  .log li { padding: 4px 0; border-bottom: 1px dashed rgba(128,110,90,.25); }
+  .log li b { color: var(--vermilion); font-weight: 600; }
+  :root[data-theme="dark"] .log li b { color: #e0937f; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .log li b { color: #e0937f; } }
+  .legend { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12px; }
+  .legend span:nth-child(odd) { font-weight: 600; white-space: nowrap; }
+
+  @media (max-width: 440px) {
+    body { padding: 14px 16px 30px; }
+    .phone { height: 680px; border-radius: 30px; padding: 6px; }
+    .screen { border-radius: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>下载管理 · 交互原型</h1>
+  <p class="lead">
+    只演示操作逻辑和 UI，下载、网速都是模拟的。设计说明见 <code>docs/download-manager.md</code>。
+    右侧可以切换「现状 / 新方案」，并模拟切后台、断网、杀进程等情况。
+  </p>
+
+  <div class="layout">
+    <div class="phone-col">
+      <div class="seg" id="sceneSeg">
+        <button data-scene="channel" class="on">频道页</button>
+        <button data-scene="manager">下载管理</button>
+        <button data-scene="shelf">书架</button>
+      </div>
+      <div class="phone"><div class="screen" id="screen"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>方案</h2>
+        <div class="ctrls" id="modeCtrls">
+          <button data-mode="new" class="on">新方案</button>
+          <button data-mode="old">现状（对照）</button>
+        </div>
+        <p class="note" id="modeNote"></p>
+      </div>
+      <div class="box">
+        <h2>模拟环境</h2>
+        <div class="ctrls">
+          <button data-env="bg" id="bgBtn">切到后台</button>
+          <button data-env="kill">杀进程并重启</button>
+          <button data-env="net" id="netBtn">断网</button>
+          <button data-env="cell" id="cellBtn">切到移动网络</button>
+          <button data-env="fail">让下一块失败</button>
+          <button data-env="reset">重置</button>
+        </div>
+        <div class="ctrls" style="margin-top:8px" id="stageCtrls">
+          <button data-stage="A" class="on">阶段 A：游标通道（回前台续）</button>
+          <button data-stage="B">阶段 B：离线包（系统下载器后台继续）</button>
+        </div>
+        <div class="ctrls" style="margin-top:8px" id="speedCtrls">
+          <button data-speed="1" class="on">1×</button>
+          <button data-speed="4">4× 快进</button>
+        </div>
+      </div>
+      <div class="box">
+        <h2>状态说明</h2>
+        <div class="legend">
+          <span>排队中</span><span>已入队，等前面的下完（阶段 A 串行 1 本；阶段 B 系统下载器同时 2 本）</span>
+          <span>下载中</span><span>正在取块，显示字节、速度、剩余时间</span>
+          <span style="color:var(--ochre)">等待中</span><span>系统原因（后台 / 断网 / 等 Wi‑Fi / 失败重试），条件满足后<b>自动</b>继续；关了「连上 Wi‑Fi 时自动下载」的，连上后停在「点 ▶ 开始」</span>
+          <span>已暂停</span><span>只有用户主动暂停，不会自动继续</span>
+          <span style="color:var(--danger)">失败</span><span>自动重试 3 次仍失败，需手动重试</span>
+          <span style="color:var(--jade)">正在安装</span><span>阶段 B：离线包已下完，回到前台解包写库</span>
+        </div>
+      </div>
+      <div class="box">
+        <h2>事件日志</h2>
+        <ul class="log" id="log"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ───────── 模拟数据 ─────────
+  const CHANNEL = "汉译 · 巴利三藏研读组";
+  const BOOKS = [
+    ["长部 · 戒蕴品", 2.1], ["长部 · 大品", 3.4], ["长部 · 波梨品", 2.7],
+    ["中部 · 根本五十经", 4.2], ["中部 · 中五十经", 3.9], ["中部 · 后五十经", 3.6],
+    ["相应部 · 有偈品", 1.8], ["相应部 · 因缘品", 2.2], ["增支部 · 一集", 0.9],
+    ["法句经", 0.6], ["经集", 1.4], ["长部义注 · 吉祥悦意（一）", 5.1],
+  ];
+  const MB = 1024 * 1024;
+  /** 书架·已下载 里的其它频道（静态示意，不参与模拟）。 */
+  const OTHER_CHANNELS = [
+    { name: "English · Bhikkhu Sujato", books: 5, bytes: 18.2, color: "#4f6f8a" },
+    { name: "汉译 · 元亨寺南传大藏经", books: 3, bytes: 9.6, color: "#6b7d4f" },
+  ];
+  // 阶段 A：游标通道写库，单写者，只能串行 1 本；阶段 B：系统下载器不碰 SQLite，可同时 2 本，安装另排队逐本进行
+  const conc = () => (S.stage === "B" ? 2 : 1);
+  const RETRY_DELAYS = [5, 30, 120]; // 秒
+
+  let S; // 全部状态
+  function initState() {
+    S = {
+      mode: S?.mode ?? "new", stage: S?.stage ?? "A", speedX: S?.speedX ?? 1,
+      scene: S?.scene ?? "channel",
+      bg: false, online: true, cell: false, failNext: false,
+      // 下载设置：默认不用移动网络（每次询问）、连上 Wi‑Fi 自动下载
+      cellularAllowed: S?.cellularAllowed ?? false, autoOnWifi: S?.autoOnWifi ?? true, settings: false,
+      sheet: null, delAsk: null, menu: null, editing: false, selected: new Set(), toast: null,
+      batch: null, // {ids, total}
+      oldBulk: null, // 现状：页面里的 for-await 计数器 {i, total}
+      tasks: BOOKS.map(([title, mb], i) => ({
+        id: i, title, total: Math.round(mb * MB), bytes: 0,
+        status: i < 2 ? "done" : "pending", reason: null, pos: null,
+        attempts: 0, retryAt: 0, samples: [], speed: 0, allowCell: false, doneAt: i < 2 ? "10月8日" : null,
+      })),
+      log: [],
+    };
+    S.tasks[0].bytes = S.tasks[0].total; S.tasks[1].bytes = S.tasks[1].total;
+  }
+  initState();
+
+  const $ = (s) => document.querySelector(s);
+  const fmtB = (b) => b >= 0.995 * MB ? (b / MB).toFixed(1) + " MB" : Math.max(0, Math.round(b / 1024)) + " KB";
+  const fmtS = (bps) => bps < 1024 ? "—" : fmtB(bps) + "/s";
+  const fmtT = (sec) => !isFinite(sec) || sec <= 0 ? "" : sec >= 3600 ? "约 1 小时以上" : sec >= 60 ? `剩约 ${Math.ceil(sec / 60)} 分钟` : `剩 ${Math.ceil(sec)} 秒`;
+  const pct = (t) => t.total ? Math.min(100, (t.bytes / t.total) * 100) : 0;
+  const now = () => performance.now() / 1000;
+
+  function log(msg) {
+    S.log.unshift(msg);
+    S.log = S.log.slice(0, 40);
+    renderLog();
+  }
+  function toast(msg) {
+    S.toast = { msg, until: now() + 2.6 };
+  }
+
+  // ───────── 新方案：调度器 ─────────
+  let posSeq = 1;
+  const active = () => S.tasks.filter((t) => ["queued", "downloading", "waiting"].includes(t.status));
+  const byPos = (a, b) => a.pos - b.pos;
+
+  function enqueue(ids, batch, allowCell = false) {
+    ids.forEach((id) => {
+      const t = S.tasks[id];
+      if (allowCell) t.allowCell = true;
+      if (t.status === "done" || t.status === "downloading" || t.status === "queued") return;
+      t.status = "queued"; t.reason = null; t.attempts = 0; t.pos = posSeq++; t.kept = false;
+    });
+    if (batch) S.batch = { ids, total: ids.length };
+    tick();
+  }
+
+  /** 网络 / 前后台条件：返回该任务的阻塞原因，null 表示可以跑。 */
+  function blocker(t) {
+    if (S.bg && S.stage === "A") return "background";
+    if (!S.online) return "network";
+    // 移动网络：只有设置里允许、或这本书用户点过「立即下载」才跑
+    if (S.cell && !S.cellularAllowed && !(t && t.allowCell)) return "wifi";
+    return null;
+  }
+  const SYS = ["background", "network", "wifi", "wifiReady"];
+
+  function tick() {
+    if (S.mode !== "new") return;
+    const t0 = now();
+    for (const t of S.tasks) {
+      const b = blocker(t);
+      // 系统原因 → 等待中；条件满足 → 回排队中（自动恢复）
+      if ((t.status === "downloading" || t.status === "queued") && b) {
+        t.status = "waiting"; t.reason = b; t.speed = 0; t.samples = [];
+      } else if (t.status === "waiting" && SYS.includes(t.reason)) {
+        if (b) t.reason = b;
+        // 连上 Wi‑Fi：开了「自动下载」直接排队；没开就停在「已连上 Wi‑Fi，等你开始」
+        else if (t.reason === "wifi" && !S.autoOnWifi) t.reason = "wifiReady";
+        else if (t.reason !== "wifiReady") { t.status = "queued"; t.reason = null; }
+      } else if (t.status === "waiting" && t.reason === "retry" && t0 >= t.retryAt && !b) {
+        t.status = "queued"; t.reason = null;
+      }
+    }
+    let running = S.tasks.filter((t) => t.status === "downloading").length;
+    const queue = S.tasks.filter((t) => t.status === "queued").sort(byPos);
+    while (running < conc() && queue.length) {
+      const t = queue.shift();
+      t.status = "downloading"; t.samples = []; running++;
+    }
+  }
+
+  function pauseTask(t) {
+    if (S.mode === "old") return oldPause(t);
+    t.status = "paused"; t.reason = "user"; t.speed = 0;
+    log(`<b>暂停</b> ${t.title}：用户暂停，不会自动继续`);
+    tick();
+  }
+  function resumeTask(t) {
+    if (t.reason === "wifiReady") log(`<b>开始</b> ${t.title}（已连上 Wi‑Fi）`);
+    t.status = "queued"; t.reason = null; t.attempts = 0; t.pos = t.pos ?? posSeq++;
+    log(`<b>继续</b> ${t.title} → 回到排队中`);
+    tick();
+  }
+  function moveTop(t) {
+    const min = Math.min(...S.tasks.filter((x) => x.pos != null).map((x) => x.pos));
+    t.pos = min - 1;
+    if (t.status === "paused") { t.status = "queued"; t.reason = null; }
+    // 置顶的书如果在排队，挤掉最后开跑的一本
+    const running = S.tasks.filter((x) => x.status === "downloading");
+    if (t.status === "queued" && running.length >= conc()) {
+      const victim = running.sort(byPos).pop();
+      victim.status = "queued";
+    }
+    log(`<b>置顶</b> ${t.title}：排到队首`);
+    tick();
+  }
+  function cancelTask(t) {
+    t.status = "pending"; t.bytes = 0; t.reason = null; t.pos = null; t.speed = 0;
+    log(`<b>取消下载</b> ${t.title}：删除已下数据，回到未下载`);
+    tick();
+  }
+
+  // ───────── 现状（对照）：页面 for-await 循环，下载层只认识当前这本 ─────────
+  function oldStartAll() {
+    const ids = S.tasks.filter((t) => t.status !== "done").map((t) => t.id);
+    S.oldBulk = { ids, i: 0, total: ids.length, stopped: false };
+    oldNext();
+    log(`<b>现状 · 全部下载</b>：页面里 for…await 逐本发起，计数器 0/${ids.length}；下载层此刻只知道第一本`);
+  }
+  function oldNext() {
+    const b = S.oldBulk;
+    if (!b) return;
+    while (b.i < b.ids.length && S.tasks[b.ids[b.i]].status === "done") b.i++;
+    if (b.i >= b.ids.length || b.stopped) { S.oldBulk = null; return; }
+    const t = S.tasks[b.ids[b.i]];
+    t.status = "downloading";
+    // 用户观察到的：只有紧挨着的一本是「排队中」，其余仍是「未下载」
+    const nxt = S.tasks[b.ids[b.i + 1]];
+    if (nxt && nxt.status === "pending") nxt.status = "queued";
+  }
+  function oldPause(t) {
+    t.status = "paused"; t.speed = 0;
+    if (S.oldBulk) S.oldBulk.stopped = true;
+    S.oldBulk = null;
+    S.tasks.forEach((x) => { if (x.status === "queued") x.status = "pending"; });
+    log(`<b>现状 · 暂停</b>：停掉整批，计数器消失`);
+  }
+
+  // ───────── 时钟 ─────────
+  let last = now();
+  // 按下手指期间不重绘，否则 innerHTML 替换会吞掉这次点击
+  let holding = false;
+  const scrEl = document.getElementById("screen");
+  scrEl.addEventListener("pointerdown", () => { holding = true; });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((ev) =>
+    scrEl.addEventListener(ev, () => setTimeout(() => { holding = false; }, 60)));
+  setInterval(() => {
+    const t1 = now();
+    const dt = (t1 - last) * S.speedX;
+    last = t1;
+    step(dt, t1);
+    if (!holding) render();
+  }, 250);
+
+  function step(dt, t1) {
+    if (S.toast && t1 > S.toast.until) S.toast = null;
+    if (S.mode === "new") tick();
+    const running = S.tasks.filter((t) => t.status === "downloading");
+    const frozen = S.mode === "old" && (S.bg || !S.online);
+    const cap = (S.cell ? 0.15 : 0.4) * MB; // 链路带宽
+    for (const t of running) {
+      if (frozen) { t.speed = 0; continue; }
+      if (S.mode === "new" && S.failNext) {
+        S.failNext = false;
+        t.attempts++;
+        if (t.attempts > RETRY_DELAYS.length) {
+          t.status = "error"; t.reason = "服务器无响应"; t.speed = 0;
+          log(`<b>失败</b> ${t.title}：自动重试 ${RETRY_DELAYS.length} 次仍失败，等用户手动重试`);
+          toast("1 本下载失败，可在下载管理重试");
+        } else {
+          const d = RETRY_DELAYS[t.attempts - 1];
+          t.status = "waiting"; t.reason = "retry"; t.retryAt = t1 + d / S.speedX; t.speed = 0;
+          log(`<b>网络错误</b> ${t.title}：${d} 秒后自动重试（第 ${t.attempts} 次）`);
+        }
+        continue;
+      }
+      if (S.mode === "old" && S.failNext) {
+        S.failNext = false;
+        t.status = "error"; t.reason = "网络错误"; t.speed = 0;
+        log(`<b>现状 · 失败</b> ${t.title}：直接失败，无自动重试；批次跳到下一本`);
+        if (S.oldBulk) { S.oldBulk.i++; oldNext(); }
+        continue;
+      }
+      const share = (cap / running.length) * (0.75 + Math.random() * 0.5);
+      const add = share * dt;
+      t.bytes = Math.min(t.total, t.bytes + add);
+      t.samples.push([t1, add / S.speedX]);
+      t.samples = t.samples.filter(([ts]) => t1 - ts <= 5);
+      const span = Math.max(1, t1 - (t.samples[0]?.[0] ?? t1));
+      const raw = t.samples.reduce((s, [, b]) => s + b, 0) / span * S.speedX;
+      t.speed = t.speed ? t.speed * 0.7 + raw * 0.3 : raw; // EMA 平滑
+      if (t.bytes >= t.total && S.mode === "new" && S.stage === "B") {
+        // 离线包：文件下完 ≠ 可读，需要在前台解包写 para_html
+        t.status = "installing"; t.speed = 0; t.installAt = Infinity; // 进安装队列，由下方单写者逐本处理
+        log(`<b>包已下完</b> ${t.title} · ${fmtB(t.total)}${S.bg ? "：App 在后台，等回前台安装" : "：进安装队列（单写者，逐本写库）"}`);
+      } else if (t.bytes >= t.total) {
+        t.status = "done"; t.speed = 0; t.doneAt = "刚刚"; t.reason = null;
+        log(`<b>完成</b> ${t.title} · ${fmtB(t.total)}`);
+        if (S.mode === "old" && S.oldBulk) { S.oldBulk.i++; oldNext(); }
+      }
+    }
+    // 安装队列：单写者，同一时刻只解包写库一本，其余「已下完 · 等待安装」
+    const inst = S.tasks.filter((t) => t.status === "installing");
+    let cur = inst.find((t) => t.installAt !== Infinity);
+    if (!cur && !S.bg && inst.length) { cur = inst[0]; cur.installAt = t1 + 1.5 / S.speedX; }
+    if (cur && t1 >= cur.installAt) { cur.status = "done"; cur.doneAt = "刚刚"; log(`<b>安装完成</b> ${cur.title}：可离线阅读`); }
+    if (S.batch && S.batch.ids.every((id) => S.tasks[id].status === "done")) {
+      log(`<b>批次完成</b>：${S.batch.total} 本全部下载`);
+      toast(`全部下载完成 · ${S.batch.total} 本`);
+      S.batch = null;
+    }
+  }
+
+  // ───────── 文案 ─────────
+  const REASON = {
+    background: "App 在后台，回到前台后自动继续",
+    network: "等待网络",
+    wifi: "等待 Wi‑Fi",
+    wifiReady: "已连上 Wi‑Fi，点 ▶ 开始",
+    suspended: "已切换账号",
+  };
+  function statusLine(t) {
+    if (S.mode === "old") {
+      const p = Math.round(pct(t));
+      switch (t.status) {
+        case "done": return ["已下载", "ok"];
+        case "downloading": return [S.bg || !S.online ? `下载中 ${p}%（实际已停）` : `下载中 ${p}%`, ""];
+        case "queued": return ["排队中", ""];
+        case "paused": return [`已暂停 ${p}%`, ""];
+        case "error": return ["下载失败", "err"];
+        default: return ["未下载", ""];
+      }
+    }
+    const qOrder = active().filter((x) => x.status === "queued" || (x.status === "waiting")).sort(byPos);
+    const est = t.bytes > 0 ? "" : "约 ";
+    switch (t.status) {
+      case "done": return [`已下载 · ${fmtB(t.total)} · ${t.doneAt}`, "ok"];
+      case "installing": return [S.bg ? `已下完 · 回到前台后安装` : t.installAt === Infinity ? `已下完 · 等待安装` : `正在安装… 写入本地库`, "ok"];
+      case "downloading": {
+        const left = (t.total - t.bytes) / (t.speed || 1);
+        return [`下载中 · ${fmtB(t.bytes)} / 约 ${fmtB(t.total)} · ${fmtS(t.speed)} · ${fmtT(left)}`, ""];
+      }
+      case "queued": return [`排队中 · 第 ${qOrder.indexOf(t) + 1} 位 · ${est}${fmtB(t.total)}`, ""];
+      case "waiting":
+        if (t.reason === "retry") {
+          const s = Math.max(0, Math.ceil((t.retryAt - now()) * S.speedX));
+          return [`等待中 · 网络错误，${s} 秒后重试（第 ${t.attempts} 次）`, "warn"];
+        }
+        return [`等待中 · ${REASON[t.reason]}${t.bytes ? " · " + fmtB(t.bytes) + " / 约 " + fmtB(t.total) : ""}`, "warn"];
+      case "paused": return [`已暂停 · ${fmtB(t.bytes)} / 约 ${fmtB(t.total)}`, ""];
+      case "error": return [`失败 · ${t.reason}`, "err"];
+      default: return [t.kept ? `未下载 · 保留下载记录 · 约 ${fmtB(t.total)}` : `未下载 · 约 ${fmtB(t.total)}`, ""];
+    }
+  }
+
+  function mainBtn(t) {
+    // 行内主按钮随状态变
+    if (S.mode === "old") {
+      if (t.status === "downloading") return `<button class="ibtn" data-act="pause" data-id="${t.id}" title="暂停">❚❚</button>`;
+      if (t.status === "done") return `<button class="ibtn trash" data-act="askDel" data-id="${t.id}" title="删除" aria-label="删除"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button>`;
+      return `<button class="ibtn" data-act="start" data-id="${t.id}" title="下载">↓</button>`;
+    }
+    switch (t.status) {
+      case "installing": return `<button class="ibtn" disabled style="opacity:.4">…</button>`;
+      case "waiting":
+        if (t.reason === "wifiReady") return `<button class="ibtn" data-act="resume" data-id="${t.id}" title="开始">▶</button>`;
+        return `<button class="ibtn" data-act="pause" data-id="${t.id}" title="暂停">❚❚</button>`;
+      case "downloading": case "queued":
+        return `<button class="ibtn" data-act="pause" data-id="${t.id}" title="暂停">❚❚</button>`;
+      case "paused": return `<button class="ibtn" data-act="resume" data-id="${t.id}" title="继续">▶</button>`;
+      case "error": return `<button class="ibtn" data-act="retry" data-id="${t.id}" title="重试">↻</button>`;
+      case "done": return `<button class="ibtn trash" data-act="askDel" data-id="${t.id}" title="删除" aria-label="删除"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button>`;
+      default: return `<button class="ibtn" data-act="start" data-id="${t.id}" title="下载">↓</button>`;
+    }
+  }
+
+  function itemHTML(t, opts = {}) {
+    const [line, cls] = statusLine(t);
+    const showBar = !["pending", "done"].includes(t.status) && (S.mode === "new" || t.status !== "queued");
+    const barCls = t.status === "waiting" ? "waiting" : t.status === "paused" || t.status === "error" ? "paused" : "";
+    const sel = S.editing && opts.manager;
+    const menu = S.menu === t.id ? menuHTML(t) : "";
+    return `<div class="item${t.status === "done" && !sel ? " tappable" : ""}" data-act="${sel ? "select" : t.status === "done" ? "open" : ""}" data-id="${t.id}">
+      ${sel ? `<span class="chk ${S.selected.has(t.id) ? "on" : ""}">${S.selected.has(t.id) ? "✓" : ""}</span>` : ""}
+      <div class="main">
+        <div class="name">${t.title}</div>
+        ${opts.channel ? `<div class="faint">${CHANNEL}</div>` : ""}
+        <div class="sub ${cls}">${line}</div>
+        ${showBar ? `<div class="bar ${barCls}"><i style="width:${pct(t)}%"></i></div>` : ""}
+      </div>
+      ${sel ? "" : mainBtn(t)}
+      ${opts.manager && S.mode === "new" && !sel && t.status !== "done" ? `<button class="ibtn more" data-act="menu" data-id="${t.id}">⋯</button>` : ""}
+      ${menu}
+    </div>`;
+  }
+
+  function menuHTML(t) {
+    const items = [];
+    if (t.status === "waiting" && t.reason === "wifi") items.push(`<button data-act="useCell" data-id="${t.id}">使用移动网络下载</button>`);
+    if (["queued", "waiting", "paused"].includes(t.status)) items.push(`<button data-act="top" data-id="${t.id}">置顶（下一个下载）</button>`);
+    if (t.status !== "done" && t.status !== "pending") items.push(`<button data-act="cancel" data-id="${t.id}" class="danger">取消下载</button>`);
+    return `<div class="menu">${items.join("")}</div>`;
+  }
+
+  // ───────── 汇总 ─────────
+  function totals(ids) {
+    const ts = ids ? ids.map((i) => S.tasks[i]) : active().concat(S.tasks.filter((t) => t.status === "paused" || t.status === "error"));
+    const total = ts.reduce((s, t) => s + t.total, 0);
+    const bytes = ts.reduce((s, t) => s + t.bytes, 0);
+    const speed = S.tasks.reduce((s, t) => s + (t.status === "downloading" ? t.speed : 0), 0);
+    return {
+      total, bytes, speed,
+      running: S.tasks.filter((t) => t.status === "downloading").length,
+      queued: S.tasks.filter((t) => t.status === "queued").length,
+      waiting: S.tasks.filter((t) => t.status === "waiting").length,
+      done: ts.filter((t) => t.status === "done").length,
+      n: ts.length,
+    };
+  }
+
+  // ───────── 场景渲染 ─────────
+  const sb = `<div class="statusbar"><span>9:41</span><span id="netInd"></span></div>`;
+  function netLabel() { return !S.online ? "无网络" : S.cell ? "4G" : "Wi‑Fi"; }
+
+  function sceneChannel() {
+    let action;
+    if (S.mode === "old") {
+      action = S.oldBulk
+        ? `<span class="pill"><span class="spin"></span>正在下载 ${S.oldBulk.i}/${S.oldBulk.total}</span>
+           <button class="btn ghost" data-act="oldStop">停止</button>`
+        : `<button class="btn primary" data-act="downloadAll">↓ 全部下载</button>`;
+    } else if (S.batch) {
+      const tt = totals(S.batch.ids);
+      const anyWaiting = S.batch.ids.some((i) => S.tasks[i].status === "waiting");
+      action = `<button class="pill" data-act="goManager"><span class="spin"></span>下载中 ${tt.done}/${tt.n} · ${anyWaiting && !tt.running ? "等待中" : fmtS(tt.speed)} ›</button>
+                <button class="btn ghost" data-act="pauseAll">全部暂停</button>`;
+    } else {
+      action = `<button class="btn primary" data-act="downloadAll">↓ 全部下载</button>`;
+    }
+    return `${sb}
+      <div class="appbar"><button class="back" data-act="back" style="border:0;background:none;padding:0">‹</button><span class="title">版本详情</span></div>
+      <div class="body">
+        <div class="card">
+          <div style="font-weight:600;font-size:15px">${CHANNEL}</div>
+          <div class="muted" style="margin-top:4px">12 本 · 已下载 ${S.tasks.filter((t) => t.status === "done").length} 本</div>
+          <div class="row-actions">${action}</div>
+        </div>
+        <div class="section-h"><span>书目</span></div>
+        <div class="card" style="padding:2px 12px">${S.tasks.map((t) => itemHTML(t)).join("")}</div>
+      </div>`;
+  }
+
+  /** 下载确认：Wi‑Fi 下只有「全部下载」需要确认；移动网络且未允许时，单本和全部都要问。 */
+  function sheetHTML() {
+    const sh = S.sheet;
+    const todo = sh.ids.map((id) => S.tasks[id]);
+    const size = todo.reduce((s, t) => s + t.total - t.bytes, 0);
+    const askCell = sh.cell;
+    const what = sh.batch ? `${todo.length} 本` : `《${todo[0].title}》`;
+    const lines = sh.batch ? `
+      <div class="line"><span>将下载</span><b>${todo.length} 本</b></div>
+      ${askCell ? "" : `<div class="line"><span>预计数据量</span><b>约 ${fmtB(size)}</b></div>`}
+      <div class="line"><span>已下载（跳过）</span><b>${S.tasks.length - todo.length} 本</b></div>` : "";
+    if (!askCell) {
+      return `<div class="scrim" data-act="closeSheet"><div class="sheet" data-act="noop">
+        <div class="grip"></div><h3>全部下载</h3>${lines}
+        <div class="line" style="border:0"><span>当前网络</span><b>${netLabel()}</b></div>
+        <div class="btns">
+          <button class="btn" data-act="closeSheet">取消</button>
+          <button class="btn primary" data-act="confirmAll">开始下载</button>
+        </div>
+        <div class="faint" style="margin-top:10px;text-align:center">全部书会立刻进入队列，离开页面、切后台、重启都不会丢</div>
+      </div></div>`;
+    }
+    return `<div class="scrim" data-act="closeSheet"><div class="sheet" data-act="noop">
+      <div class="grip"></div>
+      <h3>正在使用移动网络</h3>
+      <div class="warnbox">下载 ${what} 将使用约 <b>${fmtB(size)}</b> 移动数据。</div>
+      ${lines}
+      <div class="stack">
+        <button class="btn primary" data-act="dlNow">立即下载</button>
+        <button class="btn" data-act="waitWifi">等待 Wi‑Fi</button>
+        <button class="btn text" data-act="closeSheet">取消</button>
+      </div>
+      <button class="check" data-act="dontAsk"><span class="chk ${sh.dontAsk ? "on" : ""}">${sh.dontAsk ? "✓" : ""}</span>以后都用移动网络下载，不再询问</button>
+      <div class="faint" style="margin-top:8px">「等待 Wi‑Fi」会先加入队列，${S.autoOnWifi ? "连上 Wi‑Fi 后自动开始" : "连上 Wi‑Fi 后在下载管理里点开始"}。可在 下载管理 → ⚙ 中修改。</div>
+    </div></div>`;
+  }
+
+  /** 复用现有删除对话框（DownloadControl / BookDownloadCard 的 Alert.alert）。 */
+  function delAlertHTML() {
+    const t = S.tasks[S.delAsk];
+    return `<div class="alert-scrim" data-act="closeDel"><div class="alert" data-act="noop">
+      <h3>删除</h3>
+      <p>请选择删除方式。<br/><span class="faint">《${t.title}》</span></p>
+      <div class="acts">
+        <button data-act="delData" data-id="${t.id}">仅删除下载数据</button>
+        <button class="destructive" data-act="delAll" data-id="${t.id}">删除数据和下载记录</button>
+        <button data-act="closeDel">取消</button>
+      </div>
+    </div></div>`;
+  }
+
+  function settingsHTML() {
+    return `<div class="scrim" data-act="closeSettings"><div class="sheet" data-act="noop">
+      <div class="grip"></div><h3>下载设置</h3>
+      <button class="setrow" data-act="setCell"><div class="txt"><div class="t">使用移动网络下载</div>
+        <div class="d">关闭时，在移动网络下点下载会先询问；打开后直接下载，不再询问</div></div>
+        <span class="sw ${S.cellularAllowed ? "on" : ""}"></span></button>
+      <button class="setrow" data-act="setAuto"><div class="txt"><div class="t">连上 Wi‑Fi 时自动下载</div>
+        <div class="d">「等待 Wi‑Fi」的书在连上 Wi‑Fi 后自动开始（目前需 App 在前台）</div></div>
+        <span class="sw ${S.autoOnWifi ? "on" : ""}"></span></button>
+      ${S.stage === "B" ? `<div class="setrow" style="border:0"><div class="txt"><div class="t">同时下载数</div><div class="d">只影响系统下载器；写入本地库始终逐本进行</div></div><span class="muted">2 ›</span></div>` : ""}
+      <div class="btns"><button class="btn" data-act="closeSettings">完成</button></div>
+    </div></div>`;
+  }
+
+  /** 发起下载：移动网络且未允许 → 先问；否则直接入队（全部下载在 Wi‑Fi 下也确认一次数量）。 */
+  function requestDownload(ids, batch) {
+    const askCell = S.cell && S.online && !S.cellularAllowed;
+    if (askCell || batch) { S.sheet = { ids, batch, cell: askCell, dontAsk: false }; return; }
+    enqueue(ids);
+    log(`<b>下载</b> ${S.tasks[ids[0]].title} → 排队中${S.cell ? "（已允许移动网络，不再询问）" : ""}`);
+  }
+
+  function sceneManager() {
+    if (S.mode === "old") {
+      return `${sb}<div class="appbar"><span class="back">‹</span><span class="title">下载管理</span></div>
+        <div class="body"><div class="empty">现状：设置里「下载管理」还没有页面（入口无 route）。<br/>下载状态只能在各个频道页、书架里分别看。</div></div>`;
+    }
+    const tt = totals();
+    const ORDER = { installing: 0, downloading: 1, waiting: 2, queued: 3 };
+    const inProgress = S.tasks.filter((t) => t.status in ORDER)
+      .sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.pos - b.pos);
+    const stopped = S.tasks.filter((t) => t.status === "paused" || t.status === "error");
+    const done = S.tasks.filter((t) => t.status === "done");
+    const doneBytes = done.reduce((s, t) => s + t.total, 0);
+    const left = (tt.total - tt.bytes) / (tt.speed || 1);
+    const anyActive = inProgress.length > 0;
+    const head = anyActive
+      ? `${tt.running} 本下载中 · ${tt.queued} 本排队${tt.waiting ? ` · ${tt.waiting} 本等待` : ""}`
+      : stopped.length ? `${stopped.length} 本已暂停 / 失败` : "没有进行中的下载";
+    const waitWifi = S.tasks.filter((t) => t.status === "waiting" && t.reason === "wifi");
+    const firstWait = S.tasks.find((t) => t.status === "waiting" && t.reason !== "wifi");
+    const reasonNote = tt.waiting && !tt.running && firstWait
+      ? `<div class="sub warn" style="font-size:12px;margin-top:2px">${firstWait.reason === "retry" ? "网络错误，稍后自动重试" : REASON[firstWait.reason]}</div>` : "";
+    const wifiRow = waitWifi.length
+      ? `<div class="warnrow">${waitWifi.length} 本等待 Wi‑Fi${S.cell ? `<button class="btn" data-act="useCellAll">使用移动网络下载</button>` : ""}</div>` : "";
+
+    return `${sb}
+      <div class="appbar"><button class="back" data-act="back" style="border:0;background:none;padding:0">‹</button><span class="title">下载管理</span>
+        <button class="icon" data-act="edit">${S.editing ? "完成" : "编辑"}</button><button class="icon" data-act="settings">⚙</button></div>
+      <div class="body">
+        <div class="card summary">
+          <div class="big">${head}</div>
+          ${reasonNote}
+          ${tt.n ? `<div class="bar"><i style="width:${tt.total ? (tt.bytes / tt.total) * 100 : 0}%"></i></div>
+          <div class="muted">${fmtB(tt.bytes)} / 约 ${fmtB(tt.total)}${tt.running ? ` · ${fmtS(tt.speed)} · ${fmtT(left)}` : ""}</div>` : ""}
+          <div class="row-actions" style="justify-content:space-between">
+            ${anyActive ? `<button class="btn" data-act="pauseAll">❚❚ 全部暂停</button>` : stopped.length ? `<button class="btn" data-act="resumeAll">▶ 全部继续</button>` : `<span></span>`}
+            <span class="faint">${S.cellularAllowed ? "移动网络也下载" : "仅 Wi‑Fi 下载"}</span>
+          </div>
+          ${wifiRow}
+        </div>
+        ${S.editing ? `<div class="row-actions">
+            <button class="btn" data-act="bulkPause">暂停所选</button><button class="btn" data-act="bulkResume">继续所选</button>
+            <button class="btn" data-act="bulkDel" style="color:var(--danger)">删除所选</button></div>` : ""}
+        ${inProgress.length ? `<div class="section-h"><span>进行中 (${inProgress.length})</span></div>
+          <div class="card" style="padding:2px 12px">${inProgress.map((t) => itemHTML(t, { manager: true, channel: true })).join("")}</div>` : ""}
+        ${stopped.length ? `<div class="section-h"><span>已暂停 / 失败 (${stopped.length})</span><button class="act" data-act="resumeAll">全部继续</button></div>
+          <div class="card" style="padding:2px 12px">${stopped.map((t) => itemHTML(t, { manager: true, channel: true })).join("")}</div>` : ""}
+        <div class="section-h"><span>已下载 (${done.length})</span><span class="faint">占用 ${fmtB(doneBytes)}</span></div>
+        <div class="card" style="padding:2px 12px">
+          <div class="faint" style="padding:8px 2px 2px">${CHANNEL} · ${done.length} 本</div>
+          ${done.map((t) => itemHTML(t, { manager: true })).join("") || `<div class="empty" style="padding:16px">暂无</div>`}
+        </div>
+        <div class="faint" style="text-align:center;margin-top:12px">已下载共占 ${fmtB(doneBytes)} · 设备剩余 23.4 GB</div>
+      </div>`;
+  }
+
+  /** 书架 →「已下载」：顶部任务状态条 + 按频道归拢的列表，点频道进频道页（下载模式）。 */
+  function sceneShelf() {
+    const tt = totals();
+    const ours = S.tasks;
+    const done = ours.filter((t) => t.status === "done");
+    const running = ours.filter((t) => ["downloading", "queued", "waiting", "installing"].includes(t.status));
+    const bad = ours.filter((t) => t.status === "error");
+    const paused = ours.filter((t) => t.status === "paused");
+    const doneMB = done.reduce((a, t) => a + t.total, 0) / MB;
+
+    let status = "";
+    if (S.mode === "new" && (running.length || bad.length || paused.length)) {
+      const parts = [];
+      if (tt.running) parts.push(`正在下载 ${tt.running} 本`);
+      if (tt.queued) parts.push(`排队 ${tt.queued}`);
+      if (tt.waiting) parts.push(`等待 ${tt.waiting}`);
+      if (!running.length && paused.length) parts.push(`${paused.length} 本已暂停`);
+      const speed = tt.running ? ` · ${fmtS(tt.speed)}` : "";
+      const err = bad.length ? ` · <span style="color:var(--danger)">${bad.length} 本失败</span>` : "";
+      status = `<button class="banner" data-act="goManager">↓ ${parts.join(" · ")}${speed}${err}<span style="margin-left:auto">›</span></button>`;
+    }
+
+    // 本频道副标题：现状 = done / pending 两类；新方案多出进行中 / 失败
+    let sub;
+    if (S.mode === "old") {
+      const pend = ours.filter((t) => t.status !== "done" && t.status !== "pending").length;
+      sub = pend ? `${done.length} 本已下载 · ${pend} 本待下载` : `${done.length} 本已下载`;
+    } else {
+      sub = `${done.length} 本已下载`
+        + (running.length ? ` · <span class="run">${running.length} 本进行中</span>` : "")
+        + (bad.length ? ` · <span class="bad">${bad.length} 本失败</span>` : "")
+        + ` · ${doneMB.toFixed(1)} MB`;
+    }
+    const showOurs = done.length || running.length || bad.length || paused.length;
+    const rows = (showOurs ? [`<button class="chrow" data-act="openChannel">
+        <span class="av" style="background:var(--vermilion)">汉</span>
+        <span class="txt"><div class="t">${CHANNEL}</div><div class="d">${sub}</div></span>
+        <span class="go">›</span></button>`] : [])
+      .concat(OTHER_CHANNELS.map((c) => `<button class="chrow" data-act="otherChannel">
+        <span class="av" style="background:${c.color}">${c.name[0]}</span>
+        <span class="txt"><div class="t">${c.name}</div><div class="d">${c.books} 本已下载${S.mode === "new" ? ` · ${c.bytes} MB` : ""}</div></span>
+        <span class="go">›</span></button>`));
+    const totalMB = doneMB + OTHER_CHANNELS.reduce((a, c) => a + c.bytes, 0);
+
+    return `${sb}
+      <div class="appbar"><span class="title">书架</span><button class="plus" data-act="addDownload" title="添加下载">＋</button></div>
+      <div class="body">
+        <div class="tabs"><span>在读</span><span class="on">已下载</span><span>收藏</span><span>书签</span></div>
+        ${status}
+        <div class="card" style="padding:2px 12px">${rows.join("")}</div>
+        ${S.mode === "new"
+          ? `<div class="linkrow"><span>共占用 ${totalMB.toFixed(1)} MB</span>·<button data-act="settings">下载设置 ›</button></div>`
+          : `<div class="faint" style="margin-top:10px">现状：没有任务状态条，频道行只区分「已下载 / 待下载」，看不到进度和失败。</div>`}
+      </div>`;
+  }
+
+  function homeHTML() {
+    const tt = totals();
+    const showNotif = S.mode === "new" && S.stage === "B" && (tt.running || tt.queued || tt.waiting);
+    const notif = showNotif ? `<div class="notif">
+        <div class="app">WikiPāli · 下载</div>
+        <div class="t">${S.batch ? `正在下载 ${totals(S.batch.ids).done}/${S.batch.total} 本` : `正在下载 ${tt.running + tt.queued} 本`}</div>
+        <div>${S.tasks.find((t) => t.status === "downloading")?.title ?? "等待中"} · ${fmtS(tt.speed)}</div>
+        <div class="bar"><i style="width:${tt.total ? (tt.bytes / tt.total) * 100 : 0}%"></i></div>
+        <div class="acts"><span data-act="pauseAll">全部暂停</span><span data-env="bg">打开</span></div>
+      </div>` : "";
+    const hint = S.mode === "old"
+      ? "现状：JS 在后台被系统挂起，下载停住。<br/>此时若进程被杀，重启后只有当前那本是「已暂停」，其余都是「未下载」。"
+      : S.stage === "A"
+        ? "阶段 A：跑完当前块后停，状态记为「等待中 · App 在后台」。<br/>队列在数据库里，回到前台自动继续。"
+        : "阶段 B（离线包）：整本一个 .ndjson.gz 交给系统下载器，<br/>App 在后台也继续下；下完的包回到前台再解包写库。";
+    return `<div class="home"><div class="sb"><span>9:41</span><span>${netLabel()}</span></div>
+      ${notif}<div class="apps">${"<i></i>".repeat(12)}</div><div class="hint">${hint}<br/><br/>点右侧「回到前台」</div></div>`;
+  }
+
+  // ───────── 渲染 ─────────
+  function render() {
+    const scr = $("#screen");
+    const scrollEl = scr.querySelector(".body");
+    const top = scrollEl ? scrollEl.scrollTop : 0;
+    const html = (S.scene === "channel" ? sceneChannel() : S.scene === "manager" ? sceneManager() : sceneShelf())
+      + (S.sheet ? sheetHTML() : "") + (S.settings ? settingsHTML() : "") + (S.delAsk != null ? delAlertHTML() : "")
+      + (S.bg ? homeHTML() : "")
+      + (S.toast ? `<div class="toast">${S.toast.msg}</div>` : "");
+    scr.innerHTML = html;
+    const ind = scr.querySelector("#netInd"); if (ind) ind.textContent = netLabel();
+    const nb = scr.querySelector(".body"); if (nb) nb.scrollTop = top;
+
+    document.querySelectorAll("#sceneSeg button").forEach((b) => b.classList.toggle("on", b.dataset.scene === S.scene));
+    document.querySelectorAll("#modeCtrls button").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode));
+    document.querySelectorAll("#stageCtrls button").forEach((b) => b.classList.toggle("on", b.dataset.stage === S.stage));
+    document.querySelectorAll("#speedCtrls button").forEach((b) => b.classList.toggle("on", +b.dataset.speed === S.speedX));
+    $("#bgBtn").textContent = S.bg ? "回到前台" : "切到后台";
+    $("#bgBtn").classList.toggle("on", S.bg);
+    $("#netBtn").textContent = S.online ? "断网" : "恢复网络";
+    $("#netBtn").classList.toggle("on", !S.online);
+    $("#cellBtn").textContent = S.cell ? "切回 Wi‑Fi" : "切到移动网络";
+    $("#cellBtn").classList.toggle("on", S.cell);
+    $("#stageCtrls").style.display = S.mode === "new" ? "flex" : "none";
+    $("#modeNote").innerHTML = S.mode === "new"
+      ? "点「全部下载」→ 确认 → 全部书一次性入队（阶段 A 逐本串行下载，其余排队中；阶段 B 同时下 2 本、逐本安装）。先点「切到移动网络」再点下载，可看到移动网络询问；下载设置在「下载管理 → ⚙」。"
+      : "复现现状：页面里逐本 await，只有当前 + 下一本有状态；切后台停住；杀进程后其余书回到「未下载」；没有字节和速度。";
+  }
+  function renderLog() {
+    $("#log").innerHTML = S.log.map((m) => `<li>${m}</li>`).join("") || `<li style="opacity:.6">（还没有事件）</li>`;
+  }
+
+  // ───────── 交互 ─────────
+  $("#screen").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-act],[data-env]");
+    if (!el) { if (S.menu != null) { S.menu = null; render(); } return; }
+    if (el.dataset.env) { envAction(el.dataset.env); return; }
+    const act = el.dataset.act;
+    const t = el.dataset.id != null ? S.tasks[+el.dataset.id] : null;
+    if (act !== "menu") S.menu = null;
+    switch (act) {
+      case "noop": return;
+      case "downloadAll":
+        if (S.mode === "old") oldStartAll();
+        else requestDownload(S.tasks.filter((t) => t.status !== "done").map((t) => t.id), true);
+        break;
+      case "closeSheet": if (e.target === el) { S.sheet = null; log("取消下载"); } break;
+      case "confirmAll": {
+        const ids = S.sheet.ids; S.sheet = null;
+        enqueue(ids, true);
+        log(`<b>全部下载</b>：${ids.length} 本一次性写入队列（同一事务），立刻全部可见；${S.stage === "B" ? "系统下载器同时下 2 本" : "逐本串行下载（单写者）"}`);
+        break;
+      }
+      case "dontAsk": S.sheet.dontAsk = !S.sheet.dontAsk; break;
+      case "dlNow": {
+        const { ids, batch, dontAsk } = S.sheet; S.sheet = null;
+        if (dontAsk) { S.cellularAllowed = true; toast("已开启「使用移动网络下载」，可在下载设置中关闭"); }
+        enqueue(ids, batch, true);
+        log(`<b>立即下载</b>（移动网络）：${ids.length} 本入队，这${batch ? "批" : "本"}允许用移动网络${dontAsk ? "；勾选了不再询问 → 设置「使用移动网络下载」已打开" : ""}`);
+        break;
+      }
+      case "waitWifi": {
+        const { ids, batch } = S.sheet; S.sheet = null;
+        enqueue(ids, batch);
+        toast(S.autoOnWifi ? "已加入队列，连上 Wi‑Fi 后自动下载" : "已加入队列，连上 Wi‑Fi 后在下载管理中开始");
+        log(`<b>等待 Wi‑Fi</b>：${ids.length} 本入队，状态「等待中 · 等待 Wi‑Fi」`);
+        break;
+      }
+      case "settings": S.settings = true; break;
+      case "closeSettings": if (e.target === el) S.settings = false; break;
+      case "setCell":
+        S.cellularAllowed = !S.cellularAllowed;
+        log(`<b>设置</b> 使用移动网络下载：${S.cellularAllowed ? "开（不再询问，等 Wi‑Fi 的书立即开始）" : "关（移动网络下点下载会先询问）"}`);
+        tick(); break;
+      case "setAuto":
+        S.autoOnWifi = !S.autoOnWifi;
+        if (S.autoOnWifi) S.tasks.forEach((x) => { if (x.status === "waiting" && x.reason === "wifiReady") x.reason = "wifi"; });
+        log(`<b>设置</b> 连上 Wi‑Fi 时自动下载：${S.autoOnWifi ? "开" : "关"}`);
+        tick(); break;
+      case "useCell":
+        t.allowCell = true; log(`<b>使用移动网络下载</b> ${t.title}（用户明确点了，不再询问）`); tick(); break;
+      case "useCellAll":
+        S.tasks.forEach((x) => { if (x.status === "waiting" && x.reason === "wifi") x.allowCell = true; });
+        log(`<b>使用移动网络下载</b>：等待 Wi‑Fi 的书全部改用移动网络`); tick(); break;
+      case "oldStop": if (S.oldBulk) { const r = S.tasks.find((x) => x.status === "downloading"); if (r) oldPause(r); } break;
+      case "goManager": S.prev = S.scene; S.scene = "manager"; break;
+      case "openChannel": S.prev = "shelf"; S.scene = "channel"; break;
+      case "back": S.scene = S.prev && S.prev !== S.scene ? S.prev : "shelf"; S.prev = null; break;
+      case "otherChannel": toast("示意：其它频道同样进入该频道的频道页（下载模式）"); break;
+      case "addDownload": toast("示意：进入「全部频道」列表，挑一个频道下载"); break;
+      case "pauseAll":
+        S.tasks.forEach((x) => { if (["queued", "downloading", "waiting"].includes(x.status)) { x.status = "paused"; x.reason = "user"; x.speed = 0; } });
+        log(`<b>全部暂停</b>：都记为「用户暂停」，不会自动恢复`);
+        break;
+      case "resumeAll":
+        S.tasks.forEach((x) => { if (x.status === "paused" || x.status === "error") { x.status = "queued"; x.reason = null; x.attempts = 0; } });
+        log(`<b>全部继续</b>：已暂停 / 失败的回到排队中`); tick();
+        break;
+      case "start":
+        if (S.mode === "old") { t.status = S.tasks.some((x) => x.status === "downloading") ? "queued" : "downloading"; }
+        else requestDownload([t.id], false);
+        break;
+      case "pause": pauseTask(t); break;
+      case "resume": resumeTask(t); break;
+      case "retry": t.attempts = 0; resumeTask(t); break;
+      case "open": toast(`打开阅读：${t.title}`); break;
+      case "menu": S.menu = S.menu === t.id ? null : t.id; break;
+      case "top": moveTop(t); break;
+      case "cancel": cancelTask(t); break;
+      case "askDel": S.delAsk = t.id; break;
+      case "closeDel": if (e.target === el) S.delAsk = null; break;
+      case "delData":
+        S.delAsk = null; t.status = "pending"; t.bytes = 0; t.doneAt = null; t.pos = null; t.kept = true;
+        log(`<b>仅删除下载数据</b> ${t.title}：清正文，保留下载记录（书架里显示待下载，可重新下载）`); break;
+      case "delAll":
+        S.delAsk = null; t.status = "pending"; t.bytes = 0; t.doneAt = null; t.pos = null; t.kept = false;
+        log(`<b>删除数据和下载记录</b> ${t.title}：清正文 + 删记录（登录用户同步删除服务器记录）`); break;
+      case "edit": S.editing = !S.editing; S.selected.clear(); break;
+      case "select": if (!t) break; S.selected.has(t.id) ? S.selected.delete(t.id) : S.selected.add(t.id); break;
+      case "bulkPause": S.selected.forEach((id) => { const x = S.tasks[id]; if (["queued", "downloading", "waiting"].includes(x.status)) { x.status = "paused"; x.reason = "user"; } }); log(`<b>批量暂停</b> ${S.selected.size} 本`); S.editing = false; tick(); break;
+      case "bulkResume": S.selected.forEach((id) => { const x = S.tasks[id]; if (x.status === "paused" || x.status === "error") { x.status = "queued"; x.reason = null; } }); log(`<b>批量继续</b> ${S.selected.size} 本`); S.editing = false; tick(); break;
+      case "bulkDel": S.selected.forEach((id) => { const x = S.tasks[id]; x.status = "pending"; x.bytes = 0; x.pos = null; }); log(`<b>批量删除</b> ${S.selected.size} 本`); S.editing = false; tick(); break;
+    }
+    render();
+  });
+
+  function envAction(k) {
+    switch (k) {
+      case "bg":
+        S.bg = !S.bg;
+        if (S.mode === "new") {
+          tick();
+          log(S.bg
+            ? (S.stage === "A" ? `<b>切到后台</b>（阶段 A）：在跑的跑完当前块 → 等待中 · App 在后台；队列留在数据库`
+              : `<b>切到后台</b>（阶段 B）：系统下载器继续下离线包；下完的包标「待安装」，回前台再写库`)
+            : `<b>回到前台</b>：等待中 → 排队中，调度器自动续上`);
+        } else {
+          log(S.bg ? `<b>现状 · 切到后台</b>：JS 被挂起，进度停住（UI 仍写着「下载中」）` : `<b>现状 · 回到前台</b>：若进程没被杀，循环接着跑`);
+        }
+        break;
+      case "kill":
+        S.bg = false;
+        if (S.mode === "new") {
+          S.tasks.forEach((t) => { if (t.status === "downloading") t.status = "queued"; t.speed = 0; t.samples = []; });
+          log(`<b>杀进程并重启</b>：冷启动对账 downloading → 排队中（不是已暂停），按游标续传；未完成的 ${active().length} 本全部还在队列，自动开跑`);
+          tick();
+        } else {
+          S.tasks.forEach((t) => {
+            if (t.status === "downloading") t.status = "paused";
+            else if (t.status === "queued") t.status = "paused";
+          });
+          const lost = S.oldBulk ? S.oldBulk.ids.filter((id) => S.tasks[id].status === "pending").length : 0;
+          S.oldBulk = null;
+          log(`<b>现状 · 杀进程并重启</b>：reconcileDownloads 把 downloading/queued → 已暂停；批次计数器丢失${lost ? `，${lost} 本从没入过队，显示「未下载」` : ""}；不会自动续`);
+        }
+        break;
+      case "net":
+        S.online = !S.online;
+        if (S.mode === "new") { tick(); log(S.online ? `<b>网络恢复</b>：等待网络 → 排队中，自动继续` : `<b>断网</b>：在跑的 → 等待中 · 等待网络（不是失败）`); }
+        else log(S.online ? `<b>现状 · 网络恢复</b>` : `<b>现状 · 断网</b>：取块失败 → 下载失败，批次跳下一本`);
+        if (S.mode === "old" && !S.online) {
+          const r = S.tasks.find((t) => t.status === "downloading");
+          if (r) { r.status = "error"; if (S.oldBulk) { S.oldBulk.i++; oldNext(); } }
+        }
+        break;
+      case "cell":
+        S.cell = !S.cell;
+        log(S.cell
+          ? `<b>切到移动网络</b>${S.mode === "new" && !S.cellularAllowed ? "：未允许移动网络 → 在下的书转「等待 Wi‑Fi」（点过立即下载的除外）；此时点下载会先询问" : "（带宽变小）"}`
+          : `<b>切回 Wi‑Fi</b>${S.mode === "new" ? (S.autoOnWifi ? "：等待 Wi‑Fi 的书自动开始" : "：自动下载已关 → 停在「已连上 Wi‑Fi，点 ▶ 开始」") : ""}`);
+        tick();
+        break;
+      case "fail":
+        S.failNext = true;
+        log(`下一块请求将失败${S.mode === "new" ? "（连点 4 次可看到重试耗尽 → 失败）" : ""}`);
+        break;
+      case "reset":
+        initState(); posSeq = 1; renderLog();
+        break;
+    }
+    render();
+  }
+
+  document.querySelector(".panel").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.env) envAction(b.dataset.env);
+    if (b.dataset.mode) { S.mode = b.dataset.mode; initState(); posSeq = 1; log(`切换到「${S.mode === "new" ? "新方案" : "现状"}」，数据已重置`); render(); }
+    if (b.dataset.stage) { S.stage = b.dataset.stage; tick(); render(); }
+    if (b.dataset.speed) { S.speedX = +b.dataset.speed; render(); }
+  });
+  $("#sceneSeg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    S.scene = b.dataset.scene; S.menu = null; S.editing = false; render();
+  });
+
+  renderLog();
+  render();
+})();
+</script>
+</body>
+</html>

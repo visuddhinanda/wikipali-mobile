@@ -18,6 +18,7 @@
 | [`catalog.md`](./catalog.md) | 三藏分类树（经/律/论/藏外）细化 |
 | [`reader.md`](./reader.md) | 阅读器形态总览（正文/版本/章节列表/响应式） |
 | [`reading-content.md`](./reading-content.md) | 正文获取、阅读单元切分、离线缓存与下载 |
+| [`download-manager.md`](./download-manager.md) | **下载管理**（持久队列 / 状态机 / 后台分阶段 / 字节与速度 / 下载管理页 / 移动网络询问；阶段 A 已实现，离线包待后端；含可交互原型 `download-manager-preview.html`） |
 | [`reading-annotations.md`](./reading-annotations.md) | 阅读页段落注释：义注/复注内容内嵌 |
 | [`commentary-layers.md`](./commentary-layers.md) | 注释层次、对应章节查询与阅读页三层段级联动 |
 | [`chat.md`](./chat.md) | 探索（AI 问答）栏目设计（App / Web 一致） |
