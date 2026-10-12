@@ -398,7 +398,9 @@ CREATE TABLE IF NOT EXISTS download_state (
 ### 4.4 整本下载与断点续传
 
 下载与阅读走同一端点，只是过滤与块大小不同：下载用 `book` 过滤 + 游标，
-每块 **5000 字节**（服务端的字节上限，块越大往返越少）。
+每块 **50000 字节原文**（`DOWNLOAD_PAGE_SIZE`；按段累加巴利原文长度，响应是渲染后的 HTML，
+实际约 200～400 KB 一块；块越大往返越少。服务端上限已从 5000 放宽）。每块请求 60 秒超时
+（`DOWNLOAD_TIMEOUT_MS`）。阅读补缺口仍按 5000 一块（`READ_PAGE_SIZE`）。
 
 **进度条的分子分母**（`src/reading/download.ts`）：
 
@@ -495,7 +497,9 @@ SELECT channel, count(html) paras, sum(length(html)) bytes
 | `READING_UNIT_MIN` | 1500 | 阅读单元字符下限，触发向后扩展（§3.2）|
 | `CHAPTER_MAX_LEVEL` | 7 | 章节行 level 上限，复用 `commentary.ts` |
 | `CHAPTER_PAGE_SIZE` | 3000 | 阅读时每块的字节数（§2.2）|
-| `DOWNLOAD_PAGE_SIZE` | 5000 | 下载时每块的字节数，服务端上限（§4.4）|
+| `DOWNLOAD_PAGE_SIZE` | 50000 | 下载时每块的原文字节数（§4.4；服务端上限需 ≥ 此值）|
+| `READ_PAGE_SIZE` | 5000 | 阅读补缺口每块的原文字节数 |
+| `DOWNLOAD_TIMEOUT_MS` | 60000 | 下载每块请求超时 |
 | `WINDOW_STRLEN` | 3000 | 阅读窗口每次扩展的巴利文字符数 |
 | `EMPTY_PARA_TTL_MS` | 48 小时 | 空段占位的过期时间（§4.2）|
 | `CACHE_QUOTA_BYTES` | 200 MB | 被动缓存配额（§4.5）|
