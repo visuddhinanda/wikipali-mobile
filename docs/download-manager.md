@@ -573,5 +573,13 @@ ALTER TABLE download_state ADD COLUMN temp_file TEXT;          -- 下载中的�
 
 **真机验证（USB，本地 mint 服务器，dev client）**：全部下载 11 / 31 / 24 / 216 本入队、单写者逐本下；HOME 后台 → `waiting/background` 不动 → 回前台自动续；`am force-stop` 重启 → 未完成的回排队按游标续传；关 Wi‑Fi → `waiting/network`（attempts 不增）→ 开 Wi‑Fi 自动续；暂停 / 继续 / 置顶（抢占当前并保留其进度）/ 取消下载 / 全部暂停 / 全部继续；删除对话框两种删除；阅读页下载图标（锚点 = 视口顶段）；移动网络询问三选项与「不再询问」（无 SIM，临时强制 cellular 测）；等 Wi‑Fi → 回到 Wi‑Fi 自动开始；下载完成后 `server_id` 回填（同步 likes 成功）。
 
-**未在真机覆盖**：服务端返回错误时的退避重试（只有 `check-download-queue.mjs` 覆盖）、登录 / 退出切换用户时的 `suspendDownloads`、iOS。
+**下载请求超时**（2026-10-12 补）：每块请求 30 秒超时（`DOWNLOAD_TIMEOUT_MS`），和计时器赛跑而不只靠
+`abort`（fetch 被 CopilotKit 的 polyfill 接管）。超时抛 `RequestTimeoutError`，按失败走退避重试，**不**当作
+「等待网络」——否则服务器卡住时会无限重试、永远到不了「失败」。真机 release 包把超时临时设为 1 ms 验证：
+首次 → 5 s → 30 s → 2 min 共重试 3 次后转「下载失败 · 请求超时」，与设计一致。
+
+**未在真机覆盖**：服务端返回 HTTP 错误时的退避重试（超时路径已真机验证，二者走同一分支）、登录 / 退出切换用户时的 `suspendDownloads`、iOS。
+
+> release 包不可调试：`adb exec-out run-as … cat` 会报 `package not debuggable`，拉不到库（脚本若不检查会读到旧副本）。
+> release 下只能看界面与 logcat（`console.warn` 在 release 仍会输出到 `ReactNativeJS`）。
 
