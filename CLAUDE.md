@@ -28,6 +28,10 @@
 - 跨层依赖方向：`screens/components` → `api/data/auth/user/reading/...`，底层模块不得反向依赖页面。
 - 不改动 `index.ts` 的 polyfill 导入顺序、`metro.config.js`、`patches/`（见 `docs/README.md` §0.3 工程约束）。
 
+# 构建规则（必须遵守）
+
+- **release APK 只支持 arm64**：构建 release APK 时仅打包 arm64-v8a ABI，不做 armeabi-v7a / x86 / x86_64。
+
 # i18n 目录结构（必须遵守）
 
 界面语言统一放在 `src/i18n/`，**按语言分目录、按语义分文件**：
