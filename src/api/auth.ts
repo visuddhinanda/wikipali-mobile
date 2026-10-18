@@ -32,7 +32,7 @@ async function toAuthUser(me: Me): Promise<AuthUser> {
     nickName: me.nickName ?? "",
     realName: me.realName ?? "",
     // 后端 avatar 可能是相对路径（`/storage/...`），RN 的 <Image> 解析不了相对地址，
-    // 这里按当前 API 服务器补成绝对 URL 再交给 UI（见 config.ts `resolveAssetUrl`）。
+    // 这里按当前 API 主站补成绝对 URL 再交给 UI（见 config.ts `resolveAssetUrl`）。
     avatar: await resolveAssetUrl(me.avatar),
     roles: me.roles ?? [],
   };

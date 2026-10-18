@@ -119,8 +119,6 @@ export function SignInScreen() {
             <Text style={styles.submitText}>{t("signIn.submit")}</Text>
           )}
         </Pressable>
-
-        <Text style={styles.hint}>{t("signIn.serverHint")}</Text>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -190,10 +188,5 @@ const styles = StyleSheet.create({
     color: colors.paperRaised,
     fontWeight: "600",
     fontSize: 16,
-  },
-  hint: {
-    ...type.small,
-    textAlign: "center",
-    marginTop: spacing.lg,
   },
 });

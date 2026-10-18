@@ -2,7 +2,8 @@
  * 调试模式：在 App 内手工指定后端 API 与 AI Runtime 地址（持久化到 AsyncStorage）。
  *
  * - 开：用这里填的 `apiUrl` / `runtimeUrl`（空的那一项仍走代码默认值）。
- * - 关：完全用代码里的值 —— API 走「API 服务器」选择，Runtime 走线上兜底，
+ * - 关：完全用代码里的值 —— API 走主站 next.wikipali.cc（失败降级到
+ *   next.wikipali.org），Runtime 走线上兜底，
  *   **不再读 `.env`**。这样本地 `assembleRelease` 时 `.env` 里没注释的
  *   `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_RUNTIME_URL` 不会再把开发地址带进 release。
  *
@@ -74,7 +75,7 @@ function trimUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
-/** 调试模式下生效的 API 地址；未开或没填返回空串（走「API 服务器」选择）。 */
+/** 调试模式下生效的 API 地址；未开或没填返回空串（走主站 next.wikipali.cc）。 */
 export function debugApiUrl(c: DebugConfig = current): string {
   return c.enabled ? trimUrl(c.apiUrl) : "";
 }

@@ -3,18 +3,33 @@
  *
  * 优先级：
  *   1. 「我 → 设置 → 调试」打开时手填的 API 地址（`src/settings/debug.ts`）
- *   2. 「我 → 设置 → API 服务器」里选择的服务器（默认 next.wikipali.org）
+ *   2. 主站 `next.wikipali.cc`（`PRIMARY_API_BASE_URL`）
+ *
+ * 主站网络层失败（DNS / 连接 / 超时）时，API 请求自动降级到镜像站
+ * `next.wikipali.org`（`FALLBACK_API_BASE_URL`，见 `openapi-client.ts` 的
+ * `requestFetch`）。其余旧站点（`www.wikipali.cc` / `www.wikipali.org`）已弃用。
  *
  * `.env` 的 `EXPO_PUBLIC_API_URL` 不再直接生效，只作调试项的初始值。
  */
-import { getApiServer, serverToBaseUrl } from "../settings/server";
 import { debugApiUrl, loadDebugConfig } from "../settings/debug";
+
+/** 线上主站（默认）。 */
+export const PRIMARY_API_BASE_URL = "https://next.wikipali.cc/api/v2";
+/** 主站不可用时的降级镜像站。 */
+export const FALLBACK_API_BASE_URL = "https://next.wikipali.org/api/v2";
+
+/** 去掉 `/api/vN` 后缀，得到站点根（origin）。 */
+export function originOf(baseUrl: string): string {
+  return baseUrl.replace(/\/api\/v\d+\/?$/, "").replace(/\/+$/, "");
+}
+
+export const PRIMARY_API_ORIGIN = originOf(PRIMARY_API_BASE_URL);
+export const FALLBACK_API_ORIGIN = originOf(FALLBACK_API_BASE_URL);
 
 export async function resolveBaseUrl(): Promise<string> {
   const debugUrl = debugApiUrl(await loadDebugConfig());
   if (debugUrl) return debugUrl;
-  const server = await getApiServer();
-  return serverToBaseUrl(server);
+  return PRIMARY_API_BASE_URL;
 }
 
 /**
@@ -46,6 +61,6 @@ export async function resolveAssetUrl(
   if (!path) return undefined;
   if (/^https?:\/\//i.test(path)) return path;
   const base = await resolveBaseUrl();
-  const origin = base.replace(/\/api\/v\d+\/?$/, "").replace(/\/+$/, "");
+  const origin = originOf(base);
   return `${origin}${path.startsWith("/") ? "" : "/"}${path}`;
 }

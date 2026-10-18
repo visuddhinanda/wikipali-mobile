@@ -9,7 +9,11 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import { getTokenSync } from "../auth/session";
 import { getActiveLocale } from "../i18n";
-import { resolveApiRoot } from "./config";
+import {
+  FALLBACK_API_ORIGIN,
+  PRIMARY_API_ORIGIN,
+  resolveApiRoot,
+} from "./config";
 import { ApiError } from "./client";
 import type { paths } from "./schema";
 
@@ -36,16 +40,44 @@ const authMiddleware: Middleware = {
  * streaming fetch polyfill 只从 `request.body` 取请求体 —— RN 的 `Request` 没有
  * 这个属性（体存在内部 `_bodyInit`），于是所有 POST 都以空体发出（登录、收藏、
  * 阅读记录同步全挂）。这里拆回 `fetch(url, init)` 的形式，请求体用 `text()` 读出。
+ *
+ * 打到主站（next.wikipali.cc）的请求还带降级：网络层失败（DNS / 连接 / 超时，
+ * fetch reject）时改打镜像站 next.wikipali.org。HTTP 4xx/5xx 是服务器正常应答，
+ * 不重试（避免 POST 之类非幂等请求重复落库）。进入降级后有一段冷却窗口，这期间
+ * 新请求直接走镜像，免得每次都空等一个已经挂掉的主站。
  */
+let primaryDownUntil = 0;
+const PRIMARY_COOLDOWN_MS = 60_000;
+
+function replaceOrigin(url: string, origin: string): string {
+  return origin + url.slice(PRIMARY_API_ORIGIN.length);
+}
+
 async function requestFetch(request: Request): Promise<Response> {
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const body = hasBody ? await request.text() : "";
-  return globalThis.fetch(request.url, {
+  const init: RequestInit = {
     method: request.method,
     headers: request.headers,
     body: body || undefined,
     signal: request.signal,
-  });
+  };
+
+  // 调试手填的地址（localhost / 局域网 IP 等）原样直连，不套主站降级。
+  if (!request.url.startsWith(PRIMARY_API_ORIGIN + "/")) {
+    return globalThis.fetch(request.url, init);
+  }
+
+  const fallbackUrl = replaceOrigin(request.url, FALLBACK_API_ORIGIN);
+  if (Date.now() < primaryDownUntil) {
+    return globalThis.fetch(fallbackUrl, init);
+  }
+  try {
+    return await globalThis.fetch(request.url, init);
+  } catch (err) {
+    primaryDownUntil = Date.now() + PRIMARY_COOLDOWN_MS;
+    return globalThis.fetch(fallbackUrl, init);
+  }
 }
 
 type ApiClient = ReturnType<typeof createClient<paths>>;
@@ -54,8 +86,8 @@ type ApiClient = ReturnType<typeof createClient<paths>>;
 const cache = new Map<string, ApiClient>();
 
 /**
- * 取一个绑定到「我 → 设置 → API 服务器」当前地址的类型化客户端。
- * 服务器切换后 base 变化会自动新建实例；同一 base 复用缓存。
+ * 取一个绑定到当前 API 地址的类型化客户端（主站或调试手填地址）。
+ * base 变化会自动新建实例；同一 base 复用缓存。
  */
 export async function getApiClient(): Promise<ApiClient> {
   const baseUrl = await resolveApiRoot();

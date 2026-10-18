@@ -66,8 +66,6 @@ export type RootStackParamList = {
   Settings: undefined;
   /** 语言选择（设置的下级页）。 */
   LanguageSettings: undefined;
-  /** API 服务器选择（设置的下级页）。 */
-  ApiServerSettings: undefined;
   /** 关于 / 反馈（设置的下级页）。 */
   About: undefined;
   /** 登录页（从「我」进入）。 */

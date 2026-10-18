@@ -28,7 +28,6 @@ import { ensureAiAvailable } from "../ai/availability";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { LanguageSettingsScreen } from "../screens/LanguageSettingsScreen";
-import { ApiServerSettingsScreen } from "../screens/ApiServerSettingsScreen";
 import { AboutScreen } from "../screens/AboutScreen";
 import { DebugLayoutScreen } from "../screens/DebugLayoutScreen";
 import { ScriptConvertorScreen } from "../screens/ScriptConvertorScreen";
@@ -371,11 +370,6 @@ function ProfileStack() {
         name="LanguageSettings"
         component={LanguageSettingsScreen}
         options={{ title: t("settings.language") }}
-      />
-      <Stack.Screen
-        name="ApiServerSettings"
-        component={ApiServerSettingsScreen}
-        options={{ title: t("settings.apiServer") }}
       />
       <Stack.Screen
         name="About"

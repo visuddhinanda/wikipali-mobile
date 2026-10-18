@@ -14,9 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
-import { API_SERVERS, DEFAULT_SERVER, getApiServer } from "../settings/server";
 import {
-  debugApiUrl,
   getDebugConfig,
   setDebugConfig,
   useDebugConfig,
@@ -44,7 +42,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function SettingsScreen() {
   const navigation = useNavigation<Nav>();
-  const [server, setServer] = useState<string>(DEFAULT_SERVER);
   const { t, preference, locale } = useI18n();
   const [notify, setNotify] = useState(false);
   const [notifyBusy, setNotifyBusy] = useState(false);
@@ -95,19 +92,12 @@ export function SettingsScreen() {
         }`
       : (LOCALE_OPTIONS.find((o) => o.id === preference)?.label ?? preference);
 
-  // 调试模式填了 API 地址时选择不生效，直接显示真正在用的地址，免得看起来像 bug。
   const debug = useDebugConfig();
-  const currentServerLabel =
-    debugApiUrl(debug) ||
-    (API_SERVERS.find((s) => s.id === server)?.label ?? server);
 
   // 从下级页面返回时要反映刚改过的选择，所以每次获得焦点都重读一次。
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      getApiServer().then((v) => {
-        if (alive) setServer(v);
-      });
       getUposathaNotify().then((v) => {
         if (alive) setNotify(v);
       });
@@ -137,21 +127,6 @@ export function SettingsScreen() {
           <Ionicons name="language" size={20} color={colors.inkSoft} />
           <View style={styles.rowBody}>
             <Text style={styles.rowLabel}>{currentLanguageLabel}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
-        </Pressable>
-
-        <View style={styles.divider} />
-
-        {/* API 服务器：详情在下级页面，这里只显示当前生效的值 */}
-        <Text style={styles.sectionTitle}>{t("settings.apiServer")}</Text>
-        <Pressable
-          style={styles.row}
-          onPress={() => navigation.navigate("ApiServerSettings")}
-        >
-          <Ionicons name="server-outline" size={20} color={colors.inkSoft} />
-          <View style={styles.rowBody}>
-            <Text style={styles.rowLabel}>{currentServerLabel}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />
         </Pressable>
