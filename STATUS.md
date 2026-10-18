@@ -194,14 +194,14 @@ src/
 - **新增依赖（含原生代码 → 必须 EAS 重建 APK）**：`react-native-screens` 4.26、`react-native-safe-area-context` 5.7、`react-native-webview` 13.16、`@react-native-async-storage/async-storage` 2.2（纯 JS：`@react-navigation/*` 7、`@expo/vector-icons` 15）
 - **导航**：React Navigation v7（`@react-navigation/native` + `bottom-tabs` + `native-stack`），AI Chat 为中间凸起 Tab
 - **App.tsx**：`GestureHandlerRootView → SafeAreaProvider → CopilotKitProvider → RootNavigator`（CopilotKit 仍包住全树，`NewChat` 屏复用原 `CopilotChat`）
-- **数据源**：目录树 JSON 本地打包（离线可用）；书目/正文走 `src/api` 门面——后端地址 = `.env` 的 `EXPO_PUBLIC_API_URL`（测试覆盖）或「我 → 设置 → API 服务器」选择的域名（默认 `next.wikipali.org`）；请求失败时阅读器在正文顶端显示错误提示条并支持重试
+- **数据源**：目录树 JSON 本地打包（离线可用）；书目/正文走 `src/api` 门面——后端地址 = 调试开关打开时手填的 API 地址（`.env` 的 `EXPO_PUBLIC_API_URL` 仅作其初始值），否则固定主站 `next.wikipali.cc`、网络层失败自动降级 `next.wikipali.org`（其余站点弃用）；请求失败时阅读器在正文顶端显示错误提示条并支持重试
 - **阅读器**：`react-native-webview` 渲染，注入「纸面 + Tufte sidenote」CSS（宽屏右侧边注 / 窄屏行内折叠）
-- **设置**：`src/settings/server.ts` 用 AsyncStorage 持久化 API 服务器选择；「我 → 设置」提供 4 个域名选项（next.wikipali.cc / www.wikipali.cc / next.wikipali.org / www.wikipali.org）
+- **设置**：`src/api/config.ts` 固定主站 `next.wikipali.cc` + 降级 `next.wikipali.org`；不再提供 API 服务器选择（`src/settings/server.ts` 已删除），www.wikipali.cc / www.wikipali.org 弃用
 
 ### 9.3 真机验证前必做
 
 1. **重建 development build**（新增了 4 个原生依赖，旧 APK 不含这些模块，直接 reload 会崩）
-2. 真机选后端：进「我 → 设置 → API 服务器」选域名（默认 `next.wikipali.org`）；`.env` 的 `EXPO_PUBLIC_API_URL` 仅开发测试用，会覆盖该选择
+2. 后端默认主站 `next.wikipali.cc`（网络失败降级 `next.wikipali.org`），无需手动选；`.env` 的 `EXPO_PUBLIC_API_URL` 仅作「设置 → 调试」的初始值，打开调试并填地址才会覆盖
 3. `npx expo start`（需 `__UNSAFE_EXPO_HOME_DIRECTORY`、`npm_config_cache` 两个重定向，见下）
 
 ### 9.4 沙箱下 Expo/npm 重定向（本会话已踩）

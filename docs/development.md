@@ -46,9 +46,10 @@ These two variables are **not used directly**. They only pre-fill
 
 - **Debug on** — the app uses the two addresses typed there (an empty field falls
   back to the default below). Changes apply immediately, no restart.
-- **Debug off** — the app uses the built-in values: the API comes from the
-  in-app picker (**Me → Settings → API server**, default `next.wikipali.org`,
-  `src/settings/server.ts`), the AI runtime is `https://agent.wikipali.cc/api/copilotkit`.
+- **Debug off** — the app uses the built-in values: the API defaults to
+  `https://next.wikipali.cc/api/v2` and falls back to `https://next.wikipali.org/api/v2`
+  on a network failure (`src/api/config.ts`); the AI runtime is
+  `https://agent.wikipali.cc/api/copilotkit`.
 
 The switch defaults to **on** in a development build when `.env` sets either
 variable, and to **off** in a release build. The switch and both addresses are
@@ -65,7 +66,7 @@ restarts.
 ### Mode A — Device + public API (no local backend)
 
 The quickest way in. Browsing, chapter lists, versions and the reader all work
-against `next.wikipali.org`; the AI tab stays offline.
+against `next.wikipali.cc` (falling back to `next.wikipali.org`); the AI tab stays offline.
 
 ```bash
 npx expo start --lan       # add CI=1 if Metro hits the watcher limit (see troubleshooting)
