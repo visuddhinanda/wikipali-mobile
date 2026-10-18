@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "旧傣文",
   "script.traditional": "传统",
   "settings.about": "关于 / 反馈",
-  "settings.apiServer": "API 服务器",
   "settings.debug": "调试",
   "settings.display": "显示设置（字号 / 主题）",
   "settings.download.autoWifi": "连上 Wi‑Fi 时自动下载",

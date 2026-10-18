@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "පැරණි තායි",
   "script.traditional": "සම්ප්‍රදායික",
   "settings.about": "පිළිබඳව / ප්‍රතිපෝෂණ",
-  "settings.apiServer": "API සේවාදායකය",
   "settings.debug": "නිදොස්කරණය",
   "settings.display": "දර්ශනය (අකුරු ප්‍රමාණය / තේමාව)",
   "settings.download.autoWifi": "Wi‑Fi හි ස්වයංක්‍රීයව බාගන්න",

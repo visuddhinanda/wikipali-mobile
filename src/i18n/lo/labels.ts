@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "ໄທເດີມ",
   "script.traditional": "ດັ້ງເດີມ",
   "settings.about": "ກ່ຽວກັບ / ແຈ້ງບັນຫາ",
-  "settings.apiServer": "ເຊີບເວີ API",
   "settings.debug": "ດີບັກ",
   "settings.display": "ການສະແດງຜົນ (ຂະໜາດຕົວອັກສອນ / ຮູບແບບສີ)",
   "settings.download.autoWifi": "ດາວໂຫຼດອັດຕະໂນມັດເມື່ອມີ Wi‑Fi",

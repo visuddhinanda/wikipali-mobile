@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "Thái cổ",
   "script.traditional": "truyền thống",
   "settings.about": "Giới thiệu / Phản hồi",
-  "settings.apiServer": "Máy chủ API",
   "settings.debug": "Gỡ lỗi",
   "settings.display": "Hiển thị (cỡ chữ / giao diện)",
   "settings.download.autoWifi": "Tự động tải khi có Wi‑Fi",

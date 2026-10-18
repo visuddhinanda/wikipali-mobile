@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "ရှမ်းဟောင်း",
   "script.traditional": "ရိုးရာ",
   "settings.about": "အကြောင်း / အကြံပြုရန်",
-  "settings.apiServer": "API ဆာဗာ",
   "settings.debug": "Debug",
   "settings.display": "ပြသမှု (စာလုံးအရွယ် / အပြင်အဆင်)",
   "settings.download.autoWifi": "Wi‑Fi ချိတ်လျှင် အလိုအလျောက် ဒေါင်းလုဒ်",

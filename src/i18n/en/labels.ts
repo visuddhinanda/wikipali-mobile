@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "Old Tai",
   "script.traditional": "traditional",
   "settings.about": "About / Feedback",
-  "settings.apiServer": "API server",
   "settings.debug": "Debug",
   "settings.display": "Display (text size / theme)",
   "settings.download.autoWifi": "Download automatically on Wi‑Fi",

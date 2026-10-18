@@ -141,7 +141,6 @@ const labels = {
   "script.taiOld": "ไทเดิม",
   "script.traditional": "ดั้งเดิม",
   "settings.about": "เกี่ยวกับ / แจ้งปัญหา",
-  "settings.apiServer": "เซิร์ฟเวอร์ API",
   "settings.debug": "ดีบัก",
   "settings.display": "การแสดงผล (ขนาดตัวอักษร / ธีม)",
   "settings.download.autoWifi": "ดาวน์โหลดอัตโนมัติเมื่อเชื่อม Wi‑Fi",
