@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "ကွန်ရက် အမှား၊ {s} စက္ကန့်အတွင်း ပြန်ကြိုးစားမည် ({n})",
   "downloads.empty.sub": "ဒေါင်းပြီးသောစာအုပ်များ စာအုပ်စင် → ဒေါင်းပြီး တွင်ရှိသည်။",
   "downloads.empty.title": "လုပ်ဆောင်နေသော ဒေါင်းလုဒ် မရှိ",
+  "downloads.keepForeground": "ဒေါင်းလုဒ် လုပ်ဆောင်နေသည် — App ကို ရှေ့တွင်ထားပါ၊ နောက်ခံသို့ ပြောင်းလျှင် ရပ်သွားပါမည်။",
   "downloads.summary.downloading": "{n} အုပ် ဒေါင်းနေသည်",
   "downloads.summary.queued": "{n} အုပ် တန်းစီ",
   "downloads.summary.stopped": "{n} အုပ် ရပ်/မအောင်မြင်",

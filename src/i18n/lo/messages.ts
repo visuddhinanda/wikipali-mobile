@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "ເຄືອຂ່າຍຜິດພາດ, ລອງໃໝ່ໃນ {s} ວິນາທີ (ຄັ້ງທີ {n})",
   "downloads.empty.sub": "ປຶ້ມທີ່ດາວໂຫຼດແລ້ວຢູ່ທີ່ ຊັ້ນປຶ້ມ → ດາວໂຫຼດແລ້ວ",
   "downloads.empty.title": "ບໍ່ມີການດາວໂຫຼດ",
+  "downloads.keepForeground": "ກຳລັງດາວໂຫຼດ — ກະລຸນາເກັບ App ໄວ້ດ້ານໜ້າ, ສະຫຼັບໄປພື້ນຫຼັງຈະຢຸດຊົ່ວຄາວ",
   "downloads.summary.downloading": "ກຳລັງດາວໂຫຼດ {n}",
   "downloads.summary.queued": "ຢູ່ໃນຄິວ {n}",
   "downloads.summary.stopped": "ຢຸດ/ລົ້ມເຫຼວ {n}",

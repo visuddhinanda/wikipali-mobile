@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { KeepAwake } from "../components/KeepAwake";
 import { Screen } from "../components/Screen";
 import {
   allowCellular,
@@ -160,19 +161,28 @@ export function DownloadsScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.fill}>
+      {inProgress.length > 0 ? <KeepAwake /> : null}
       <SectionList<DownloadProgress, Section>
         sections={sections}
         keyExtractor={(r) => `${r.channel}/${r.book}`}
         contentContainerStyle={styles.content}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          <SummaryCard
-            inProgress={inProgress}
-            stopped={stopped}
-            cellularAllowed={settings.cellularAllowed}
-            waitingWifi={waitingWifi}
-            onCellular={env.cellular}
-          />
+          <>
+            {inProgress.length > 0 ? (
+              <View style={styles.keepNote}>
+                <Ionicons name="information-circle-outline" size={16} color="#7a4b16" />
+                <Text style={styles.keepNoteText}>{t("downloads.keepForeground")}</Text>
+              </View>
+            ) : null}
+            <SummaryCard
+              inProgress={inProgress}
+              stopped={stopped}
+              cellularAllowed={settings.cellularAllowed}
+              waitingWifi={waitingWifi}
+              onCellular={env.cellular}
+            />
+          </>
         }
         renderSectionHeader={({ section }) =>
           section.key === "active" ? (
@@ -452,6 +462,21 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  keepNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: "#f6ead8",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  keepNoteText: {
+    ...type.caption,
+    color: "#7a4b16",
+    flex: 1,
   },
   card: {
     backgroundColor: colors.paperRaised,

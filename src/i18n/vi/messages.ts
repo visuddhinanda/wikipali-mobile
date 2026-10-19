@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "Lỗi mạng, thử lại sau {s} giây (lần {n})",
   "downloads.empty.sub": "Sách đã tải ở Tủ sách → Đã tải.",
   "downloads.empty.title": "Không có tải xuống nào",
+  "downloads.keepForeground": "Đang tải xuống — hãy giữ ứng dụng ở nền trước, chuyển sang nền sẽ tạm dừng.",
   "downloads.summary.downloading": "{n} đang tải",
   "downloads.summary.queued": "{n} đang chờ",
   "downloads.summary.stopped": "{n} tạm dừng / lỗi",

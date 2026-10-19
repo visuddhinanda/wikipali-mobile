@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "网络错误，{s} 秒后重试（第 {n} 次）",
   "downloads.empty.sub": "已下好的书在 书架 → 已下载。",
   "downloads.empty.title": "没有进行中的下载",
+  "downloads.keepForeground": "下载进行中，请保持应用在前台，切到后台会暂停下载",
   "downloads.summary.downloading": "{n} 本下载中",
   "downloads.summary.queued": "{n} 本排队",
   "downloads.summary.stopped": "{n} 本已暂停 / 失败",

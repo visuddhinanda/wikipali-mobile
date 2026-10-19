@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "Network error, retrying in {s}s (attempt {n})",
   "downloads.empty.sub": "Finished books are in Bookshelf → Downloaded.",
   "downloads.empty.title": "No downloads in progress",
+  "downloads.keepForeground": "Download in progress — keep the app in the foreground; switching to the background pauses it.",
   "downloads.summary.downloading": "{n} downloading",
   "downloads.summary.queued": "{n} queued",
   "downloads.summary.stopped": "{n} paused / failed",

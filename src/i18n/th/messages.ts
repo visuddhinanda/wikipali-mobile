@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "เครือข่ายผิดพลาด ลองใหม่ใน {s} วินาที (ครั้งที่ {n})",
   "downloads.empty.sub": "หนังสือที่ดาวน์โหลดเสร็จอยู่ที่ ชั้นหนังสือ → ดาวน์โหลดแล้ว",
   "downloads.empty.title": "ไม่มีการดาวน์โหลดที่กำลังดำเนินการ",
+  "downloads.keepForeground": "กำลังดาวน์โหลด — โปรดเปิดแอปไว้ด้านหน้า การสลับไปเบื้องหลังจะหยุดชั่วคราว",
   "downloads.summary.downloading": "กำลังดาวน์โหลด {n} เล่ม",
   "downloads.summary.queued": "รอคิว {n} เล่ม",
   "downloads.summary.stopped": "หยุด/ล้มเหลว {n} เล่ม",

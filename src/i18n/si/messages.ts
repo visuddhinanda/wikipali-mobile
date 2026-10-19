@@ -123,6 +123,7 @@ const messages = {
   "download.retryIn": "ජාල දෝෂයකි, තත්පර {s} කින් නැවත උත්සාහ ({n})",
   "downloads.empty.sub": "බාගත් පොත් පොත් රාක්කය → බාගත් තුළ ඇත.",
   "downloads.empty.title": "ක්‍රියාත්මක බාගැනීම් නැත",
+  "downloads.keepForeground": "බාගැනීම සිදුවෙමින් — යෙදුම ඉදිරියේ තබාගන්න; පසුබිමට මාරු වුවහොත් විරාම වේ.",
   "downloads.summary.downloading": "{n} ක් බාගනිමින්",
   "downloads.summary.queued": "{n} ක් පෝලිමේ",
   "downloads.summary.stopped": "{n} ක් නවතා/අසාර්ථක",
