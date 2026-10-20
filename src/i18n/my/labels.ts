@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "ပိတ်",
   "reader.keepAwake.on": "ဖွင့်",
   "reader.restoreLastReading": "နောက်ဆုံးဖတ်ခဲ့သည့်နေရာကို ပြန်ဖွင့်ရန်",
+  "reader.showParaNumbers": "စာပိုဒ်နံပါတ်များ ပြသရန်",
   "reader.paliScript": "ပါဠိစာလုံး",
   "reader.size.lg": "ကြီး",
   "reader.size.md": "ပုံမှန်",

@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "关",
   "reader.keepAwake.on": "开",
   "reader.restoreLastReading": "恢复上次阅读位置",
+  "reader.showParaNumbers": "显示段落编号",
   "reader.paliScript": "巴利字体",
   "reader.size.lg": "大",
   "reader.size.md": "标准",

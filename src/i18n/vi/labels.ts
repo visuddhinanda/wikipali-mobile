@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "Tắt",
   "reader.keepAwake.on": "Bật",
   "reader.restoreLastReading": "Mở lại vị trí đọc gần nhất",
+  "reader.showParaNumbers": "Hiển thị số đoạn văn",
   "reader.paliScript": "Chữ viết Pāli",
   "reader.size.lg": "Lớn",
   "reader.size.md": "Chuẩn",

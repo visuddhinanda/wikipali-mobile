@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "Off",
   "reader.keepAwake.on": "On",
   "reader.restoreLastReading": "Resume last reading position",
+  "reader.showParaNumbers": "Show paragraph numbers",
   "reader.paliScript": "Pāli script",
   "reader.size.lg": "Large",
   "reader.size.md": "Default",

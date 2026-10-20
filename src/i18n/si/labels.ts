@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "අක්‍රිය",
   "reader.keepAwake.on": "සක්‍රිය",
   "reader.restoreLastReading": "අවසන් කියවූ ස්ථානය යළි විවෘත කරන්න",
+  "reader.showParaNumbers": "ඡේද අංක පෙන්වන්න",
   "reader.paliScript": "පාලි අකුරු",
   "reader.size.lg": "විශාල",
   "reader.size.md": "සම්මත",

@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "ปิด",
   "reader.keepAwake.on": "เปิด",
   "reader.restoreLastReading": "เปิดตำแหน่งที่อ่านล่าสุด",
+  "reader.showParaNumbers": "แสดงเลขย่อหน้า",
   "reader.paliScript": "อักษรบาลี",
   "reader.size.lg": "ใหญ่",
   "reader.size.md": "มาตรฐาน",

@@ -80,6 +80,8 @@ export interface ReaderSettings {
   pageMargin: ReaderPageMargin;
   /** 冷启动时是否自动回到上次的阅读页与阅读位置（见 useRestoreLastReading）。 */
   restoreLastReading: boolean;
+  /** 是否显示段落编号（`data-para` 段号，挂在左槽）。默认关。 */
+  showParaNumbers: boolean;
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
@@ -94,6 +96,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   lineHeight: "standard",
   pageMargin: "standard",
   restoreLastReading: true,
+  showParaNumbers: false,
 };
 
 const KEY = "@wikipali/reader-settings";
@@ -167,6 +170,7 @@ export async function loadReaderSettings(): Promise<ReaderSettings> {
         ? parsed.pageMargin
         : "standard",
       restoreLastReading: parsed.restoreLastReading !== false,
+      showParaNumbers: parsed.showParaNumbers === true,
     };
   } catch {
     return DEFAULT_READER_SETTINGS;

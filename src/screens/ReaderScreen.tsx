@@ -1366,6 +1366,20 @@ function MoreSettingsSheet({
             />
           </View>
 
+          <View style={styles.moreSwitchRow}>
+            <Text style={[styles.moreSwitchLabel, { color: c.ink }]}>
+              {t("reader.showParaNumbers")}
+            </Text>
+            <Switch
+              value={settings.showParaNumbers}
+              onValueChange={(showParaNumbers) =>
+                onChange({ ...settings, showParaNumbers })
+              }
+              trackColor={{ false: c.paperSunken, true: c.vermilion }}
+              thumbColor="#fdfaf1"
+            />
+          </View>
+
           <Pressable
             style={[styles.resetBtn, { borderColor: c.border }]}
             onPress={() => onChange({ ...DEFAULT_READER_SETTINGS })}

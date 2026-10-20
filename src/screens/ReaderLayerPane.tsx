@@ -268,6 +268,7 @@ function buildReaderHtml(
     annotationMode: "inline" | "footnote";
     lineHeight: number;
     pageMargin: number;
+    showParaNumbers: boolean;
   },
 ): string {
   const inkVars = opts.dark
@@ -275,7 +276,7 @@ function buildReaderHtml(
     : "--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
   const vars = `--paper:${opts.paper};${inkVars}`;
   return `<!DOCTYPE html>
-<html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false">
+<html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false" data-para-numbers="${opts.showParaNumbers ? "on" : "off"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -334,7 +335,8 @@ function buildReaderHtml(
    * （「150.」这类）开头，浮动的段号会和列表序号叠在一起。
    */
   /* 只匹配段落外壳 div[data-para]：角标 <label> / <cite> 也带 data-para（跳转目标段号），
-     不能一起命中，否则它们的 ::before 会把 507 之类的段号当角标前缀显示出来。 */
+     不能一起命中，否则它们的 ::before 会把 507 之类的段号当角标前缀显示出来。
+     段号默认不显示（data-para-numbers="off"），在「更多设置」里打开才挂到左槽。 */
   div[data-para] {
     position: relative;
     padding-left: 2.3em;
@@ -351,6 +353,12 @@ function buildReaderHtml(
     color: var(--ink-faint);
     font-size: 0.6em;
     font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  /* 关闭段号：藏起所有段号，散文顶格（偈颂号/居中不受影响，它们的缩进在
+     下面的 gatha / centered 规则里单独给定）。 */
+  html[data-para-numbers="off"] div[data-para]::before { content: none; }
+  html[data-para-numbers="off"] div[data-para]:not(.hangnum):not(.gatha1):not(.gatha2):not(.gatha3):not(.gathalast):not(.centered) {
+    padding-left: 0;
   }
   /* 列表自己的序号也要留在左槽之内，别再往外顶。 */
   div[data-para] ol, div[data-para] ul { margin: 0; padding-left: 1.4em; }
@@ -1474,6 +1482,7 @@ export const ReaderLayerPane = forwardRef<
               annotationMode: settings.annotationMode,
               lineHeight: LINE_HEIGHT_VALUES[settings.lineHeight],
               pageMargin: PAGE_MARGIN_VALUES[settings.pageMargin],
+              showParaNumbers: settings.showParaNumbers,
             },
           )
         : "",
@@ -1486,6 +1495,7 @@ export const ReaderLayerPane = forwardRef<
       settings.pageMargin,
       settings.annotationCollapsedLines,
       settings.annotationMode,
+      settings.showParaNumbers,
       isDark,
       readerWidth,
       measure,

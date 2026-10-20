@@ -117,6 +117,7 @@ const labels = {
   "reader.keepAwake.off": "ປິດ",
   "reader.keepAwake.on": "ເປີດ",
   "reader.restoreLastReading": "ເປີດຕຳແໜ່ງທີ່ອ່ານຫຼ້າສຸດ",
+  "reader.showParaNumbers": "ສະແດງເລກວັກ",
   "reader.paliScript": "ອັກສອນບາລີ",
   "reader.size.lg": "ໃຫຍ່",
   "reader.size.md": "ມາດຕະຖານ",
