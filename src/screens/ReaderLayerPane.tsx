@@ -354,6 +354,79 @@ function buildReaderHtml(
   }
   /* 列表自己的序号也要留在左槽之内，别再往外顶。 */
   div[data-para] ol, div[data-para] ul { margin: 0; padding-left: 1.4em; }
+
+  /* ---- 偈颂（gatha）与居中文本（centered）排版 ----
+   * 服务端把每首偈的若干行标成 gatha1/2/3/gathalast，行前可选一行 hangnum
+   * （偈颂号，verse 在 sutta 里的编号）；致敬语 / 结语标成 centered。桌面端刚在
+   * reader-content.css 完成等价排版，这里按 mobile 的架构（段号挂在左槽、
+   * 段落间距在 .original/.translation 外层）适配，不照抄桌面。
+   */
+
+  /* 偈颂号：藏起 data-para 段号，把偈颂号 float 到左槽、悬挂在首行前面。
+   * 偈颂号（「2.」）右对齐占满左槽、加粗、二级墨色；段号是等宽小字、淡墨。 */
+  div[data-para].hangnum::before { content: none; }
+  div[data-para].hangnum {
+    float: left;
+    clear: left;
+    width: 2.3em;           /* 占满段号槽，作为偈颂号列 */
+    padding-left: 0;
+    margin-bottom: 0.2em;   /* 紧贴首行 */
+  }
+  div[data-para].hangnum .para-block {
+    text-align: right;
+    font-size: 0.8em;
+    font-weight: 700;
+    color: var(--ink-soft);
+  }
+  /* 偈颂号悬在首行左侧时，首行自己的段号（::before）会和它叠在左槽里，藏起。
+   * 只藏「紧跟 hangnum 的 gatha1」：无 hangnum 的译文首行仍保留段号。 */
+  div[data-para].hangnum + div[data-para].gatha1::before { content: none; }
+  /* hangnum 有两种形态，都要显示号码：
+   *  - 原文是纯文本 <span> 1.</span>；
+   *  - 部分译文被 markdown 渲染成空有序列表 <ol start="N"><li></li></ol>，
+   *    号码靠列表 marker 显示。复位时不要用 list-style 简写（会把
+   *    list-style-position 重置回 outside，号码不显示），逐条写 type + position。 */
+  div[data-para].hangnum ol {
+    list-style-type: decimal;
+    list-style-position: inside;
+    padding: 0;
+    margin: 0;
+  }
+  div[data-para].hangnum li {
+    list-style-type: decimal;
+    list-style-position: inside;
+    margin: 0;
+    line-height: inherit;
+  }
+
+  /* 偈颂行：在段号槽之外再缩进，让 verse 从顶格散文里凸显；行间收紧，
+   * 末行下方留大间隔，保证「两首偈之间 > 一首偈内行与行之间」。 */
+  div[data-para].gatha1,
+  div[data-para].gatha2,
+  div[data-para].gatha3,
+  div[data-para].gathalast {
+    padding-left: 3.5em;    /* 2.3em 段号槽 + 1.2em 偈颂额外缩进 */
+    margin-bottom: 0.2em;   /* 覆盖 .translation/.original 的 0.55em，行间收紧 */
+  }
+  /* 折行悬挂缩进：续行比首行再缩进，长行（巴利一颂跨行）也能看出行界。 */
+  div[data-para].gatha1 .para-block,
+  div[data-para].gatha2 .para-block,
+  div[data-para].gatha3 .para-block,
+  div[data-para].gathalast .para-block {
+    padding-left: 1.25em;
+    text-indent: -1.25em;
+  }
+  div[data-para].gathalast { margin-bottom: 1.5em; }  /* 两首偈之间的大间隔 */
+
+  /* 居中文本（致敬语 / 结语）：水平居中。段号对这类整行没有意义，藏起并去掉
+   * 左槽 padding，否则正文被左槽挤得偏右、不算真居中。 */
+  div[data-para].centered::before { content: none; }
+  div[data-para].centered {
+    padding-left: 0;
+    text-align: center;
+    margin-bottom: 1.5em;
+  }
+
   .sentence { display: inline; }
   .sentence + .sentence::before { content: " "; }
   strong { font-weight: 700; }
