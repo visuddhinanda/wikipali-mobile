@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "Sao chép",
   "reader.menu.lookup": "Tra từ",
   "reader.more": "Thêm",
+  "reader.readEntry": "Đọc mục từ",
   "reader.nextChapter": "Chương sau",
   "reader.prevChapter": "Chương trước",
   "reader.settings": "Cài đặt đọc",

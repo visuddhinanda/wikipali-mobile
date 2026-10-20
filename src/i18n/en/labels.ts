@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "Output script",
   "tools.script.title": "Script conversion",
   "tools.transcode.title": "Script conversion",
+  "term.entry": "Term",
+  "term.editor": "Editor",
+  "term.updatedAt": "Updated",
 } as const;
 
 export default labels;

@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "පිටපත්",
   "reader.menu.lookup": "වචනය සොයන්න",
   "reader.more": "තවත්",
+  "reader.readEntry": "ලිපිය කියවන්න",
   "reader.nextChapter": "ඊළඟ පරිච්ඡේදය",
   "reader.prevChapter": "පෙර පරිච්ඡේදය",
   "reader.settings": "කියවීම් සැකසුම්",

@@ -72,6 +72,13 @@ export type RootStackParamList = {
   SignIn: undefined;
   /** 下载管理（书架「已下载」状态条 / 频道页批次进度 / 设置 → 下载管理）。 */
   Downloads: undefined;
+  /** 百科词条详情（阅读器词条卡片 → 「阅读条目」）。 */
+  TermEntry: {
+    /** 词条 guid（`/v2/terms/{guid}` 的 guid）。 */
+    guid: string;
+    /** 释义，用作标题；缺省时详情页取回数据后自行回填。 */
+    title?: string;
+  };
   /** 译本频道列表（书架 → 批量下载）。 */
   ChannelList: undefined;
   /** 译本频道详情：信息 + 该频道下的书列表。 */

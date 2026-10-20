@@ -72,6 +72,11 @@ import {
   saveBookmark,
 } from "../data/bookmarks";
 import { ChapterDrawer } from "../components/ChapterDrawer";
+import {
+  TermDrawer,
+  TermPopover,
+  type TermTap,
+} from "../components/TermSheet";
 import { serifFont } from "../theme";
 import {
   MAX_CONTENT_WIDTH,
@@ -439,6 +444,13 @@ function buildReaderHtml(
   .sentence + .sentence::before { content: " "; }
   strong { font-weight: 700; }
 
+  /* 百科词条（term-ref）：只加下划线，不斜体、不变色，保留可点击 */
+  .term-ref {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    cursor: pointer;
+  }
+
   code {
     font-family: inherit;
     color: var(--vermilion);
@@ -617,6 +629,25 @@ function buildReaderHtml(
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: "pane-focus" }));
     }
     var dualOrigin = document.documentElement.getAttribute("data-dual-origin") === "true";
+
+    // 百科词条：点 .term-ref[data-id] → 通知 RN 弹词条（手机抽屉 / 平板 popover）。
+    var termRef = closest(e.target, ".term-ref");
+    if (termRef && termRef.getAttribute("data-id")) {
+      e.preventDefault();
+      var tr = termRef.getBoundingClientRect();
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: "term-tap",
+          id: termRef.getAttribute("data-id"),
+          term: termRef.getAttribute("data-term"),
+          x: Math.round(tr.left),
+          y: Math.round(tr.top),
+          w: Math.round(tr.width),
+          h: Math.round(tr.height)
+        }));
+      }
+      return;
+    }
 
     var t = closest(e.target, ".anno-jump");
     if (t) {
@@ -1025,6 +1056,10 @@ export const ReaderLayerPane = forwardRef<
 ) {
   const t = useT();
 
+  // 设备档位：compact（手机）→ 词条弹底部抽屉；medium 及以上（平板）→ 弹 popover。
+  const { width: windowWidth } = useWindowDimensions();
+  const isTablet = widthClassOf(windowWidth) !== "compact";
+
   const [unit, setUnit] = useState<ReadingUnit | null>(null);
   const [channelId, setChannelId] = useState<string | undefined>(
     initialChannelId,
@@ -1053,6 +1088,18 @@ export const ReaderLayerPane = forwardRef<
   const [moreVisible, setMoreVisible] = useState(false);
   const [starred, setStarred] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+
+  // 百科词条点击（WebView .term-ref 上报）：手机弹抽屉、平板弹 popover。
+  const [termTap, setTermTap] = useState<TermTap | null>(null);
+
+  /** 「阅读条目」：关闭词条卡片并跳转到词条详情页。 */
+  const openTermEntry = useCallback(
+    (guid: string, title: string) => {
+      setTermTap(null);
+      navigation.navigate("TermEntry", { guid, title });
+    },
+    [navigation],
+  );
 
   // ---- 窗口化懒加载状态 ----
   // 正文不再「一次加载整个阅读单元」，而是维护一个按巴利文字符数滑动的段落
@@ -1435,6 +1482,8 @@ export const ReaderLayerPane = forwardRef<
   }, [unit]);
 
   const [readerWidth, setReaderWidth] = useState(0);
+  /** 正文容器高度（供平板词条 popover 上/下翻转定位）。 */
+  const [readerHeight, setReaderHeight] = useState(0);
   const sidenoteMode: "inline" | "margin" =
     readerWidth >= SIDENOTE_MARGIN_MIN_WIDTH ? "margin" : "inline";
   const measure = useMemo(() => {
@@ -1913,6 +1962,17 @@ export const ReaderLayerPane = forwardRef<
         onFocus?.();
         return;
       }
+      if (msg.type === "term-tap" && typeof msg.id === "string") {
+        setTermTap({
+          id: msg.id,
+          term: typeof msg.term === "string" ? msg.term : "",
+          x: Number(msg.x) || 0,
+          y: Number(msg.y) || 0,
+          w: Number(msg.w) || 0,
+          h: Number(msg.h) || 0,
+        });
+        return;
+      }
       const book = Number(msg.book);
       const para = Number(msg.para);
       const start = Number(msg.start);
@@ -1956,9 +2016,10 @@ export const ReaderLayerPane = forwardRef<
       <View style={styles.bodyRow}>
         <View
           style={styles.body}
-          onLayout={(e) =>
-            setReaderWidth(Math.round(e.nativeEvent.layout.width))
-          }
+          onLayout={(e) => {
+            setReaderWidth(Math.round(e.nativeEvent.layout.width));
+            setReaderHeight(Math.round(e.nativeEvent.layout.height));
+          }}
         >
           {error ? (
             <View style={styles.center}>
@@ -2030,6 +2091,17 @@ export const ReaderLayerPane = forwardRef<
               </Text>
             </Pressable>
           )}
+          {/* 百科词条（平板）：锚定在词条附近的气泡 popover，覆盖在正文之上。 */}
+          {termTap && isTablet ? (
+            <TermPopover
+              term={termTap}
+              dark={isDark}
+              containerWidth={readerWidth}
+              containerHeight={readerHeight}
+              onClose={() => setTermTap(null)}
+              onOpenEntry={openTermEntry}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -2065,6 +2137,14 @@ export const ReaderLayerPane = forwardRef<
         onShare={shareFromMenu}
         onFavorite={() => void toggleFavorite()}
         onBookmark={() => void toggleBookmark()}
+      />
+
+      {/* 百科词条（手机）：底部抽屉。 */}
+      <TermDrawer
+        term={termTap && !isTablet ? termTap : null}
+        dark={isDark}
+        onClose={() => setTermTap(null)}
+        onOpenEntry={openTermEntry}
       />
     </View>
   );

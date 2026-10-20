@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "ຄັດລອກ",
   "reader.menu.lookup": "ຄົ້ນຄຳ",
   "reader.more": "ເພີ່ມເຕີມ",
+  "reader.readEntry": "ອ່ານຄຳສັບ",
   "reader.nextChapter": "ບົດຕໍ່ໄປ",
   "reader.prevChapter": "ບົດກ່ອນໜ້າ",
   "reader.settings": "ຕັ້ງຄ່າການອ່ານ",

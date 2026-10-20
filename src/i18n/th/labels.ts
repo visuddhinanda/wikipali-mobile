@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "อักษรปลายทาง",
   "tools.script.title": "แปลงอักษร",
   "tools.transcode.title": "แปลงอักษร",
+  "term.entry": "คำศัพท์",
+  "term.editor": "ผู้แก้ไข",
+  "term.updatedAt": "อัปเดตเมื่อ",
 } as const;
 
 export default labels;

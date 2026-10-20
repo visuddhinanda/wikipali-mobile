@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "ထွက်ရှိစာလုံး",
   "tools.script.title": "စာလုံးပြောင်းလဲခြင်း",
   "tools.transcode.title": "အက္ခရာ ပြောင်းလဲခြင်း",
+  "term.entry": "ဝေါဟာရ",
+  "term.editor": "တည်းဖြတ်သူ",
+  "term.updatedAt": "ပြုပြင်သည့်နေ့",
 } as const;
 
 export default labels;

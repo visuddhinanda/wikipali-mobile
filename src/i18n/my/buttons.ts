@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "ကူးယူ",
   "reader.menu.lookup": "အဓိပ္ပာယ်ရှာ",
   "reader.more": "နောက်ထပ်",
+  "reader.readEntry": "ဝေါဟာရဖတ်ရန်",
   "reader.nextChapter": "နောက်အခန်း",
   "reader.prevChapter": "ယခင်အခန်း",
   "reader.settings": "ဖတ်ရှုမှု ဆက်တင်",

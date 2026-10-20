@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "คัดลอก",
   "reader.menu.lookup": "ค้นศัพท์",
   "reader.more": "เพิ่มเติม",
+  "reader.readEntry": "อ่านคำศัพท์",
   "reader.nextChapter": "บทถัดไป",
   "reader.prevChapter": "บทก่อนหน้า",
   "reader.settings": "ตั้งค่าการอ่าน",

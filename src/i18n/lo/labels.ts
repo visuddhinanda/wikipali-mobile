@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "ອັກສອນປາຍທາງ",
   "tools.script.title": "ແປງອັກສອນ",
   "tools.transcode.title": "ແປງອັກສອນ",
+  "term.entry": "ຄຳສັບ",
+  "term.editor": "ຜູ້ແກ້ໄຂ",
+  "term.updatedAt": "ອັບເດດເມື່ອ",
 } as const;
 
 export default labels;

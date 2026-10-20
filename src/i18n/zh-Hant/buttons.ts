@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "複製",
   "reader.menu.lookup": "查詞",
   "reader.more": "更多",
+  "reader.readEntry": "閱讀條目",
   "reader.nextChapter": "下一章",
   "reader.prevChapter": "上一章",
   "reader.settings": "閱讀設定",

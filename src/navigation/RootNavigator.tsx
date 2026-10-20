@@ -40,6 +40,7 @@ import { ScanScreen } from "../screens/ScanScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelDetailScreen } from "../screens/ChannelDetailScreen";
 import { DownloadsScreen } from "../screens/DownloadsScreen";
+import { TermEntryScreen } from "../screens/TermEntryScreen";
 import { navigationRef } from "../linking/handler";
 import { useDeepLinks } from "../linking/useDeepLinks";
 import { useRestoreLastReading } from "./useRestoreLastReading";
@@ -209,6 +210,13 @@ function readingChainScreens(t: T) {
         name="Reader"
         component={ReaderScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="TermEntry"
+        component={TermEntryScreen}
+        options={({ route }) => ({
+          title: route.params.title ?? t("term.entry"),
+        })}
       />
       <Stack.Screen
         name="ChannelList"

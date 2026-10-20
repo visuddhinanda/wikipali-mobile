@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "Chữ viết đích",
   "tools.script.title": "Chuyển đổi chữ viết",
   "tools.transcode.title": "Chuyển đổi chữ viết",
+  "term.entry": "Mục từ",
+  "term.editor": "Người biên tập",
+  "term.updatedAt": "Cập nhật",
 } as const;
 
 export default labels;

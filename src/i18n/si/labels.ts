@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "ප්‍රතිදාන අකුරු",
   "tools.script.title": "අකුරු පරිවර්තනය",
   "tools.transcode.title": "අක්ෂර පරිවර්තනය",
+  "term.entry": "පදය",
+  "term.editor": "සංස්කාරක",
+  "term.updatedAt": "යාවත්කාලීන",
 } as const;
 
 export default labels;

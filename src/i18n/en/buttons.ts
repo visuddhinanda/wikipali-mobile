@@ -46,6 +46,7 @@ const buttons = {
   "reader.menu.copy": "Copy",
   "reader.menu.lookup": "Look up",
   "reader.more": "More",
+  "reader.readEntry": "Read entry",
   "reader.nextChapter": "Next",
   "reader.prevChapter": "Previous",
   "reader.settings": "Reading settings",

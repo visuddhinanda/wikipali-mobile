@@ -161,6 +161,9 @@ const labels = {
   "tools.script.output": "輸出字體",
   "tools.script.title": "編碼轉換",
   "tools.transcode.title": "編碼轉換",
+  "term.entry": "詞條",
+  "term.editor": "編輯者",
+  "term.updatedAt": "更新時間",
 } as const;
 
 export default labels;
