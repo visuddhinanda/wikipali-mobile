@@ -19,12 +19,94 @@ adb logcat -c && adb logcat -v brief | grep -iE "ReactNativeJS|FATAL|sqlite"
 
 **注入点击的已知盲区**：
 
-- 阅读页正文区（WebView）里的控件（如「就此段落提问」）收不到 `input tap`，
-  只能人工点。
+- 阅读页正文区（WebView）里的控件（如「就此段落提问」）收不到 `input tap`。
+  用 dev client 时可以改走 WebView 远程调试，在页面里派发点击（见 §0.1）；
+  release 包没开 WebView 调试，只能人工点。
 - 首次点击约三成会被吞，点第二次才生效 —— 判定「无响应」前至少点两次，
   并用 dump 比对界面是否真的没变。
 - 底部 Tab 要点 y≈2300（更低会被手势导航条吃掉）。
 - 小米需在开发者选项打开「USB 调试（安全设置）」，否则注入事件被拒。
+
+
+### 0.1 用 dev client 驱动 WebView 与 App 运行时
+
+注入点击打不进 WebView，输入法又会搅乱 `input text`，这两块改用调试协议直接操作。
+**只适用于 dev client**（debug 包：react-native-webview 在 `ReactBuildConfig.DEBUG` 下才开 WebView
+远程调试，Hermes inspector 也只有 dev 才有）。2026-10-21 测阅读页 issue 标注时用的就是这套。
+
+**准备**
+
+```bash
+export ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
+# debug 包与 release 包同用 android/app/debug.keystore 签名，-r 覆盖安装不丢数据
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb reverse tcp:8081 tcp:8081      # Metro
+adb reverse tcp:8000 tcp:8000      # 本地 mint（php artisan serve），App 里用 http://127.0.0.1:8000/api/v2
+npx expo start --dev-client --port 8081      # ⚠️ 不要加 CI=1，见下方「坑」
+adb shell am start -a android.intent.action.VIEW \
+  -d "exp+mobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081" com.iapt.mobile
+# 直达阅读页（支持 wikipali:// 与 http(s)://…/library/tipitaka/… 两种，见 src/linking/wikipali-url.ts）
+adb shell am start -a android.intent.action.VIEW \
+  -d "'wikipali://library/tipitaka/169-893/read?channel=<channel uuid>'" com.iapt.mobile
+```
+
+**在 App 的 JS 运行时里执行代码（Hermes，经 Metro inspector）**
+
+适合改设置、读状态、整体 reload——不用点界面、不经过输入法。Metro 的 dev bundle 里
+`__r.getModules()` 返回 `Map<id, {verboseName}>`，`verboseName` 是源码路径，据此找到模块再 `__r(id)` 调用。
+
+```js
+// hermes-eval.cjs —— node hermes-eval.cjs '<js 表达式>'
+const WebSocket = require("<repo>/node_modules/ws");
+(async () => {
+  const [target] = await (await fetch("http://127.0.0.1:8081/json/list")).json();
+  // 新版 dev-middleware 校验 Origin，不带会 401
+  const ws = new WebSocket(target.webSocketDebuggerUrl, { headers: { Origin: "http://127.0.0.1:8081" } });
+  ws.on("open", () => ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate",
+    params: { expression: process.argv[2], awaitPromise: true, returnByValue: true } })));
+  ws.on("message", (raw) => { const m = JSON.parse(raw); if (m.id === 1) { console.log(JSON.stringify(m.result)); process.exit(0); } });
+})();
+```
+
+常用表达式：
+
+```js
+// 按源码路径找模块 id
+(function(){ var hit=[]; __r.getModules().forEach(function(m,k){ if (/src\/settings\/debug\.ts$/.test(String(m&&m.verboseName))) hit.push(k); }); return hit; })()
+// 改调试 API 地址（id 换成上一步查到的）
+__r(<id>).setDebugConfig({ apiUrl: "http://127.0.0.1:8000/api/v2" })
+// 整体 reload（模块路径 Libraries/Utilities/DevSettings.js）
+__r(<DevSettings id>).reload()
+```
+
+**在阅读 WebView 里执行代码 / 派发点击（Chrome DevTools 协议）**
+
+```bash
+pid=$(adb shell pidof com.iapt.mobile)
+adb forward tcp:9333 localabstract:webview_devtools_remote_$pid   # App 重启后 pid 会变，要重新 forward
+curl -s http://127.0.0.1:9333/json/version    # 能看到 WebView 内核版本
+curl -s http://127.0.0.1:9333/json/list       # 每个 WebView 一个 page
+```
+
+对每个 page 的 `webSocketDebuggerUrl` 发 `Runtime.evaluate` 即可（同上，不需要 Origin 头）。注意：
+
+- **可能同时有好几个 WebView**（原文 / 义注 / 复注各栏、预加载的栏），只对屏幕上那个下手：
+  表达式里先判断 `document.visibilityState === "visible"`。
+- 派发点击用 `el.scrollIntoView({block: "center"}); el.click()`：走的是页面里真实的 click 监听
+  （`buildReaderHtml` 里那段），会照常 `postMessage` 给 RN，RN 弹出的抽屉再用
+  `uiautomator dump` 读文字、`adb exec-out screencap -p > x.png` 截图验证。
+- 点嵌套元素要选到最里层（如句尾图标点 `.anno-issue-mark i`），`e.target` 才和手点一致。
+
+**坑**
+
+- **Metro 不要用 `CI=1` 启动**：CI 模式不监听文件变化，改了代码 bundle 也不会更新，
+  `POST /reload` 也只是重发旧 bundle。表现是「改了没效果」。
+- **`adb shell input text` 不可靠**：中文输入法（实测华为 / 荣耀自带）会把字母吃进拼音组合，
+  URL 之类的输入会被打乱。能用 Hermes 改的设置就别走界面。
+- **WebView 内核可能很旧**：测试机 KOZ-AL00 是 Chrome 83，`color-mix()`、`text-underline-offset`
+  等较新的 CSS 不生效。写阅读页样式前先 `curl …/json/version` 看一眼。
+- 换回日常用的包：`adb install -r android/app/build/outputs/apk/release/app-release.apk`，
+  并把「我 → 设置 → 调试」里的地址改回去（`adb reverse` 拔线即失效）。
 
 ## 1. 冷启动与首次安装
 
