@@ -77,6 +77,12 @@ import {
   TermPopover,
   type TermTap,
 } from "../components/TermSheet";
+import {
+  IssueDrawer,
+  IssuePopover,
+  issueColor,
+  type IssueTap,
+} from "../components/IssueSheet";
 import { serifFont } from "../theme";
 import {
   MAX_CONTENT_WIDTH,
@@ -279,7 +285,12 @@ function buildReaderHtml(
   const inkVars = opts.dark
     ? "--ink:#e8dfd0;--ink-soft:#bfb198;--ink-faint:#8f8166;--vermilion:#d17a67;--hairline:#3a3227;"
     : "--ink:#3a3128;--ink-soft:#6b5f4e;--ink-faint:#9a8c76;--vermilion:#8c3b2e;--hairline:#d8cdb4;";
-  const vars = `--paper:${opts.paper};${inkVars}`;
+  // issue 标注配色：与 RN 弹层（IssueSheet.issueColor）同一来源
+  const issueVars =
+    `--issue-error:${issueColor("error", opts.dark)};` +
+    `--issue-warning:${issueColor("warning", opts.dark)};` +
+    `--issue-suggestion:${issueColor("suggestion", opts.dark)};`;
+  const vars = `--paper:${opts.paper};${inkVars}${issueVars}`;
   return `<!DOCTYPE html>
 <html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false" data-para-numbers="${opts.showParaNumbers ? "on" : "off"}">
 <head>
@@ -449,6 +460,37 @@ function buildReaderHtml(
     text-decoration: underline;
     text-underline-offset: 0.15em;
     cursor: pointer;
+  }
+
+  /* issue 标注（服务端注入，见 docs/reading-annotations.md §18）：
+   * span.anno-issue = 有位置的 issue，波浪下划线标出原文；
+   * span.anno-issue-mark = 没有位置的 issue，句尾三角叹号（服务端给的是 tabler 图标
+   * <i class="ti ti-alert-triangle">，WebView 里没有图标字体，用 SVG mask 画出来）。
+   * 颜色按 severity：error 红、warning 橙、suggestion 蓝，没有 severity 用淡墨色。 */
+  .anno-issue-error { --issue-color: var(--issue-error); }
+  .anno-issue-warning { --issue-color: var(--issue-warning); }
+  .anno-issue-suggestion { --issue-color: var(--issue-suggestion); }
+  .anno-issue-none { --issue-color: var(--ink-faint); }
+  span.anno-issue {
+    cursor: pointer;
+    text-decoration: underline wavy var(--issue-color);
+    text-decoration-skip-ink: none;
+    text-underline-offset: 0.25em;
+    -webkit-tap-highlight-color: transparent;
+  }
+  span.anno-issue-mark {
+    cursor: pointer;
+    display: inline-block;
+    padding: 0 2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  span.anno-issue-mark i {
+    display: inline-block;
+    width: 0.95em;
+    height: 0.95em;
+    vertical-align: -0.12em;
+    background-color: var(--issue-color);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E") center / contain no-repeat;
   }
 
   code {
@@ -647,6 +689,28 @@ function buildReaderHtml(
         }));
       }
       return;
+    }
+
+    // issue 标注：点高亮原文 / 句尾三角 → 通知 RN 弹 issue 列表。高亮里可能嵌着边注角标、
+    // 义注出处（label / input / .sidenote / .anno-jump），它们有自己的点击行为，让给它们。
+    var issueEl = closest(e.target, ".anno-issue, .anno-issue-mark");
+    if (issueEl && !closest(e.target, "label, input, .sidenote, .anno-jump")) {
+      var ids = (issueEl.getAttribute("data-discussion-ids") || "").split(",").filter(Boolean);
+      if (ids.length) {
+        e.preventDefault();
+        var ir = issueEl.getBoundingClientRect();
+        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: "issue-tap",
+            ids: ids,
+            x: Math.round(ir.left),
+            y: Math.round(ir.top),
+            w: Math.round(ir.width),
+            h: Math.round(ir.height)
+          }));
+        }
+        return;
+      }
     }
 
     var t = closest(e.target, ".anno-jump");
@@ -1091,6 +1155,8 @@ export const ReaderLayerPane = forwardRef<
 
   // 百科词条点击（WebView .term-ref 上报）：手机弹抽屉、平板弹 popover。
   const [termTap, setTermTap] = useState<TermTap | null>(null);
+  // issue 标注点击（WebView .anno-issue / .anno-issue-mark 上报）：同上。
+  const [issueTap, setIssueTap] = useState<IssueTap | null>(null);
 
   /** 「阅读条目」：关闭词条卡片并跳转到词条详情页。 */
   const openTermEntry = useCallback(
@@ -1962,6 +2028,19 @@ export const ReaderLayerPane = forwardRef<
         onFocus?.();
         return;
       }
+      if (msg.type === "issue-tap" && Array.isArray(msg.ids)) {
+        const ids = msg.ids.filter((id: unknown): id is string => typeof id === "string");
+        if (ids.length > 0) {
+          setIssueTap({
+            ids,
+            x: Number(msg.x) || 0,
+            y: Number(msg.y) || 0,
+            w: Number(msg.w) || 0,
+            h: Number(msg.h) || 0,
+          });
+        }
+        return;
+      }
       if (msg.type === "term-tap" && typeof msg.id === "string") {
         setTermTap({
           id: msg.id,
@@ -2102,6 +2181,16 @@ export const ReaderLayerPane = forwardRef<
               onOpenEntry={openTermEntry}
             />
           ) : null}
+          {/* issue 标注（平板）：同词条 popover。 */}
+          {issueTap && isTablet ? (
+            <IssuePopover
+              issue={issueTap}
+              dark={isDark}
+              containerWidth={readerWidth}
+              containerHeight={readerHeight}
+              onClose={() => setIssueTap(null)}
+            />
+          ) : null}
         </View>
       </View>
 
@@ -2137,6 +2226,13 @@ export const ReaderLayerPane = forwardRef<
         onShare={shareFromMenu}
         onFavorite={() => void toggleFavorite()}
         onBookmark={() => void toggleBookmark()}
+      />
+
+      {/* issue 标注（手机）：底部抽屉。 */}
+      <IssueDrawer
+        issue={issueTap && !isTablet ? issueTap : null}
+        dark={isDark}
+        onClose={() => setIssueTap(null)}
       />
 
       {/* 百科词条（手机）：底部抽屉。 */}

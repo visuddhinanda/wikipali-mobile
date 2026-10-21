@@ -371,3 +371,26 @@ INSERT INTO discussions (
 8. 大平板横屏（双列，右栏 ≥ 840）：左栏同 7，右栏为边注模式。
 9. `annotationMode`、`annotationCollapsedLines` 在阅读设置可调并持久化。
 10. 无对应注释的段落不出现任何角标/脚注，正文外观与现状一致；改/删注释记录后刷新能看到变化（缓存失效生效）；缩回窄屏/切换字号/深浅色时布局无状态丢失（[`README.md`](./README.md) §4.9）。
+
+## 18. issue 与术语讨论（glossary）
+
+2026-10-21 起，服务端除了插入义注 / 边注，还会注入另外两种 discussion（mint
+`PaliContentService::injectAnnotationNotes`，排版规则在 `App\Services\AnnotationLayout`）：
+
+| 类型 | 正文里的形态 | App 端处理 |
+|---|---|---|
+| `glossary`（术语讨论） | 锚点原文替换成 `[[词头#原文]]`，渲染成 `.term-ref` | 与普通术语相同（点开弹词条） |
+| `issue`，有位置 | `<span class="anno-issue anno-issue-{severity}" data-discussion-ids="id1,id2">原文</span>` | 波浪下划线，颜色按 severity；点击弹 issue 列表 |
+| `issue`，没有位置 | 句尾 `<span class="anno-issue-mark …"><i class="ti ti-alert-triangle"></i></span>` | 三角叹号（WebView 没有 tabler 字体，用 SVG mask 画）；点击同上 |
+
+- 只注入未关闭的 issue / glossary；交叠的 issue 服务端已合并成一个 span（id 取并集、颜色取最重的
+  severity），同一句里所有没有位置的 issue 也合成一个图标。所以一次点击可能对应多条，弹层是列表。
+- 颜色：error 红、warning 橙、suggestion 蓝，没有 severity 用淡墨色。唯一来源是
+  `src/components/IssueSheet.tsx` 的 `issueColor()`，WebView 的 CSS 变量也从它生成。
+- 只有下划线、没有底色：部分机型的 WebView 内核较旧（实测 Chrome 83），不支持 `color-mix()`，
+  且波浪下划线已经足够醒目。
+- 点击优先级：issue 里嵌着的术语、义注角标、`<cite>` 出处先响应各自的行为，其余位置才弹 issue。
+- 内容按 id 逐条取 `GET /v3/discussions/{id}`（issue 对匿名公开），显示标题、`summary`（服务端渲染好的
+  纯文本）、严重程度 · 作者 · 日期 · 回复数。已删除的显示「已不存在」。手机底部抽屉、平板 popover，
+  与百科词条同一套交互（`src/api/discussion.ts`、`src/components/IssueSheet.tsx`）。
+- 离线阅读（已下载的章节）里同样带这些标记；没网时点开显示「加载失败」。
