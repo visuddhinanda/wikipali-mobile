@@ -13,6 +13,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -24,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchTerm, type TermEntry } from "../api/term";
 import { useT } from "../i18n/I18nContext";
+import { useSlideUp } from "../hooks/useSlideUp";
 import { serifFont } from "../theme";
 import { readerColors, type ReaderChrome } from "../theme/reader";
 
@@ -170,6 +172,7 @@ export function TermDrawer({
   const t = useT();
   const c = readerColors(dark);
   const insets = useSafeAreaInsets();
+  const translateY = useSlideUp(term != null);
   const { data, loading, error } = useTermEntry(term?.id ?? null);
   const visible = term != null;
   const title = data?.meaning?.trim() ?? "";
@@ -178,7 +181,7 @@ export function TermDrawer({
     <Modal
       transparent
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
     >
@@ -187,13 +190,14 @@ export function TermDrawer({
           style={[styles.backdrop, { backgroundColor: c.backdrop }]}
           onPress={onClose}
         />
-        <View
+        <Animated.View
           style={[
             styles.drawer,
             {
               backgroundColor: c.paperRaised,
               borderTopColor: c.border,
               paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
             },
           ]}
         >
@@ -227,7 +231,7 @@ export function TermDrawer({
               />
             ) : null}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -20,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchIssue, type Issue, type IssueSeverity } from "../api/discussion";
 import { useT } from "../i18n/I18nContext";
+import { useSlideUp } from "../hooks/useSlideUp";
 import { readerColors, type ReaderChrome } from "../theme/reader";
 
 /** 一次 issue 标注点击：ids 用于取内容，坐标用于平板 popover 定位（WebView 视口内）。 */
@@ -176,13 +178,14 @@ export function IssueDrawer({
   const t = useT();
   const c = readerColors(dark);
   const insets = useSafeAreaInsets();
+  const translateY = useSlideUp(issue != null);
   const { items, loading } = useIssues(issue?.ids ?? null);
 
   return (
     <Modal
       transparent
       visible={issue != null}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
     >
@@ -191,13 +194,14 @@ export function IssueDrawer({
           style={[styles.backdrop, { backgroundColor: c.backdrop }]}
           onPress={onClose}
         />
-        <View
+        <Animated.View
           style={[
             styles.drawer,
             {
               backgroundColor: c.paperRaised,
               borderTopColor: c.border,
               paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
             },
           ]}
         >
@@ -219,7 +223,7 @@ export function IssueDrawer({
           <ScrollView style={styles.drawerBody}>
             <IssueList items={items} loading={loading} c={c} dark={dark} />
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
