@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "ဝေါဟာရ",
   "term.editor": "တည်းဖြတ်သူ",
   "term.updatedAt": "ပြုပြင်သည့်နေ့",
+  "reader.issue.title": "ပြဿနာများ",
+  "reader.issue.severity.error": "အမှား",
+  "reader.issue.severity.warning": "သတိပေးချက်",
+  "reader.issue.severity.suggestion": "အကြံပြုချက်",
 } as const;
 
 export default labels;

@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "ວາງ ຫຼື ພິມຂໍ້ຄວາມບາລີໃສ່ນີ້",
   "tools.script.outputHint": "ຜົນການແປງ",
   "tools.transcode.desc": "ໂຣມັນ · ສິດທັມ · ພະມ້າ/ໄທ",
+  "reader.issue.notFound": "ບັນຫານີ້ບໍ່ມີແລ້ວ",
+  "reader.issue.replies": "{n} ຄຳຕອບ",
 } as const;
 
 export default messages;

@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "පාලි පෙළ මෙහි අලවන්න",
   "tools.script.outputHint": "පරිවර්තිත පෙළ",
   "tools.transcode.desc": "රෝම · සිද්ධම් · බුරුම/තායි",
+  "reader.issue.notFound": "මෙම ගැටලුව තවදුරටත් නොපවතී",
+  "reader.issue.replies": "පිළිතුරු {n}",
 } as const;
 
 export default messages;

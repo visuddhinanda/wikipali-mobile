@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "在此貼上或輸入巴利文",
   "tools.script.outputHint": "轉換結果",
   "tools.transcode.desc": "羅馬轉寫 · 悉曇 · 緬泰文",
+  "reader.issue.notFound": "這條問題已不存在",
+  "reader.issue.replies": "{n} 則回覆",
 } as const;
 
 export default messages;

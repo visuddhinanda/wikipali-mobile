@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "在此粘贴或输入巴利文",
   "tools.script.outputHint": "转换结果",
   "tools.transcode.desc": "罗马转写 · 悉昙 · 缅泰文",
+  "reader.issue.notFound": "这条问题已不存在",
+  "reader.issue.replies": "{n} 条回复",
 } as const;
 
 export default messages;

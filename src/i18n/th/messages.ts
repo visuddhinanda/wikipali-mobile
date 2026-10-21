@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "วางหรือพิมพ์ข้อความบาลีที่นี่",
   "tools.script.outputHint": "ผลการแปลง",
   "tools.transcode.desc": "อักษรโรมัน · สิทธัม · พม่า/ไทย",
+  "reader.issue.notFound": "ปัญหานี้ไม่มีอยู่แล้ว",
+  "reader.issue.replies": "{n} การตอบกลับ",
 } as const;
 
 export default messages;

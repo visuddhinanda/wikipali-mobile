@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "ຄຳສັບ",
   "term.editor": "ຜູ້ແກ້ໄຂ",
   "term.updatedAt": "ອັບເດດເມື່ອ",
+  "reader.issue.title": "ບັນຫາ",
+  "reader.issue.severity.error": "ຂໍ້ຜິດພາດ",
+  "reader.issue.severity.warning": "ຄຳເຕືອນ",
+  "reader.issue.severity.suggestion": "ຄຳແນະນຳ",
 } as const;
 
 export default labels;

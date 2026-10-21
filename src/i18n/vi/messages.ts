@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "Dán hoặc nhập văn bản Pāli tại đây",
   "tools.script.outputHint": "Kết quả chuyển đổi",
   "tools.transcode.desc": "La-tinh · Siddham · Miến/Thái",
+  "reader.issue.notFound": "Vấn đề này không còn tồn tại",
+  "reader.issue.replies": "{n} phản hồi",
 } as const;
 
 export default messages;

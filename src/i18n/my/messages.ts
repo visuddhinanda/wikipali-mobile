@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "ပါဠိစာသားကို ဤနေရာတွင် ကူးထည့်ပါ",
   "tools.script.outputHint": "ပြောင်းလဲပြီးစာသား",
   "tools.transcode.desc": "ရောမအက္ခရာ · သိဒ္ဓံ · မြန်မာ/ထိုင်း",
+  "reader.issue.notFound": "ဤပြဿနာ မရှိတော့ပါ",
+  "reader.issue.replies": "ပြန်စာ {n} ခု",
 } as const;
 
 export default messages;

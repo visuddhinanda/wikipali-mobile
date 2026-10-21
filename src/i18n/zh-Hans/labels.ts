@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "词条",
   "term.editor": "编辑者",
   "term.updatedAt": "更新时间",
+  "reader.issue.title": "问题",
+  "reader.issue.severity.error": "错误",
+  "reader.issue.severity.warning": "警告",
+  "reader.issue.severity.suggestion": "建议",
 } as const;
 
 export default labels;

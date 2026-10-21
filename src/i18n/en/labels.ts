@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "Term",
   "term.editor": "Editor",
   "term.updatedAt": "Updated",
+  "reader.issue.title": "Issues",
+  "reader.issue.severity.error": "Error",
+  "reader.issue.severity.warning": "Warning",
+  "reader.issue.severity.suggestion": "Suggestion",
 } as const;
 
 export default labels;

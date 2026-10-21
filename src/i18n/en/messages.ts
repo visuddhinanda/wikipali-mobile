@@ -187,6 +187,8 @@ const messages = {
   "tools.script.inputHint": "Paste or type Pāli here",
   "tools.script.outputHint": "Converted text",
   "tools.transcode.desc": "Roman · Siddham · Burmese/Thai",
+  "reader.issue.notFound": "This issue no longer exists",
+  "reader.issue.replies": "{n} replies",
 } as const;
 
 export default messages;

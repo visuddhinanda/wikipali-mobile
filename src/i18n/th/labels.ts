@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "คำศัพท์",
   "term.editor": "ผู้แก้ไข",
   "term.updatedAt": "อัปเดตเมื่อ",
+  "reader.issue.title": "ปัญหา",
+  "reader.issue.severity.error": "ข้อผิดพลาด",
+  "reader.issue.severity.warning": "คำเตือน",
+  "reader.issue.severity.suggestion": "ข้อเสนอแนะ",
 } as const;
 
 export default labels;

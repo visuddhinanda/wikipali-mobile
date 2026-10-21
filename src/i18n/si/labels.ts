@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "පදය",
   "term.editor": "සංස්කාරක",
   "term.updatedAt": "යාවත්කාලීන",
+  "reader.issue.title": "ගැටලු",
+  "reader.issue.severity.error": "දෝෂය",
+  "reader.issue.severity.warning": "අවවාදය",
+  "reader.issue.severity.suggestion": "යෝජනාව",
 } as const;
 
 export default labels;

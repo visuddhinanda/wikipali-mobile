@@ -164,6 +164,10 @@ const labels = {
   "term.entry": "Mục từ",
   "term.editor": "Người biên tập",
   "term.updatedAt": "Cập nhật",
+  "reader.issue.title": "Vấn đề",
+  "reader.issue.severity.error": "Lỗi",
+  "reader.issue.severity.warning": "Cảnh báo",
+  "reader.issue.severity.suggestion": "Gợi ý",
 } as const;
 
 export default labels;
