@@ -372,14 +372,14 @@ INSERT INTO discussions (
 9. `annotationMode`、`annotationCollapsedLines` 在阅读设置可调并持久化。
 10. 无对应注释的段落不出现任何角标/脚注，正文外观与现状一致；改/删注释记录后刷新能看到变化（缓存失效生效）；缩回窄屏/切换字号/深浅色时布局无状态丢失（[`README.md`](./README.md) §4.9）。
 
-## 18. issue 与术语讨论（glossary）
+## 18. issue 与外挂术语（glossary）
 
 2026-10-21 起，服务端除了插入义注 / 边注，还会注入另外两种 discussion（mint
 `PaliContentService::injectAnnotationNotes`，排版规则在 `App\Services\AnnotationLayout`）：
 
 | 类型 | 正文里的形态 | App 端处理 |
 |---|---|---|
-| `glossary`（术语讨论） | 锚点原文替换成 `[[词头#原文]]`，渲染成 `.term-ref` | 与普通术语相同（点开弹词条） |
+| `glossary`（外挂术语：不改译文，给锚点处的译文挂上术语） | 锚点原文替换成 `[[词头#原文]]`，渲染成 `.term-ref` | 与普通术语相同（点开弹词条） |
 | `issue`，有位置 | `<span class="anno-issue anno-issue-{severity}" data-discussion-ids="id1,id2">原文</span>` | 波浪下划线，颜色按 severity；点击弹 issue 列表 |
 | `issue`，没有位置 | 句尾 `<span class="anno-issue-mark …"><i class="ti ti-alert-triangle"></i></span>` | 三角叹号（WebView 没有 tabler 字体，用 SVG mask 画）；点击同上 |
 
