@@ -455,10 +455,17 @@ function buildReaderHtml(
   .sentence + .sentence::before { content: " "; }
   strong { font-weight: 700; }
 
-  /* 百科词条（term-ref）：只加下划线，不斜体、不变色，保留可点击 */
+  /* 百科词条（term-ref）：只加点线下划线，不斜体、不变色，保留可点击。
+   * 点线用重复的背景渐变画（点宽 1.5px、间隔 3px、线粗 1.5px），贴在底部；padding-bottom
+   * 控制与文字的距离。不用 text-decoration / border dotted：前者调不了距离
+   * （text-underline-offset 要 Chrome 87+，部分机型 WebView 更旧，实测 83），
+   * 后者点距固定 1px，高分屏上看着像实线。 */
   .term-ref {
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
+    padding-bottom: 0.2em;
+    background-image: linear-gradient(to right, currentColor 1.5px, transparent 1.5px);
+    background-size: 4.5px 1.5px;
+    background-repeat: repeat-x;
+    background-position: 0 100%;
     cursor: pointer;
   }
 
