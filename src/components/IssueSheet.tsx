@@ -1,6 +1,6 @@
 /**
- * issue 标注弹层：阅读正文里点 `.anno-issue`（高亮原文）或句尾 `.anno-issue-mark`
- * （三角叹号）后弹出，逐条显示该处的 issue。
+ * issue / 译文评估标注弹层：阅读正文里点 `.anno-issue`（高亮原文）、句尾 `.anno-issue-mark`
+ * （三角叹号）或句尾 `.anno-assessment-mark`（评估对勾）后弹出，逐条显示该处的 issue / 评估。
  *
  * 对齐桌面端 `resources/js/modules/issue-popover.js` 的展示口径，交互同百科词条
  * （`TermSheet.tsx`）：手机（compact）→ 底部抽屉；平板（medium 及以上）→ popover。
@@ -24,8 +24,15 @@ import { useT } from "../i18n/I18nContext";
 import { useSlideUp } from "../hooks/useSlideUp";
 import { readerColors, type ReaderChrome } from "../theme/reader";
 
-/** 一次 issue 标注点击：ids 用于取内容，坐标用于平板 popover 定位（WebView 视口内）。 */
+/** 评估分数档位：服务端（mint `AnnotationLayout::assessmentLevel`）定档，写在标注的 data-level 上。 */
+export type AssessmentLevel = "high" | "medium" | "low";
+
+/** 一次标注点击：ids 用于取内容，坐标用于平板 popover 定位（WebView 视口内）。 */
 export interface IssueTap {
+  /** 点的是 issue 还是译文评估（决定弹层标题）。 */
+  kind: "issue" | "assessment";
+  /** 评估的分数档位（只有 assessment 有），弹层里的对勾与分数用它着色。 */
+  level: AssessmentLevel | null;
   ids: string[];
   x: number;
   y: number;
@@ -53,6 +60,28 @@ export function issueColor(severity: IssueSeverity | null, dark: boolean): strin
     default:
       return null;
   }
+}
+
+/**
+ * 评估档位的颜色，与阅读 WebView 里 `.anno-assessment-*` 的配色一致（ReaderLayerPane）：
+ * high 绿、medium 橙、low 红。
+ */
+export function assessmentColor(level: AssessmentLevel | null, dark: boolean): string | null {
+  switch (level) {
+    case "high":
+      return dark ? "#5cc98a" : "#2f9e44";
+    case "medium":
+      return dark ? "#f5b041" : "#e67700";
+    case "low":
+      return dark ? "#ef6b6b" : "#d63939";
+    default:
+      return null;
+  }
+}
+
+/** 从 WebView 上报的字符串取评估档位，不认识的给 null。 */
+export function asAssessmentLevel(value: unknown): AssessmentLevel | null {
+  return value === "high" || value === "medium" || value === "low" ? value : null;
 }
 
 /** 一条 issue 的取数结果：null = 已不存在，Error = 取失败。 */
@@ -102,15 +131,20 @@ function formatDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
 }
 
-/** issue 列表正文：每条 = 三角图标 + 标题，正文，元信息（严重程度 · 作者 · 日期 · 回复数）。 */
+/**
+ * 列表正文。issue：三角图标 + 标题，正文，元信息（严重程度 · 作者 · 日期 · 回复数）；
+ * 评估：对勾 + 分数 + 标题，理由，元信息（方法 · 作者（+ 模型）· 日期 · 回复数）。
+ */
 function IssueList({
   items,
   loading,
+  level,
   c,
   dark,
 }: {
   items: IssueResult[];
   loading: boolean;
+  level: AssessmentLevel | null;
   c: ReaderChrome;
   dark: boolean;
 }) {
@@ -134,6 +168,34 @@ function IssueList({
               <Text style={[styles.errorText, { color: c.inkFaint }]}>
                 {item === null ? t("reader.issue.notFound") : t("common.loadFailed")}
               </Text>
+            </View>
+          );
+        }
+        if (item.type === "assessment") {
+          const color = assessmentColor(level, dark) ?? c.inkFaint;
+          const meta = [
+            item.method ? t("reader.assessment.method", { method: item.method }) : "",
+            item.coEditor ? `${item.editor} + ${item.coEditor}` : item.editor,
+            formatDate(item.updatedAt),
+            item.replyCount > 0 ? t("reader.issue.replies", { n: item.replyCount }) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <View key={item.id} style={[styles.item, divider]}>
+              <View style={styles.itemHead}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={color} />
+                <Text style={[styles.itemScore, { color }]}>
+                  {item.score === null ? "" : String(item.score)}
+                </Text>
+                <Text style={[styles.itemTitle, { color: c.ink }]}>{item.title}</Text>
+              </View>
+              {item.summary ? (
+                <Text style={[styles.itemBody, { color: c.inkSoft }]}>{item.summary}</Text>
+              ) : null}
+              {meta ? (
+                <Text style={[styles.itemMeta, { color: c.inkFaint }]}>{meta}</Text>
+              ) : null}
             </View>
           );
         }
@@ -210,7 +272,7 @@ export function IssueDrawer({
           </View>
           <View style={[styles.header, { borderBottomColor: c.hairline }]}>
             <Text style={[styles.headerTitle, { color: c.ink }]} numberOfLines={1}>
-              {t("reader.issue.title")}
+              {t(issue?.kind === "assessment" ? "reader.assessment.title" : "reader.issue.title")}
             </Text>
             <Pressable
               onPress={onClose}
@@ -221,7 +283,13 @@ export function IssueDrawer({
             </Pressable>
           </View>
           <ScrollView style={styles.drawerBody}>
-            <IssueList items={items} loading={loading} c={c} dark={dark} />
+            <IssueList
+              items={items}
+              loading={loading}
+              level={issue?.level ?? null}
+              c={c}
+              dark={dark}
+            />
           </ScrollView>
         </Animated.View>
       </View>
@@ -275,7 +343,7 @@ export function IssuePopover({
       >
         <View style={[styles.popoverHeader, { borderBottomColor: c.hairline }]}>
           <Text style={[styles.popoverTitle, { color: c.ink }]} numberOfLines={1}>
-            {t("reader.issue.title")}
+            {t(issue.kind === "assessment" ? "reader.assessment.title" : "reader.issue.title")}
           </Text>
           <Pressable onPress={onClose} hitSlop={8}>
             <Ionicons name="close" size={16} color={c.inkFaint} />
@@ -286,7 +354,7 @@ export function IssuePopover({
           contentContainerStyle={styles.popoverBody}
           showsVerticalScrollIndicator={false}
         >
-          <IssueList items={items} loading={loading} c={c} dark={dark} />
+          <IssueList items={items} loading={loading} level={issue.level} c={c} dark={dark} />
         </ScrollView>
       </View>
     </View>
@@ -320,6 +388,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  itemScore: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
   itemTitle: {
     flex: 1,

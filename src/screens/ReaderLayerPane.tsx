@@ -81,6 +81,8 @@ import {
   IssueDrawer,
   IssuePopover,
   issueColor,
+  assessmentColor,
+  asAssessmentLevel,
   type IssueTap,
 } from "../components/IssueSheet";
 import { serifFont } from "../theme";
@@ -289,7 +291,10 @@ function buildReaderHtml(
   const issueVars =
     `--issue-error:${issueColor("error", opts.dark)};` +
     `--issue-warning:${issueColor("warning", opts.dark)};` +
-    `--issue-suggestion:${issueColor("suggestion", opts.dark)};`;
+    `--issue-suggestion:${issueColor("suggestion", opts.dark)};` +
+    `--assessment-high:${assessmentColor("high", opts.dark)};` +
+    `--assessment-medium:${assessmentColor("medium", opts.dark)};` +
+    `--assessment-low:${assessmentColor("low", opts.dark)};`;
   const vars = `--paper:${opts.paper};${inkVars}${issueVars}`;
   return `<!DOCTYPE html>
 <html lang="zh" data-sidenote="${opts.sidenote}" data-annotation-mode="${opts.annotationMode}" data-content-width="${opts.contentWidth}" data-dual-origin="false" data-para-numbers="${opts.showParaNumbers ? "on" : "off"}">
@@ -500,6 +505,29 @@ function buildReaderHtml(
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E") center / contain no-repeat;
   }
 
+  /* 译文评估（服务端注入，见 docs/reading-annotations.md §19）：句尾 span.anno-assessment-mark，
+   * 服务端给的是 tabler 图标 <i class="ti ti-circle-check">，同样用 SVG mask 画。
+   * 颜色按分数档位（服务端定档）：high 绿、medium 橙、low 红；未评估的灰（anno-assessment-none）。 */
+  .anno-assessment-high { --assessment-color: var(--assessment-high); }
+  .anno-assessment-medium { --assessment-color: var(--assessment-medium); }
+  .anno-assessment-low { --assessment-color: var(--assessment-low); }
+  /* 同段有句子评估过时，没评估的句子补的灰色对勾（服务端给，没有 discussion id，点了不弹） */
+  .anno-assessment-none { --assessment-color: var(--ink-faint); }
+  span.anno-assessment-mark {
+    cursor: pointer;
+    display: inline-block;
+    padding: 0 2px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  span.anno-assessment-mark i {
+    display: inline-block;
+    width: 0.95em;
+    height: 0.95em;
+    vertical-align: -0.12em;
+    background-color: var(--assessment-color, var(--ink-faint));
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0'/%3E%3Cpath d='M9 12l2 2l4 -4'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+
   code {
     font-family: inherit;
     color: var(--vermilion);
@@ -700,7 +728,8 @@ function buildReaderHtml(
 
     // issue 标注：点高亮原文 / 句尾三角 → 通知 RN 弹 issue 列表。高亮里可能嵌着边注角标、
     // 义注出处（label / input / .sidenote / .anno-jump），它们有自己的点击行为，让给它们。
-    var issueEl = closest(e.target, ".anno-issue, .anno-issue-mark");
+    // 句尾的评估对勾同样上报（kind=assessment，带服务端定好的分数档位）。
+    var issueEl = closest(e.target, ".anno-issue, .anno-issue-mark, .anno-assessment-mark");
     if (issueEl && !closest(e.target, "label, input, .sidenote, .anno-jump")) {
       var ids = (issueEl.getAttribute("data-discussion-ids") || "").split(",").filter(Boolean);
       if (ids.length) {
@@ -709,6 +738,8 @@ function buildReaderHtml(
         if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: "issue-tap",
+            kind: issueEl.classList.contains("anno-assessment-mark") ? "assessment" : "issue",
+            level: issueEl.getAttribute("data-level") || null,
             ids: ids,
             x: Math.round(ir.left),
             y: Math.round(ir.top),
@@ -1162,7 +1193,7 @@ export const ReaderLayerPane = forwardRef<
 
   // 百科词条点击（WebView .term-ref 上报）：手机弹抽屉、平板弹 popover。
   const [termTap, setTermTap] = useState<TermTap | null>(null);
-  // issue 标注点击（WebView .anno-issue / .anno-issue-mark 上报）：同上。
+  // issue / 评估标注点击（WebView .anno-issue / .anno-issue-mark / .anno-assessment-mark 上报）：同上。
   const [issueTap, setIssueTap] = useState<IssueTap | null>(null);
 
   /** 「阅读条目」：关闭词条卡片并跳转到词条详情页。 */
@@ -2039,6 +2070,8 @@ export const ReaderLayerPane = forwardRef<
         const ids = msg.ids.filter((id: unknown): id is string => typeof id === "string");
         if (ids.length > 0) {
           setIssueTap({
+            kind: msg.kind === "assessment" ? "assessment" : "issue",
+            level: asAssessmentLevel(msg.level),
             ids,
             x: Number(msg.x) || 0,
             y: Number(msg.y) || 0,
