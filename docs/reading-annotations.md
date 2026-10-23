@@ -394,3 +394,21 @@ INSERT INTO discussions (
   纯文本）、严重程度 · 作者 · 日期 · 回复数。已删除的显示「已不存在」。手机底部抽屉、平板 popover，
   与百科词条同一套交互（`src/api/discussion.ts`、`src/components/IssueSheet.tsx`）。
 - 离线阅读（已下载的章节）里同样带这些标记；没网时点开显示「加载失败」。
+
+## 19. 译文评估（assessment）
+
+2026-10-22 起服务端还会注入译文评估：channel 的编辑者（或其授权的 AI）用某种方法给一句译文打分，
+一句只留一条，重新评估覆盖旧的（mint `/v3/discussions`，`type=assessment`）。
+
+| 正文里的形态 | App 端处理 |
+|---|---|
+| 句尾 `<span class="anno-assessment-mark anno-assessment-{level}" data-discussion-ids="id" data-score="85" data-level="high"><i class="ti ti-circle-check"></i></span>`，在 issue 三角之后 | 圆圈对勾（SVG mask 画），颜色按档位；点击弹评估卡片 |
+
+- 档位由服务端定（`AnnotationLayout::assessmentLevel`）：`high`（≥80）绿、`medium`（≥60）橙、`low` 红。
+  App 不重复分档阈值，只认 `data-level`；颜色唯一来源是 `src/components/IssueSheet.tsx` 的 `assessmentColor()`。
+- 点击与 issue 共用一套弹层（`IssueTap.kind = "assessment"`，标题换成「译文评估」）：显示分数、标题（可空）、
+  理由（`summary`）、方法（discussion 的 `severity` 列存的就是评估方法）· 作者（AI 代写时「授权人 + 模型」）· 日期 · 回复数。
+- 只在 html 格式里有；离线阅读同样带标记。
+- 同一段里有句子评估过时，没评估的句子句尾也有一个**灰色**对勾（`anno-assessment-none`，没有
+  `data-discussion-ids`，点了不弹），用来标出句子边界——不然读者会把它和下一句的对勾连起来当成一句。
+  整段都没评估就都不加。这是服务端按段落决定的，App 只给它配灰色。
