@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "ဖြန့်ရန်",
   "channels.expandRest": "ကျန် {n} ခု ပြရန်",
   "chat.followUp": "ဆက်လက် မေးမြန်းရန်…",
+  "chat.deepThinking": "နက်နက်ရှိုင်းရှိုင်း စဉ်းစားရန်",
   "common.cancel": "ပယ်ဖျက်ရန်",
   "common.ok": "ရပါပြီ",
   "common.retry": "ထပ်ကြိုးစားရန်",

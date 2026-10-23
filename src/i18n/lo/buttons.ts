@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "ຂະຫຍາຍ",
   "channels.expandRest": "ສະແດງອີກ {n} ລາຍການ",
   "chat.followUp": "ຖາມຕໍ່…",
+  "chat.deepThinking": "ຄິດຢ່າງເລິກເຊິ່ງ",
   "common.cancel": "ຍົກເລີກ",
   "common.ok": "ຮັບຊາບ",
   "common.retry": "ລອງໃໝ່",

@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "Mở rộng",
   "channels.expandRest": "Hiện thêm {n} mục",
   "chat.followUp": "Hỏi tiếp…",
+  "chat.deepThinking": "Suy nghĩ sâu",
   "common.cancel": "Hủy",
   "common.ok": "Đã hiểu",
   "common.retry": "Thử lại",

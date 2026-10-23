@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "දිගහරින්න",
   "channels.expandRest": "තවත් {n}ක් පෙන්වන්න",
   "chat.followUp": "තවදුරටත් අසන්න…",
+  "chat.deepThinking": "ගැඹුරින් සිතන්න",
   "common.cancel": "අවලංගු කරන්න",
   "common.ok": "හරි",
   "common.retry": "නැවත උත්සාහ කරන්න",

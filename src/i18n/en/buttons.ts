@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "Expand",
   "channels.expandRest": "Show {n} more",
   "chat.followUp": "Ask a follow-up…",
+  "chat.deepThinking": "Deep thinking",
   "common.cancel": "Cancel",
   "common.ok": "OK",
   "common.retry": "Retry",

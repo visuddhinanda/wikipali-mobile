@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "ขยาย",
   "channels.expandRest": "แสดงอีก {n} รายการ",
   "chat.followUp": "ถามต่อ…",
+  "chat.deepThinking": "คิดเชิงลึก",
   "common.cancel": "ยกเลิก",
   "common.ok": "รับทราบ",
   "common.retry": "ลองใหม่",

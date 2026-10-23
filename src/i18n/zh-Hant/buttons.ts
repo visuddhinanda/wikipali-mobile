@@ -16,6 +16,7 @@ const buttons = {
   "channels.expand": "展開",
   "channels.expandRest": "展開其餘 {n} 個",
   "chat.followUp": "與AI助手討論",
+  "chat.deepThinking": "深度思考",
   "common.cancel": "取消",
   "common.ok": "知道了",
   "common.retry": "重試",
