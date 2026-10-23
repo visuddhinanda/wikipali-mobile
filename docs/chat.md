@@ -146,6 +146,11 @@ Chat 栏目是「巴利经文 AI 问答」的核心入口，分为**引流层 + 
 - **Schema**：`{ ref: string, passageId: string, pali: string, zh: string }`。
 - **展示**：AI 回答内/下方内联渲染；每张卡片显示出处 `ref` + 经文片段（pali / zh）。
 - **跳转**：点击 → 阅读器对应段落（`passageId` → `book` + `paragraph` → `Reader` 路由）。
+- **引用面板（`CitationSheet`）选哪个版本**：链接带具体版本 uid 就用它；否则用
+  `GET /v2/channel?view=paragraphs&book_id=&para=` 取**这一段**有内容的版本，选 `updated_at` 最新的译文；
+  没有译文、或该版本取不到正文时，退回巴利原文 `_System_Pali_VRI_`。正文接口只认 uid、各站点 uid 不同，
+  所以 `_System_Pali_VRI_` 按名字换 uid：先查本地记过的 uid↔名字，再查 `GET /v2/channel?view=system`。
+  （旧逻辑用章节级的 `progress?view=chapter_channels`，常为空，于是拿版本**名字**去取正文，显示「暂无内容」。）
 - **实现**：CopilotKit 无等 `citations` 字段，经 **Generative UI / tool-call 渲染**（`useRenderTool({ name: "retrieve_sutta_passage", render })`）内联渲染，不改 `CopilotChat` 本体（详见 `README.md` §6.2）。
 
 ---
@@ -196,6 +201,27 @@ Chat 栏目是「巴利经文 AI 问答」的核心入口，分为**引流层 + 
 2. 回复内引用卡片点击 → 跳转阅读器段落。
 
 **RAG 检索缺口**：当前 `agent-poc` 的 `retrieve_sutta_passage` 返回**平文本 mock**，需替换为接 mint `OpenSearchService`/`EmbeddingService` 的真实 RAG，并返回结构化 `citations`（`{ ref, passageId, pali, zh }`）。
+
+### 6.1 深度思考与阅读页提问上下文
+
+agent 按问题类型走不同的研究路径（设计见 agent-poc 仓库 `docs/agent-routing.md`）。App 发送前调用
+`agent.setState({ deep_thinking, passage })`，经 AG-UI 的 `RunAgentInput.state` 交给后端；只写这两项，
+不把后端回灌的其余 state 带回去。进入「新对话」时先 `setState({})`，上一轮的 `passage` 不会串进来。
+
+- **深度思考开关**：对话页输入框上方的胶囊按钮（`chat.deepThinking`），默认关，每个新对话重新从关开始；
+  运行中不可切换。关：少量检索、不开模型思考；开：多查几轮、开模型思考，更慢。
+- **阅读页提问的 `passage`**（类型见 `src/ai/passage.ts`）：
+
+| 入口 | `source` | `paragraphs` | `focus` |
+|---|---|---|---|
+| 选中文字 → 查词 / 提问 | `selection` | 选区覆盖的段（WebView `selectionchange` → `sel-paras`） | 选区起始段 |
+| 点按「提问」按钮 | `screen` | 屏幕上可见的段（注入 `__visibleParas` → `visible-paras`，600 ms 超时退回视口顶部段） | 视口顶部段 |
+
+  另带 `channel`（读者正在看的版本）、`selected_text`（罗马巴利，仅 selection）与章节标题。后端据此取
+  段落原文 + 该版本译文 + 所在章节 + 对应的义注 / 复注，再作答。旧的 system 提示词（`passageSystemPrompt`）
+  仍保留，兼容尚未升级的后端。
+- **引用链接**：服务端给的出处链接指向章节起点、段号在锚点里（`…/tipitaka/203-1677/read#1702`），
+  `parsePassage` 有 `#段号` 时以它为准。
 
 ---
 

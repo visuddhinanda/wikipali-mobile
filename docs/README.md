@@ -283,6 +283,7 @@ medium 档不做双栏——600–839dp 拆两栏后正文只剩不到 500dp，�
 |---|---|
 | 三藏目录树 | 本地打包 `src/catalog/default.json`（离线可用；线上 `GET /api/pali-book-category/default` 同构） |
 | 版本/频道列表 | `GET /api/v2/progress?view=chapter_channels&book=<book>&par=<paragraph>` |
+| 某一段有内容的版本（引用面板选版本） | `GET /api/v2/channel?view=paragraphs&book_id=<book>&para=<paragraph>`；系统版本 uid：`GET /api/v2/channel?view=system` |
 | **章节正文（阅读，当前使用）** | `GET /api/v3/search/tipitaka_chapter_<book>-<paragraph>_<channel_id>` |
 | 章节/段落内容（旧/备用） | `ChapterContentController` / `ParagraphContentController` / `SentenceController` |
 | 逐词词典 / 术语 | `WbwLookupController` / `DictController` / `Term*` / `DhammaTermController` |
