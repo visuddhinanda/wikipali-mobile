@@ -29,6 +29,7 @@ export {
 export { resolveBookTitles, type BookTitleRef } from "./bookTitle";
 export {
   channelNames,
+  channelUidByName,
   findFirstContent,
   loadOnePara,
   loadParasMap,

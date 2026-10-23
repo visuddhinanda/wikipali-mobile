@@ -10,9 +10,8 @@ import {
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { getBookChannels } from "../api";
-import { loadOnePara } from "../reading";
-import type { ChapterChannel } from "../catalog";
+import { getParagraphChannels, getSystemChannels, type ParagraphChannel } from "../api";
+import { channelUidByName, loadOnePara, rememberChannelName } from "../reading";
 import { useT } from "../i18n/I18nContext";
 import { colors, radius, spacing, type } from "../theme";
 
@@ -27,8 +26,28 @@ export interface CitationTarget {
 /** 兜底版本：巴利原文（与阅读器 FALLBACK_CHANNEL_NAME 一致）。 */
 const PALI_VRI = "_System_Pali_VRI_";
 
-function isPaliOriginal(c: ChapterChannel): boolean {
-  return c.type === "original" || c.name === PALI_VRI;
+/**
+ * `_System_Pali_VRI_` 的 uid。接口只认 uid、不认名字，而且各站点（线上 / 本地 mint）的 uid 不同，
+ * 不能写死：先看本地记过的 uid↔名字，没有再问系统版本列表（并记下来，下次离线也能用）。
+ */
+async function paliVriUid(): Promise<string | null> {
+  const local = await channelUidByName(PALI_VRI).catch(() => null);
+  if (local) return local;
+  try {
+    const hit = (await getSystemChannels()).find((c) => c.name === PALI_VRI);
+    if (!hit) return null;
+    void rememberChannelName(hit.uid, hit.name);
+    return hit.uid;
+  } catch {
+    return null;
+  }
+}
+
+/** 最新的译文版本：按版本最后更新时间倒序取第一个。 */
+function latestTranslation(list: ParagraphChannel[]): ParagraphChannel | undefined {
+  return list
+    .filter((c) => c.type === "translation")
+    .sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")))[0];
 }
 
 /** 把一段正文 HTML 包成极简阅读样式（暖米黄纸感 + 衬线，与阅读器同一套观感）。 */
@@ -77,8 +96,8 @@ function buildHtml(body: string): string {
 /**
  * 引用内容底部面板：点击 AI 回答里的引用链接时，从下方拉出并展示对应段落。
  *
- * 展示策略：链接带具体版本就取该版本；否则译文优先，没有译文回退到
- * 巴利原文 `_System_Pali_VRI_`。
+ * 展示策略：链接带具体版本就取该版本；否则取这一段**最新的译文**（按版本更新时间），
+ * 没有译文或取不到正文时回退到巴利原文 `_System_Pali_VRI_`。
  */
 export function CitationSheet({
   target,
@@ -105,49 +124,46 @@ export function CitationSheet({
     setError(false);
 
     (async () => {
-      let list: ChapterChannel[] = [];
+      // 这一段在哪些版本里有内容（按段精确，不是章节级列表——章节级列表常为空，
+      // 那时旧逻辑会拿版本**名字**去请求正文，接口只认 uid，于是显示「暂无内容」）。
+      let list: ParagraphChannel[] = [];
       try {
-        list = await getBookChannels(target.book, target.paragraph);
+        list = await getParagraphChannels(target.book, target.paragraph);
+        for (const c of list) void rememberChannelName(c.uid, c.name);
       } catch {
         list = [];
       }
 
-      let channelId: string;
-      let channelName = "";
-
+      // 候选顺序：链接指定的版本 → 最新的译文 → 巴利原文 _System_Pali_VRI_。
+      // 前面的取不到正文就退到下一个，巴利原文是最后的兜底。
+      const candidates: { uid: string; label: string }[] = [];
       if (target.channel && target.channel !== "translation") {
-        // 链接里带具体版本 uid → 直接用；从列表里找回显示名。
-        channelId = target.channel;
-        const hit = list.find((c) => c.channel_id === target.channel);
-        if (hit) channelName = isPaliOriginal(hit) ? "" : hit.name;
+        const hit = list.find((c) => c.uid === target.channel);
+        candidates.push({
+          uid: target.channel,
+          label: hit && hit.type !== "original" ? hit.name : "",
+        });
       } else {
-        // 译文优先，没有译文回退巴利原文。
-        const translation = list.find((c) => c.type === "translation");
-        const pali =
-          list.find((c) => c.name === PALI_VRI) ??
-          list.find((c) => c.type === "original");
-        const picked = translation ?? pali;
-        if (picked) {
-          channelId = picked.channel_id;
-          channelName = isPaliOriginal(picked) ? "" : picked.name;
-        } else {
-          // 版本列表拿不到时，直接按巴利原文频道取正文。
-          channelId = PALI_VRI;
-        }
+        const tr = latestTranslation(list);
+        if (tr) candidates.push({ uid: tr.uid, label: tr.name });
+      }
+      const pali = list.find((c) => c.name === PALI_VRI)?.uid ?? (await paliVriUid());
+      if (pali && !candidates.some((c) => c.uid === pali)) {
+        candidates.push({ uid: pali, label: "" });
       }
 
       try {
-        // 走阅读链路的缓存（`src/reading/cache.ts`）：该版本没有这一段、
-        // 或离线取不到，都回 null —— 离线占位文不能冒充真经显示出去。
-        const body = await loadOnePara(channelId, target.book, target.paragraph);
-        if (!alive) return;
-        if (!body) {
-          setError(true);
-          return;
+        for (const c of candidates) {
+          // 走阅读链路的缓存（`src/reading/cache.ts`）：该版本没有这一段、
+          // 或离线取不到，都回 null —— 离线占位文不能冒充真经显示出去。
+          const body = await loadOnePara(c.uid, target.book, target.paragraph).catch(() => null);
+          if (!alive) return;
+          if (body) {
+            setHtml(body);
+            setLabel(c.label);
+            return;
+          }
         }
-        setHtml(body);
-        setLabel(channelName);
-      } catch {
         if (alive) setError(true);
       } finally {
         if (alive) setLoading(false);

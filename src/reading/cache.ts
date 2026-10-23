@@ -513,6 +513,17 @@ export function localChannelsFor(book: number): Promise<LocalChannel[]> {
   });
 }
 
+/** 按显示名反查版本 uid（`rememberChannelName` 记过的）；没见过返回 null。 */
+export function channelUidByName(name: string): Promise<string | null> {
+  return withReadingWrite(async (db) => {
+    const row = await db.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM channels WHERE name = ? LIMIT 1",
+      [name],
+    );
+    return row?.uid ?? null;
+  });
+}
+
 /** 批量查版本显示名（uid → name）；没见过的 uid 不会出现在结果里。 */
 export function channelNames(uids: string[]): Promise<Map<string, string>> {
   const unique = [...new Set(uids.filter(Boolean))];

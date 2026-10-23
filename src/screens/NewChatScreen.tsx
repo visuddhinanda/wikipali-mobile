@@ -34,6 +34,8 @@ import type { AskPassage } from "../ai/passage";
  * 例：`…/library/tipitaka/188-459/read?channel=translation`
  *   - `channel=translation`：特殊标记，表示「该段有译文」（点击时优先展示译文）
  *   - `channel=<uuid>`：具体频道 id，直接按该版本请求经文
+ * 服务端给的出处链接指向章节起点、段号在锚点里：`…/tipitaka/203-1677/read#1702`
+ * 是第 1702 段，所以有 `#段号` 时以它为准。
  */
 function parsePassage(url: string): {
   book: number;
@@ -53,7 +55,8 @@ function parsePassage(url: string): {
     }
   }
 
-  return { book: Number(m[1]), paragraph: Number(m[2]), channel };
+  const anchor = /#(\d+)$/.exec(url)?.[1];
+  return { book: Number(m[1]), paragraph: Number(anchor ?? m[2]), channel };
 }
 
 /** 工具名 → 文案 key。 */

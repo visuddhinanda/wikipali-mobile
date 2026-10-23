@@ -8,7 +8,27 @@
  * 见 `src/reading`（`docs/reading-content.md`）。
  */
 import type { ChapterChannel } from "../catalog";
-import { fetchBookChannels } from "./catalog";
+import {
+  fetchBookChannels,
+  fetchParagraphChannels,
+  fetchSystemChannels,
+  type ParagraphChannel,
+} from "./catalog";
+
+export type { ParagraphChannel };
+
+/** 某一段有内容的版本（按段精确，带版本最后更新时间）。 */
+export function getParagraphChannels(
+  book: number,
+  paragraph: number,
+): Promise<ParagraphChannel[]> {
+  return fetchParagraphChannels(book, paragraph);
+}
+
+/** 系统版本列表（按名字找 `_System_Pali_VRI_` 等系统版本的 uid）。 */
+export function getSystemChannels(): Promise<ParagraphChannel[]> {
+  return fetchSystemChannels();
+}
 
 /** 一本书可读的版本/频道列表（原文 + 各译文/逐词版本）。 */
 export async function getBookChannels(
