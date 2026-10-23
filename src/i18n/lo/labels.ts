@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "ຂໍ້ຜິດພາດ",
   "reader.issue.severity.warning": "ຄຳເຕືອນ",
   "reader.issue.severity.suggestion": "ຄຳແນະນຳ",
+  "reader.assessment.title": "ການປະເມີນຄຳແປ",
 } as const;
 
 export default labels;

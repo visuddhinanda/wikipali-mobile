@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "ข้อผิดพลาด",
   "reader.issue.severity.warning": "คำเตือน",
   "reader.issue.severity.suggestion": "ข้อเสนอแนะ",
+  "reader.assessment.title": "การประเมินคำแปล",
 } as const;
 
 export default labels;

@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "罗马转写 · 悉昙 · 缅泰文",
   "reader.issue.notFound": "这条问题已不存在",
   "reader.issue.replies": "{n} 条回复",
+  "reader.assessment.method": "方法：{method}",
 } as const;
 
 export default messages;

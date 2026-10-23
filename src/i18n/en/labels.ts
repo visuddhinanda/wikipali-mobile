@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "Error",
   "reader.issue.severity.warning": "Warning",
   "reader.issue.severity.suggestion": "Suggestion",
+  "reader.assessment.title": "Assessment",
 } as const;
 
 export default labels;

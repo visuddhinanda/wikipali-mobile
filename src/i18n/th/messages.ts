@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "อักษรโรมัน · สิทธัม · พม่า/ไทย",
   "reader.issue.notFound": "ปัญหานี้ไม่มีอยู่แล้ว",
   "reader.issue.replies": "{n} การตอบกลับ",
+  "reader.assessment.method": "วิธี: {method}",
 } as const;
 
 export default messages;

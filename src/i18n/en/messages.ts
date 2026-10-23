@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "Roman · Siddham · Burmese/Thai",
   "reader.issue.notFound": "This issue no longer exists",
   "reader.issue.replies": "{n} replies",
+  "reader.assessment.method": "Method: {method}",
 } as const;
 
 export default messages;

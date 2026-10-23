@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "羅馬轉寫 · 悉曇 · 緬泰文",
   "reader.issue.notFound": "這條問題已不存在",
   "reader.issue.replies": "{n} 則回覆",
+  "reader.assessment.method": "方法：{method}",
 } as const;
 
 export default messages;

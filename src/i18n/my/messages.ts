@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "ရောမအက္ခရာ · သိဒ္ဓံ · မြန်မာ/ထိုင်း",
   "reader.issue.notFound": "ဤပြဿနာ မရှိတော့ပါ",
   "reader.issue.replies": "ပြန်စာ {n} ခု",
+  "reader.assessment.method": "နည်းလမ်း − {method}",
 } as const;
 
 export default messages;

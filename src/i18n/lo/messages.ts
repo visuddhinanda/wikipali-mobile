@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "ໂຣມັນ · ສິດທັມ · ພະມ້າ/ໄທ",
   "reader.issue.notFound": "ບັນຫານີ້ບໍ່ມີແລ້ວ",
   "reader.issue.replies": "{n} ຄຳຕອບ",
+  "reader.assessment.method": "ວິທີ: {method}",
 } as const;
 
 export default messages;

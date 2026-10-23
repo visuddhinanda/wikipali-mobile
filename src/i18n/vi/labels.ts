@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "Lỗi",
   "reader.issue.severity.warning": "Cảnh báo",
   "reader.issue.severity.suggestion": "Gợi ý",
+  "reader.assessment.title": "Đánh giá bản dịch",
 } as const;
 
 export default labels;

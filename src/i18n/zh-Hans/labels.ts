@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "错误",
   "reader.issue.severity.warning": "警告",
   "reader.issue.severity.suggestion": "建议",
+  "reader.assessment.title": "译文评估",
 } as const;
 
 export default labels;

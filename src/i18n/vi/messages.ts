@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "La-tinh · Siddham · Miến/Thái",
   "reader.issue.notFound": "Vấn đề này không còn tồn tại",
   "reader.issue.replies": "{n} phản hồi",
+  "reader.assessment.method": "Phương pháp: {method}",
 } as const;
 
 export default messages;

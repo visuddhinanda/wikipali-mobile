@@ -189,6 +189,7 @@ const messages = {
   "tools.transcode.desc": "රෝම · සිද්ධම් · බුරුම/තායි",
   "reader.issue.notFound": "මෙම ගැටලුව තවදුරටත් නොපවතී",
   "reader.issue.replies": "පිළිතුරු {n}",
+  "reader.assessment.method": "ක්‍රමය: {method}",
 } as const;
 
 export default messages;

@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "දෝෂය",
   "reader.issue.severity.warning": "අවවාදය",
   "reader.issue.severity.suggestion": "යෝජනාව",
+  "reader.assessment.title": "පරිවර්තන ඇගයීම",
 } as const;
 
 export default labels;

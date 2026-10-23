@@ -168,6 +168,7 @@ const labels = {
   "reader.issue.severity.error": "အမှား",
   "reader.issue.severity.warning": "သတိပေးချက်",
   "reader.issue.severity.suggestion": "အကြံပြုချက်",
+  "reader.assessment.title": "ဘာသာပြန် အကဲဖြတ်ချက်",
 } as const;
 
 export default labels;
