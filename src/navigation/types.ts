@@ -1,4 +1,5 @@
 import type { CategoryNode } from "../catalog";
+import type { AskPassage } from "../ai/passage";
 
 export type TabParamList = {
   Discover: undefined;
@@ -52,6 +53,8 @@ export type RootStackParamList = {
     | {
         /** 「就此段落提问」带来的段落上下文。 */
         passageRef?: { book: number; paragraph: number; title: string };
+        /** 阅读页提问交给 agent 的结构化段落上下文（选中的段 / 屏幕上的段）。 */
+        passage?: AskPassage;
         /** 预置的追问文本（进入对话后自动提交一次）。 */
         seedText?: string;
         /** 预填到输入框、等用户自己补完再发的草稿（与 seedText 二选一）。 */

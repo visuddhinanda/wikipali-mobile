@@ -112,6 +112,7 @@ import {
 } from "../settings/reader";
 import type { RootStackParamList } from "../navigation/types";
 import { ensureAiAvailable } from "../ai/availability";
+import { cleanParas, type AskPassage } from "../ai/passage";
 
 type ReaderNavigation = NativeStackNavigationProp<RootStackParamList, "Reader">;
 
@@ -819,6 +820,52 @@ function buildReaderHtml(
       }
     }
   });
+
+  // ---- 阅读页提问的段落上下文 ----
+  // 选区变化时上报选区覆盖的段（div[data-para]）：长按选词后点「提问」时 RN 已经拿到，
+  // 不必等菜单回调再查（那时选区可能已被系统清掉）。
+  function paraOf(node) {
+    var el = node && node.nodeType === 1 ? node : node && node.parentElement;
+    var p = el && el.closest ? el.closest("div[data-para]") : null;
+    return p ? Number(p.getAttribute("data-para")) : null;
+  }
+  var selTimer = null;
+  document.addEventListener("selectionchange", function () {
+    if (selTimer) clearTimeout(selTimer);
+    selTimer = setTimeout(function () {
+      var sel = window.getSelection ? window.getSelection() : null;
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+      var range = sel.getRangeAt(0);
+      var a = paraOf(range.startContainer);
+      var b = paraOf(range.endContainer);
+      if (a == null && b == null) return;
+      if (a == null) a = b;
+      if (b == null) b = a;
+      var paras = [];
+      document.querySelectorAll("div[data-para]").forEach(function (d) {
+        var n = Number(d.getAttribute("data-para"));
+        if (n >= Math.min(a, b) && n <= Math.max(a, b) && paras.indexOf(n) < 0) paras.push(n);
+      });
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: "sel-paras", paras: paras, start: a }));
+      }
+    }, 120);
+  });
+  // 点按提问按钮：RN 注入调用，回报当前视口里能看到的段（与视口有交集即算）。
+  window.__visibleParas = function (reqId) {
+    var vh = window.innerHeight;
+    var paras = [];
+    document.querySelectorAll("div[data-para]").forEach(function (d) {
+      var r = d.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < vh && r.height > 0) {
+        var n = Number(d.getAttribute("data-para"));
+        if (paras.indexOf(n) < 0) paras.push(n);
+      }
+    });
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: "visible-paras", reqId: reqId, paras: paras }));
+    }
+  };
 </script>
 </head>
 <body>
@@ -1792,11 +1839,44 @@ export const ReaderLayerPane = forwardRef<
     onShare();
   };
 
+  /** WebView 最近一次上报的选区段落（selectionchange，见注入脚本「阅读页提问的段落上下文」）。 */
+  const selParasRef = useRef<{ paras: number[]; start: number } | null>(null);
+  /** 等 WebView 回报「屏幕上可见的段」的请求：reqId → resolve。 */
+  const visibleReqRef = useRef(new Map<string, (paras: number[]) => void>());
+
+  /** 问 WebView 视口里能看到哪些段；WebView 没回（还在加载等）就退回空数组，由调用方兜底。 */
+  const requestVisibleParas = (): Promise<number[]> =>
+    new Promise((resolve) => {
+      const reqId = `v${Date.now()}`;
+      const timer = setTimeout(() => {
+        visibleReqRef.current.delete(reqId);
+        resolve([]);
+      }, 600);
+      visibleReqRef.current.set(reqId, (paras) => {
+        clearTimeout(timer);
+        resolve(paras);
+      });
+      webViewRef.current?.injectJavaScript(
+        `window.__visibleParas && window.__visibleParas(${JSON.stringify(reqId)}); true;`,
+      );
+    });
+
   const askAboutParagraph = async () => {
     if (!(await ensureAiAvailable(t))) return;
     const para = topParaRef.current || p;
+    // 点按提问：把屏幕上可见的段都交给 agent，重点段是视口顶部段
+    const visible = await requestVisibleParas();
+    const passage: AskPassage = {
+      source: "screen",
+      book,
+      paragraphs: visible.length ? visible : [para],
+      focus: para,
+      channel: channelId,
+      title: toc,
+    };
     navigation.navigate("NewChat", {
       passageRef: { book, paragraph: para, title: toc },
+      passage,
       systemPrompt: passageSystemPrompt(book, para, channelId),
     });
   };
@@ -1833,9 +1913,21 @@ export const ReaderLayerPane = forwardRef<
     // 看到的样子，查词问的是词本身。
     const pali = scriptToRoman(text, paliScript);
     if (!(await ensureAiAvailable(t))) return;
-    const para = topParaRef.current || p;
+    // 选中文字提问：用选区所在的段，而不是视口顶部段（选的可能是屏幕中下部的一句）
+    const sel = selParasRef.current;
+    const para = sel?.start || topParaRef.current || p;
+    const passage: AskPassage = {
+      source: "selection",
+      book,
+      paragraphs: sel?.paras.length ? sel.paras : [para],
+      focus: para,
+      channel: channelId,
+      selected_text: pali,
+      title: toc,
+    };
     const common = {
       passageRef: { book, paragraph: para, title: toc },
+      passage,
       systemPrompt: passageSystemPrompt(book, para, channelId),
     } as const;
     if (key === "lookup") {
@@ -2060,6 +2152,22 @@ export const ReaderLayerPane = forwardRef<
       }
       if (msg.type === "wl-follow-miss" && typeof msg.para === "number") {
         reloadAt(msg.para);
+        return;
+      }
+      if (msg.type === "sel-paras" && Array.isArray(msg.paras)) {
+        const paras = cleanParas(msg.paras);
+        const start = Number(msg.start);
+        selParasRef.current = paras.length
+          ? { paras, start: Number.isInteger(start) && start > 0 ? start : paras[0] }
+          : null;
+        return;
+      }
+      if (msg.type === "visible-paras" && typeof msg.reqId === "string") {
+        const resolve = visibleReqRef.current.get(msg.reqId);
+        if (resolve) {
+          visibleReqRef.current.delete(msg.reqId);
+          resolve(cleanParas(Array.isArray(msg.paras) ? msg.paras : []));
+        }
         return;
       }
       if (msg.type === "pane-focus") {

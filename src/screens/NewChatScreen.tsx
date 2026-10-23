@@ -27,6 +27,7 @@ import { useT } from "../i18n/I18nContext";
 import type { MessageKey } from "../i18n";
 import { CitationSheet, type CitationTarget } from "../components/CitationSheet";
 import { KeepAwake } from "../components/KeepAwake";
+import type { AskPassage } from "../ai/passage";
 
 /**
  * 从 wikipali 阅读器链接解析 book/paragraph/channel。
@@ -184,11 +185,13 @@ function ChatUI({
   draftText,
   systemPrompt,
   passageRef,
+  passage,
 }: {
   seedText?: string;
   draftText?: string;
   systemPrompt?: string;
   passageRef?: { book: number; paragraph: number; title: string };
+  passage?: AskPassage;
 }) {
   const t = useT();
   const { agent, messages, isRunning, submitMessage } = useCopilotChatContext();
@@ -197,6 +200,27 @@ function ChatUI({
   const [citation, setCitation] = React.useState<CitationTarget | null>(null);
   const listRef = useRef<FlatList>(null);
   const headerHeight = useHeaderHeight();
+  // 深度思考：默认关。关时 agent 走快速路径（少量检索、不开模型思考），开时多查几轮再作答。
+  const [deep, setDeep] = React.useState(false);
+  const deepRef = useRef(deep);
+  deepRef.current = deep;
+
+  /**
+   * 每次发送前把开关与阅读页段落写进 agent state（AG-UI 的 RunAgentInput.state），
+   * 后端据此选研究路径（agent-poc docs/agent-routing.md §3）。
+   * passage 整个对话都带着：在阅读页进来的对话，追问仍是针对那几段。
+   */
+  const syncAgentState = () => {
+    if (!agent) return;
+    // 只写这两项：agent.state 里其余字段是后端 STATE_SNAPSHOT 回灌的（消息、检索计划等），
+    // 原样带回去只会让请求体越滚越大，后端也不需要
+    agent.setState({
+      deep_thinking: deepRef.current,
+      passage: passage ?? null,
+    });
+  };
+  const syncAgentStateRef = useRef(syncAgentState);
+  syncAgentStateRef.current = syncAgentState;
 
   // 「就此段落提问」带来的预置追问：进入对话后自动提交一次。
   // 用 ref 取最新 submitMessage，依赖只放 seedText，避免 submitMessage 引用
@@ -211,6 +235,8 @@ function ChatUI({
     // 都先清空上一轮会话，并换一个新的 threadId，让后端也从新线程开始，
     // 否则从主导航点主题卡片进来会看到上次的聊天内容。
     agent?.setMessages?.([]);
+    // state 同理：上一轮对话的 passage 不能带进这一轮
+    agent?.setState?.({});
     if (agent) agent.threadId = newThreadId();
     // 系统提示词要排在第一条用户消息**之前**，不然模型是在没有上下文的
     // 情况下先读到问题的（阅读器过来的「查词/提问」全靠它交代章节坐标）。
@@ -221,7 +247,10 @@ function ChatUI({
         content: systemPrompt,
       });
     }
-    if (seedText) submitMessageRef.current(seedText);
+    if (seedText) {
+      syncAgentStateRef.current();
+      submitMessageRef.current(seedText);
+    }
   }, [seedText, systemPrompt, agent]);
 
   // 「思考中」指示：AI 在跑、但当前既没在流式输出正文、也没在跑工具（查资料）时显示。
@@ -261,6 +290,7 @@ function ChatUI({
     const text = input.trim();
     if (!text || isRunning) return;
     setInput("");
+    syncAgentState();
     submitMessage(text);
   };
 
@@ -337,6 +367,25 @@ function ChatUI({
               </Text>
             </View>
           ) : null}
+          <View style={styles.optionBar}>
+            <Pressable
+              style={[styles.deepToggle, deep && styles.deepToggleOn]}
+              onPress={() => setDeep((v) => !v)}
+              disabled={isRunning}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: deep, disabled: isRunning }}
+              hitSlop={6}
+            >
+              <Ionicons
+                name={deep ? "bulb" : "bulb-outline"}
+                size={14}
+                color={deep ? colors.paperRaised : colors.inkSoft}
+              />
+              <Text style={[styles.deepToggleText, deep && styles.deepToggleTextOn]}>
+                {t("chat.deepThinking")}
+              </Text>
+            </Pressable>
+          </View>
           <View style={styles.inputBar}>
             <TextInput
               style={styles.input}
@@ -367,7 +416,7 @@ function ChatUI({
 export function NewChatScreen({
   route,
 }: NativeStackScreenProps<RootStackParamList, "NewChat">) {
-  const { seedText, draftText, systemPrompt, passageRef } = route.params ?? {};
+  const { seedText, draftText, systemPrompt, passageRef, passage } = route.params ?? {};
   return (
     <CopilotChat agentId="pali_agent">
       <ChatUI
@@ -375,6 +424,7 @@ export function NewChatScreen({
         draftText={draftText}
         systemPrompt={systemPrompt}
         passageRef={passageRef}
+        passage={passage}
       />
     </CopilotChat>
   );
@@ -469,6 +519,33 @@ const styles = StyleSheet.create({
     flex: 1,
     ...type.small,
     color: colors.inkSoft,
+  },
+  optionBar: {
+    flexDirection: "row",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  deepToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.paperSunken,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  deepToggleOn: {
+    backgroundColor: colors.vermilion,
+    borderColor: colors.vermilion,
+  },
+  deepToggleText: {
+    ...type.small,
+    color: colors.inkSoft,
+  },
+  deepToggleTextOn: {
+    color: colors.paperRaised,
   },
   inputBar: {
     flexDirection: "row",
