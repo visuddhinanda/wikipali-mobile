@@ -22,21 +22,27 @@ export interface BookTitle {
   language?: string | null;
 }
 
-/** 一本书的版本/频道（对应 mint `progress?view=chapter_channels` 的 rows）。 */
+/**
+ * 一章的一个版本/频道及其完成度（对应 mint `GET /v3/tipitaka-chapter-channels/{book}/{para}`
+ * 的一行）。服务端只列当前用户看得见的频道。
+ */
 export interface ChapterChannel {
+  /** 章节进度行的 uid（列表 key 用）。 */
+  id: string;
   book: number;
   para: number;
-  /** 该版本在此段落的内容 uid（后续按版本加载正文用）。 */
-  uid: string;
-  channel_id: string;
-  /** 版本显示名，如 `_System_Pali_VRI_` / `cs6` / `中文翻译`。 */
-  name: string;
-  /** original | translation | wbw */
-  type: string;
+  /** 0–1 的完成度。 */
   progress: number;
-  /** 该版本最近更新时间（ISO 8601 字符串）。 */
+  /** 该版本这一章最近更新时间（ISO 8601 字符串）。 */
   updated_at?: string;
-  channel?: { uid: string; name: string; type: string };
+  channel: {
+    id: string;
+    /** 版本显示名，如 `_System_Pali_VRI_` / `cs6` / `中文翻译`。 */
+    name: string;
+    /** original | translation | nissaya | commentary … */
+    type: string;
+    lang: string;
+  };
 }
 
 /** 章节目录条目（对应 mint toc 视图）。 */

@@ -5,6 +5,7 @@
  * 已迁移到 openapi-fetch 类型化客户端（`getApiClient`）。
  */
 import { getApiClient, throwHttpError, unwrapV2 } from "./openapi-client";
+import { ApiError } from "./client";
 import { t } from "../i18n";
 import type { BookTitle, ChapterChannel, TocItem } from "../catalog";
 
@@ -19,26 +20,43 @@ export async function fetchBookTitles(): Promise<BookTitle[]> {
   ).rows;
 }
 
-/** 一本书可读的版本/频道列表（原始频道 + 各译文/逐词版本）。 */
+/** 单章最多几十个版本，一页 200 足够取全。 */
+const CHAPTER_CHANNELS_PAGE_SIZE = 200;
+
+/**
+ * 一章可读的版本/频道列表（原始频道 + 各译文/逐词版本），按完成度从高到低。
+ * 服务端按登录身份过滤可见性：未登录只看得到公开频道。
+ */
 export async function fetchBookChannels(
   book: number,
   paragraph: number,
 ): Promise<ChapterChannel[]> {
   const client = await getApiClient();
-  const { data, error, response } = await client.GET("/v2/progress", {
-    params: {
-      query: {
-        view: "chapter_channels",
-        book: String(book),
-        par: String(paragraph),
+  const { data, error, response } = await client.GET(
+    "/v3/tipitaka-chapter-channels/{book}/{para}",
+    {
+      params: {
+        path: { book, para: paragraph },
+        query: { per_page: CHAPTER_CHANNELS_PAGE_SIZE },
       },
     },
-  });
+  );
   if (error) throwHttpError(error, response);
-  return unwrapV2<{ rows: ChapterChannel[]; count: number }>(
-    data,
-    t("error.backend"),
-  ).rows;
+  const rows = data?.data;
+  if (!Array.isArray(rows)) throw new ApiError(t("error.backend"));
+  return rows.map((r) => ({
+    id: r.id ?? "",
+    book: r.book ?? book,
+    para: r.para ?? paragraph,
+    progress: r.progress ?? 0,
+    updated_at: r.updated_at,
+    channel: {
+      id: r.channel?.id ?? "",
+      name: r.channel?.name ?? "",
+      type: r.channel?.type ?? "",
+      lang: r.channel?.lang ?? "",
+    },
+  }));
 }
 
 /** 某一段有内容的版本（`v2/channel?view=paragraphs`），每行带版本类型与最后更新时间。 */

@@ -1439,16 +1439,16 @@ export const ReaderLayerPane = forwardRef<
         return getBookChannels(book, unit.from).then((list) => {
           if (!alive) return;
           // 记下 id→名字，下次可以离线选版本。
-          for (const c of list) void rememberChannelName(c.channel_id, c.name);
+          for (const c of list) void rememberChannelName(c.channel.id, c.channel.name);
           // 先按 uid 认，认不到再退回按名字（老记录可能只有名字）。
           const preferred =
             (preferredChannelUid
-              ? list.find((c) => c.channel_id === preferredChannelUid)
+              ? list.find((c) => c.channel.id === preferredChannelUid)
               : undefined) ??
             (preferredChannelName
-              ? list.find((c) => c.name === preferredChannelName)
+              ? list.find((c) => c.channel.name === preferredChannelName)
               : undefined);
-          const fallback = list.find((c) => c.name === FALLBACK_CHANNEL_NAME);
+          const fallback = list.find((c) => c.channel.name === FALLBACK_CHANNEL_NAME);
           const picked = preferred ?? fallback;
           if (!picked) {
             // 列表为空但明确知道上一层用的版本（义注/复注层沿用原文层的版本 uid）：
@@ -1462,8 +1462,8 @@ export const ReaderLayerPane = forwardRef<
             setError(t("reader.noVersions"));
             return;
           }
-          setChannelId(picked.channel_id);
-          setChannelName(picked.name);
+          setChannelId(picked.channel.id);
+          setChannelName(picked.channel.name);
         });
       })
       .catch(() => {
@@ -1783,8 +1783,8 @@ export const ReaderLayerPane = forwardRef<
     // 换版本要保持当前阅读位置：以视口顶部段（或锚点单元起点）为窗口锚点。
     jumpTargetRef.current =
       topParaRef.current || unitRef.current?.from || paragraph || 0;
-    setChannelId(ch.channel_id);
-    setChannelName(ch.name);
+    setChannelId(ch.channel.id);
+    setChannelName(ch.channel.name);
     setVersionVisible(false);
   };
 
@@ -2479,10 +2479,10 @@ function VersionSheet({
           ) : (
             <ScrollView style={styles.versionList}>
               {channels.map((ch) => {
-                const active = ch.channel_id === activeChannelId;
+                const active = ch.channel.id === activeChannelId;
                 return (
                   <Pressable
-                    key={ch.uid}
+                    key={ch.id}
                     style={[
                       styles.versionRow,
                       {
@@ -2502,7 +2502,7 @@ function VersionSheet({
                         },
                       ]}
                     >
-                      {ch.name}
+                      {ch.channel.name}
                     </Text>
                     {active ? (
                       <Ionicons name="checkmark" size={18} color={c.vermilion} />

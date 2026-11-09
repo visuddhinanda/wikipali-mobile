@@ -143,15 +143,15 @@ export function BookChannelsScreen({ route, navigation }: Props) {
     const order: string[] = [...GROUP_ORDER];
     const known = new Set<string>(GROUP_ORDER);
     for (const c of channels) {
-      if (!known.has(c.type)) {
-        known.add(c.type);
-        order.push(c.type);
+      if (!known.has(c.channel.type)) {
+        known.add(c.channel.type);
+        order.push(c.channel.type);
       }
     }
 
     return order
       .map((kind) => {
-        const data = channels.filter((c) => c.type === kind);
+        const data = channels.filter((c) => c.channel.type === kind);
         const total = data.length;
         const over = total > COLLAPSE_AT;
         const isExpanded = !!expanded[kind];
@@ -203,7 +203,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
       ) : (
         <SectionList
           sections={sections}
-          keyExtractor={(item) => item.uid}
+          keyExtractor={(item) => item.id}
           style={styles.sectionList}
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled={false}
@@ -246,16 +246,13 @@ export function BookChannelsScreen({ route, navigation }: Props) {
                   // 有阅读记录就接着上次读；没有才用目录点进来的锚点。
                   paragraph: lastParagraph ?? paragraph,
                   title,
-                  channelId: item.channel_id,
-                  channelName: item.name,
+                  channelId: item.channel.id,
+                  channelName: item.channel.name,
                 })
               }
             >
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                {item.channel && item.channel.name !== item.name ? (
-                  <Text style={styles.rowSub}>{item.channel.name}</Text>
-                ) : null}
+                <Text style={styles.rowTitle}>{item.channel.name}</Text>
                 {item.updated_at ? (
                   <Text style={styles.rowTime}>
                     {formatRelativeTime(item.updated_at, locale, t)}
@@ -275,7 +272,7 @@ export function BookChannelsScreen({ route, navigation }: Props) {
               <View style={styles.downloadWrap}>
                 <DownloadIconButton
                   book={book}
-                  channelId={item.channel_id}
+                  channelId={item.channel.id}
                   color={colors.inkSoft}
                   paragraph={item.para}
                 />
@@ -364,11 +361,6 @@ const styles = StyleSheet.create({
     ...type.body,
     fontWeight: "600",
     fontFamily: serifFont,
-  },
-  rowSub: {
-    ...type.small,
-    marginTop: 2,
-    color: colors.inkSoft,
   },
   rowTime: {
     ...type.small,

@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS sync_outbox (
 
 - **正向（推送时）**：`GET /api/v2/progress?view=ids&book=<book>&par=<para>&channel=<channel_id>`，返回 `rows[].id` 即 `uid`（`ProgressChapterController::index` 的 `view=ids`）。
 - **反向（下拉时）**：`GET /api/v2/progress/{uid}`，返回 `book` / `para` / `channel_id`（`ProgressChapterController::show`，模型主键 `uid`）。
-- 也可复用 `view=chapter_channels` 已返回的 `uid`（`ChapterChannel.uid`）。
+- 也可复用版本列表（`GET /api/v3/tipitaka-chapter-channels/<book>/<para>`）已返回的 `id`（`ChapterChannel.id`，即该行的 `progress_chapters.uid`）。
 
 ### 6.3 书级映射（level=1 就是书）
 
